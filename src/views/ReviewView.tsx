@@ -1,0 +1,347 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { usePayrollStore } from "@/store/usePayrollStore";
+import { usePayrollRows, useCompanySupplementary } from "@/store/selectors";
+import { validateAll } from "@/lib/validation";
+import { lookupBracket, monthlySalaryTotal, supplementaryBaseDifferential, bonusWithholding } from "@/lib/calc";
+import type { PageKey } from "@/App";
+import { cn, ntd, formatPeriod } from "@/lib/utils";
+import { CheckCircle2, AlertTriangle, ArrowRight, Undo2, Users, Banknote, Wallet, Building } from "lucide-react";
+
+type Tab = "overview" | "checks" | "bonus";
+
+export function ReviewView({ onNavigate }: { onNavigate: (p: PageKey) => void }) {
+  const {
+    employees, salaries, dependents, events, parameters,
+    currentPeriod, confirmations, confirmPeriod, unconfirmPeriod,
+  } = usePayrollStore();
+  const [tab, setTab] = useState<Tab>("overview");
+
+  const rows = usePayrollRows();
+  const companySupp = useCompanySupplementary(rows);
+  const periodEvents = events.filter((e) => e.period === currentPeriod);
+  const issues = validateAll(employees, salaries, dependents, periodEvents, parameters);
+  const errors = issues.filter((i) => i.severity === "error");
+
+  const pendingTax = rows.filter(
+    (r) =>
+      r.withholdingSuggestion.type === "manual-lookup" &&
+      (periodEvents.find((e) => e.employeeId === r.employeeId)?.withheldTax ?? null) === null,
+  );
+
+  const confirmed = confirmations[currentPeriod];
+  const totals = rows.reduce(
+    (a, r) => ({
+      gross: a.gross + r.grossPay,
+      net: a.net + r.netPay,
+      employer: a.employer + r.employerTotalCost,
+    }),
+    { gross: 0, net: 0, employer: 0 },
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-bold">結算查核</h1>
+          <p className="text-sm text-muted-foreground">
+            {formatPeriod(currentPeriod)}：請檢視全公司試算結果與系統檢查，確認無誤後按「確認本月結算」，再產出報表。
+          </p>
+        </div>
+        {confirmed ? (
+          <div className="flex items-center gap-2">
+            <Badge variant="success">已於 {new Date(confirmed).toLocaleString("zh-TW")} 確認</Badge>
+            <Button variant="outline" size="sm" onClick={() => unconfirmPeriod(currentPeriod)}>
+              <Undo2 /> 取消確認
+            </Button>
+          </div>
+        ) : (
+          <Button
+            onClick={() => confirmPeriod(currentPeriod)}
+            disabled={errors.length > 0 || pendingTax.length > 0}
+          >
+            <CheckCircle2 /> 確認本月結算
+          </Button>
+        )}
+      </div>
+
+      {(errors.length > 0 || pendingTax.length > 0) && !confirmed && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <AlertTriangle className="mr-1 inline size-4" />
+          確認前請先處理：
+          {errors.length > 0 && <span className="ml-1">{errors.length} 項資料錯誤（見「統計查核」）</span>}
+          {pendingTax.length > 0 && (
+            <span className="ml-1">
+              {pendingTax.map((r) => r.name).join("、")} 需查稅額表填入代扣所得稅（回「薪資結算」編輯）
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* 摘要卡 */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatCard icon={Users} label="結算人數" value={`${rows.length} 人`} />
+        <StatCard icon={Banknote} label="應發總額" value={`${ntd(totals.gross)} 元`} />
+        <StatCard icon={Wallet} label="實發總額" value={`${ntd(totals.net)} 元`} />
+        <StatCard icon={Building} label="公司總成本" value={`${ntd(totals.employer)} 元`} hint="含公司負擔之四項保費" />
+      </div>
+
+      <div className="flex gap-1">
+        {(
+          [
+            ["overview", "試算總覽"],
+            ["checks", `統計查核${issues.length > 0 ? `（${issues.length}）` : ""}`],
+            ["bonus", "獎金試算"],
+          ] as [Tab, string][]
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm",
+              tab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <Card>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>員工</TableHead>
+                  <TableHead className="text-right">月薪總額</TableHead>
+                  <TableHead className="text-right">加班費</TableHead>
+                  <TableHead className="text-right">獎金</TableHead>
+                  <TableHead className="text-right">應發</TableHead>
+                  <TableHead className="text-right">勞保</TableHead>
+                  <TableHead className="text-right">健保</TableHead>
+                  <TableHead className="text-right">勞退自提</TableHead>
+                  <TableHead className="text-right">補充保費</TableHead>
+                  <TableHead className="text-right">所得稅</TableHead>
+                  <TableHead className="text-right">請假/其他</TableHead>
+                  <TableHead className="text-right font-semibold">實發</TableHead>
+                  <TableHead className="text-right">公司成本</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const ev = periodEvents.find((e) => e.employeeId === r.employeeId);
+                  const other = r.leaveDeduction + (ev?.otherDeduction ?? 0);
+                  return (
+                    <TableRow key={r.employeeId}>
+                      <TableCell className="whitespace-nowrap font-medium">{r.name}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.salaryTotal)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.overtimePay)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(ev?.monthlyBonus ?? 0)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.grossPay)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.premiums.laborEmployee)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.premiums.healthEmployee)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.premiums.pensionVoluntary)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.personalSupplementary)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.withheldTax)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(other)}</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">{ntd(r.netPay)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">{ntd(r.employerTotalCost)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell>合計</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(rows.reduce((a, r) => a + r.salaryTotal, 0))}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(rows.reduce((a, r) => a + r.overtimePay, 0))}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(periodEvents.reduce((a, e) => a + e.monthlyBonus, 0))}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(totals.gross)}</TableCell>
+                  <TableCell colSpan={6} />
+                  <TableCell className="text-right font-bold tabular-nums">{ntd(totals.net)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(totals.employer)}</TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+            <div className="mt-4 flex justify-end">
+              <Button variant="outline" onClick={() => onNavigate("reports")}>
+                前往報表與薪資條 <ArrowRight />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "checks" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">資料檢查</CardTitle>
+              <CardDescription>系統自動檢查法規與資料完整性，紅色必須處理、黃色建議確認。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {issues.length === 0 ? (
+                <p className="flex items-center gap-2 text-sm text-emerald-600">
+                  <CheckCircle2 className="size-4" /> 全部通過，沒有需要處理的項目。
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {issues.map((i, idx) => (
+                    <li key={idx} className="flex items-start gap-2 rounded-md border p-2 text-sm">
+                      <AlertTriangle
+                        className={cn("mt-0.5 size-4 shrink-0", i.severity === "error" ? "text-destructive" : "text-amber-500")}
+                      />
+                      {i.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">統計數據勾稽</CardTitle>
+              <CardDescription>各分類合計應等於全公司合計；差額為 0 才正常。</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {(["department", "costCenter", "project"] as const).map((dim) => {
+                const label = { department: "部門別", costCenter: "成本中心別", project: "專案別" }[dim];
+                const sum = rows.reduce((a, r) => a + r.grossPay, 0);
+                const grouped = rows.reduce((a, r) => a + (r[dim] ? r.grossPay : 0), 0);
+                const unclassified = sum - grouped;
+                return (
+                  <div key={dim} className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <span>{label}應發合計勾稽</span>
+                    {unclassified === 0 ? (
+                      <Badge variant="success">一致 ✓</Badge>
+                    ) : (
+                      <Badge variant="warning">未分類 {ntd(unclassified)} 元</Badge>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <span>
+                  公司二代健保補充保費（概算）
+                  <span className="block text-xs text-muted-foreground">
+                    （當月支付總額 − 全體投保金額）× 2.11%，次月底前繳納
+                  </span>
+                </span>
+                <span className="font-semibold tabular-nums">{ntd(companySupp)} 元</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {tab === "bonus" && <BonusCalculator />}
+    </div>
+  );
+}
+
+function StatCard({
+  icon: Icon, label, value, hint,
+}: {
+  icon: React.ElementType; label: string; value: string; hint?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <Icon className="size-8 rounded-md bg-primary/10 p-1.5 text-primary" />
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="font-bold tabular-nums">{value}</p>
+          {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 獎金試算機：發放前先試算補充保費與所得稅 */
+function BonusCalculator() {
+  const { employees, salaries, brackets, parameters } = usePayrollStore();
+  const [inputs, setInputs] = useState<Record<string, { prior: number; amount: number }>>({});
+
+  const get = (id: string) => inputs[id] ?? { prior: 0, amount: 0 };
+  const set = (id: string, p: Partial<{ prior: number; amount: number }>) =>
+    setInputs((s) => ({ ...s, [id]: { ...get(id), ...p } }));
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">獎金試算（發放前先算）</CardTitle>
+        <CardDescription>
+          輸入預計發放金額，系統試算「二代健保補充保費」與「所得稅 5%」，得到實際入帳金額。
+          確定發放後，再到「薪資結算」把獎金填入該員工的本月異動。
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>員工</TableHead>
+              <TableHead className="text-right">補充保費門檻</TableHead>
+              <TableHead className="text-right">今年已發獎金</TableHead>
+              <TableHead className="text-right">本次預計發放</TableHead>
+              <TableHead className="text-right">補充保費</TableHead>
+              <TableHead className="text-right">所得稅</TableHead>
+              <TableHead className="text-right">實際入帳</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {employees.map((emp) => {
+              const s = salaries.find((x) => x.employeeId === emp.id);
+              const health = s ? lookupBracket(brackets.health, monthlySalaryTotal(s)) : 0;
+              const inp = get(emp.id);
+              const supp = supplementaryBaseDifferential(inp.prior, inp.amount, health, parameters);
+              const tax = bonusWithholding(inp.amount, emp.taxResidency, parameters);
+              const taxAmt = tax.type === "auto" ? tax.amount : 0;
+              return (
+                <TableRow key={emp.id}>
+                  <TableCell className="font-medium">{emp.name}</TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">{ntd(health * 4)}</TableCell>
+                  <TableCell className="text-right">
+                    <Input
+                      type="number" className="h-8 w-28 col-input text-right tabular-nums"
+                      value={inp.prior}
+                      onChange={(e) => set(emp.id, { prior: Number(e.target.value) || 0 })}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Input
+                      type="number" className="h-8 w-28 col-input text-right tabular-nums"
+                      value={inp.amount}
+                      onChange={(e) => set(emp.id, { amount: Number(e.target.value) || 0 })}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(supp.premium)}</TableCell>
+                  <TableCell className="text-right">
+                    {tax.type === "auto" ? (
+                      <span className="tabular-nums">{ntd(taxAmt)}</span>
+                    ) : (
+                      <Badge variant="warning">併當月薪資計稅</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums">
+                    {tax.type === "auto" ? ntd(inp.amount - supp.premium - taxAmt) : "—"}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+        <p className="mt-3 text-xs text-muted-foreground">
+          說明：獎金單次達 {ntd(parameters.taxThresholdBase)} 元才需扣 5% 所得稅（未達者免扣但年底仍列入扣繳憑單）；
+          補充保費則看「今年累計」是否超過個人健保投保金額的 4 倍——兩者分開判斷，互不影響。
+        </p>
+      </CardContent>
+    </Card>
+  );
+}

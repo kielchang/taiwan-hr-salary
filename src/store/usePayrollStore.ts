@@ -57,6 +57,16 @@ interface PayrollState {
   events: MonthlyEvent[]; // 跨期間扁平儲存，以 employeeId+period 識別
   currentPeriod: string;
 
+  /** 初始設定引導是否已完成（false → 顯示設定精靈） */
+  setupCompleted: boolean;
+  completeSetup: () => void;
+  reopenSetup: () => void;
+
+  /** 每月結算之人事確認紀錄：period → 確認時間（ISO）；編輯該月資料即自動解除 */
+  confirmations: Record<string, string>;
+  confirmPeriod: (period: string) => void;
+  unconfirmPeriod: (period: string) => void;
+
   // 設定
   setParameters: (patch: Partial<Parameters>) => void;
   setBrackets: (patch: Partial<InsuranceBrackets>) => void;
@@ -73,6 +83,8 @@ interface PayrollState {
   // 眷屬
   upsertDependent: (d: Dependent) => void;
   removeDependent: (id: string) => void;
+  /** 以人為單位整批覆寫某員工之眷屬（基本資料編輯視窗用） */
+  setEmployeeDependents: (employeeId: string, deps: Dependent[]) => void;
 
   // 每月變動事件
   upsertEvent: (e: MonthlyEvent) => void;
@@ -92,6 +104,21 @@ export const usePayrollStore = create<PayrollState>()(
       dependents: SEED_DEPENDENTS,
       events: SEED_EVENTS,
       currentPeriod: SEED_PERIOD,
+
+      setupCompleted: false,
+      completeSetup: () => set({ setupCompleted: true }),
+      reopenSetup: () => set({ setupCompleted: false }),
+
+      confirmations: {},
+      confirmPeriod: (period) =>
+        set((st) => ({
+          confirmations: { ...st.confirmations, [period]: new Date().toISOString() },
+        })),
+      unconfirmPeriod: (period) =>
+        set((st) => {
+          const { [period]: _removed, ...rest } = st.confirmations;
+          return { confirmations: rest };
+        }),
 
       setParameters: (patch) =>
         set((st) => ({ parameters: { ...st.parameters, ...patch } })),
@@ -136,17 +163,29 @@ export const usePayrollStore = create<PayrollState>()(
         })),
       removeDependent: (id) =>
         set((st) => ({ dependents: st.dependents.filter((d) => d.id !== id) })),
+      setEmployeeDependents: (employeeId, deps) =>
+        set((st) => ({
+          dependents: [
+            ...st.dependents.filter((d) => d.employeeId !== employeeId),
+            ...deps,
+          ],
+        })),
 
       upsertEvent: (e) =>
-        set((st) => ({
-          events: st.events.some(
-            (x) => x.employeeId === e.employeeId && x.period === e.period,
-          )
-            ? st.events.map((x) =>
-                x.employeeId === e.employeeId && x.period === e.period ? e : x,
-              )
-            : [...st.events, e],
-        })),
+        set((st) => {
+          // 結算資料異動 → 該月確認狀態自動解除（需重新查核）
+          const { [e.period]: _removed, ...confirmations } = st.confirmations;
+          return {
+            confirmations,
+            events: st.events.some(
+              (x) => x.employeeId === e.employeeId && x.period === e.period,
+            )
+              ? st.events.map((x) =>
+                  x.employeeId === e.employeeId && x.period === e.period ? e : x,
+                )
+              : [...st.events, e],
+          };
+        }),
       getEvent: (employeeId, period) =>
         get().events.find(
           (e) => e.employeeId === employeeId && e.period === period,
