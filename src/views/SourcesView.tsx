@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BookOpen, ExternalLink, Layers } from "lucide-react";
+import { BracketTables } from "@/components/BracketTables";
+import { usePayrollStore } from "@/store/usePayrollStore";
 
 /** 全國法規資料庫連結工具：條文層級與整部法規 */
 const lawSingle = (pcode: string, flno: number) =>
@@ -185,6 +187,7 @@ const BRACKET_TABLES = [
 ];
 
 export function SourcesView() {
+  const brackets = usePayrollStore((s) => s.brackets);
   return (
     <div className="space-y-4">
       <div>
@@ -248,6 +251,11 @@ export function SourcesView() {
                 <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-sky-600" />
               </a>
             ))}
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium">系統採用的級距表（115 年度）</p>
+            <BracketTables brackets={brackets} />
           </div>
         </CardContent>
       </Card>

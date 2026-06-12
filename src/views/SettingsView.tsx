@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { BracketTables } from "@/components/BracketTables";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import type { Parameters } from "@/config/parameters";
-import { ntd } from "@/lib/utils";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info } from "lucide-react";
 
 interface Field {
@@ -77,17 +76,9 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
   },
 ];
 
-const BRACKET_TABS: { key: "labor" | "occupational" | "health" | "pension"; label: string; desc: string }[] = [
-  { key: "labor", label: "勞保", desc: "11 級，上限 45,800" },
-  { key: "occupational", label: "職保", desc: "21 級，上限 72,800" },
-  { key: "health", label: "健保", desc: "58 級，上限 313,000" },
-  { key: "pension", label: "勞退", desc: "62 級，上限 150,000" },
-];
-
 export function SettingsView() {
   const { parameters, brackets, setParameters, resetToSeed, clearAll, reopenSetup } = usePayrollStore();
   const [showBrackets, setShowBrackets] = useState(false);
-  const [bracketTab, setBracketTab] = useState<(typeof BRACKET_TABS)[number]["key"]>("labor");
 
   const renderField = (f: Field, tone: "company" | "legal") => {
     const raw = parameters[f.key];
@@ -182,38 +173,7 @@ export function SettingsView() {
         </CardHeader>
         {showBrackets && (
           <CardContent>
-            <div className="mb-3 flex flex-wrap gap-1">
-              {BRACKET_TABS.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setBracketTab(t.key)}
-                  className={`rounded-md px-3 py-1.5 text-xs ${
-                    bracketTab === t.key ? "bg-primary text-primary-foreground" : "bg-muted"
-                  }`}
-                >
-                  {t.label}
-                  <span className="ml-1 opacity-70">{t.desc}</span>
-                </button>
-              ))}
-            </div>
-            <div className="max-h-72 overflow-auto rounded-md border">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background">
-                  <TableRow>
-                    <TableHead className="w-20">級</TableHead>
-                    <TableHead className="text-right">月投保金額</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {brackets[bracketTab].map((amt, i) => (
-                    <TableRow key={i}>
-                      <TableCell>{i + 1}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(amt)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <BracketTables brackets={brackets} />
           </CardContent>
         )}
       </Card>
