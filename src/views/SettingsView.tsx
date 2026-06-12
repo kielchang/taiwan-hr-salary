@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BracketTables } from "@/components/BracketTables";
+import { BracketTableCards } from "@/components/BracketTableCards";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -173,7 +173,7 @@ export function SettingsView() {
         </CardHeader>
         {showBrackets && (
           <CardContent>
-            <BracketTables brackets={brackets} />
+            <BracketTableCards brackets={brackets} />
           </CardContent>
         )}
       </Card>

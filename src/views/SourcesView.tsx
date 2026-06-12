@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BookOpen, ExternalLink, Layers } from "lucide-react";
-import { BracketTables } from "@/components/BracketTables";
+import { BracketTableCards } from "@/components/BracketTableCards";
 import { usePayrollStore } from "@/store/usePayrollStore";
 
 /** 全國法規資料庫連結工具：條文層級與整部法規 */
@@ -158,34 +158,6 @@ const SOURCES: { group: string; items: SourceCard[] }[] = [
   },
 ];
 
-/** 四張投保級距表的官方分級表專頁（非入口首頁） */
-const BRACKET_TABLES = [
-  {
-    name: "勞工保險投保薪資分級表",
-    detail: "11 級，下限 29,500、上限 45,800（115 年）",
-    org: "勞動部勞工保險局",
-    url: "https://www.bli.gov.tw/0005475.html",
-  },
-  {
-    name: "勞工職業災害保險投保薪資分級表",
-    detail: "21 級，下限 29,500、上限 72,800（115 年）",
-    org: "勞動部勞工保險局",
-    url: "https://www.bli.gov.tw/0103450.html",
-  },
-  {
-    name: "全民健康保險投保金額分級表",
-    detail: "58 級，下限 29,500、上限 313,000（115 年）",
-    org: "衛福部中央健康保險署",
-    url: "https://www.nhi.gov.tw/ch/cp-19421-f9533-2569-1.html",
-  },
-  {
-    name: "勞工退休金月提繳分級表",
-    detail: "62 級，下限 1,500、上限 150,000（115 年）",
-    org: "勞動部勞工保險局",
-    url: "https://www.bli.gov.tw/0012959.html",
-  },
-];
-
 export function SourcesView() {
   const brackets = usePayrollStore((s) => s.brackets);
   return (
@@ -199,64 +171,20 @@ export function SourcesView() {
         </p>
       </div>
 
-      {/* 投保級距表說明（四險） */}
+      {/* 投保級距表（四險）— 與下方各組同一張卡片樣式 */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Layers className="size-4 text-primary" />
             投保級距表（四險）
           </CardTitle>
-          <CardDescription>勞保、職災保險、健保、勞退各有一張分級表，是計算保費的基礎。</CardDescription>
+          <CardDescription>
+            系統以「月薪資總額」查表決定投保金額：落在某級區間即以該級金額投保，介於兩級取較高一級，
+            超過最高級以最高級計（觸頂）。四險各自獨立查表，級數與上限不同。每年由主管機關公告（第 1 級多隨最低工資連動）。
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
-            <p className="font-medium">級距表怎麼運作？</p>
-            <ul className="ml-4 list-disc space-y-1 text-muted-foreground">
-              <li>
-                系統用員工的「月薪資總額」去查表，找出對應的<strong>月投保金額</strong>：薪資落在某級區間，
-                就以該級的金額投保；剛好介於兩級之間者，以<strong>較高一級</strong>申報；超過最高級時，
-                一律以最高一級計（觸頂）。
-              </li>
-              <li>
-                <strong>四險各自獨立查表</strong>，因為級數與上限不同，同一位員工的四個投保金額可能不一樣
-                （例：月薪 16 萬 → 勞保 45,800／職保 72,800／健保 162,800／勞退 150,000）。
-              </li>
-              <li>
-                保費＝<strong>投保金額 × 費率 × 負擔比例</strong>；您不需要手動選級距，系統會自動帶入，
-                完整級距可在「系統設定」頁檢視。
-              </li>
-              <li>
-                <strong>申報義務</strong>：月薪資總額（含經常性給與）異動時，應於 2 月底／8 月底前申報調整投保薪資；
-                以多報少會被處短繳保費 4 倍罰鍰（勞工保險條例第 72 條）。
-              </li>
-              <li>
-                級距表<strong>每年由主管機關公告</strong>，第 1 級通常隨最低工資連動；年度更新時於「系統設定」替換即可。
-              </li>
-            </ul>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {BRACKET_TABLES.map((t) => (
-              <a
-                key={t.name}
-                href={t.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-start justify-between gap-2 rounded-md border p-3 transition-colors hover:bg-accent"
-              >
-                <span>
-                  <span className="text-sm font-medium">{t.name}</span>
-                  <span className="block text-xs text-muted-foreground">{t.detail}</span>
-                  <span className="block text-xs text-muted-foreground">{t.org}</span>
-                </span>
-                <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-sky-600" />
-              </a>
-            ))}
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-medium">系統採用的級距表（115 年度）</p>
-            <BracketTables brackets={brackets} />
-          </div>
+        <CardContent>
+          <BracketTableCards brackets={brackets} />
         </CardContent>
       </Card>
 

@@ -40,8 +40,14 @@ function toRows(amounts: number[]): Row[] {
 }
 
 /** 直接顯示系統採用的四張投保級距表（資料來自系統設定的級距）。 */
-export function BracketTables({ brackets }: { brackets: InsuranceBrackets }) {
-  const [tab, setTab] = useState<keyof InsuranceBrackets>("labor");
+export function BracketTables({
+  brackets,
+  initial = "labor",
+}: {
+  brackets: InsuranceBrackets;
+  initial?: keyof InsuranceBrackets;
+}) {
+  const [tab, setTab] = useState<keyof InsuranceBrackets>(initial);
   const rows = toRows(brackets[tab]);
 
   return (
