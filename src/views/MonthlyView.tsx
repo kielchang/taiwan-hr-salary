@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { calculatePayroll } from "@/lib/calc";
 import type { MonthlyEvent } from "@/lib/types";
-import type { PageKey } from "@/App";
 import { ntd, formatPeriod } from "@/lib/utils";
 import { Pencil, ArrowRight, Wand2, Info } from "lucide-react";
 
@@ -26,7 +25,13 @@ function summarize(e: MonthlyEvent): string[] {
   return chips;
 }
 
-export function MonthlyView({ onNavigate }: { onNavigate: (p: PageKey) => void }) {
+export function MonthlyView({
+  showPeriodPicker = true,
+  onNext,
+}: {
+  showPeriodPicker?: boolean;
+  onNext?: () => void;
+}) {
   const {
     employees, dependents, events, parameters, brackets,
     currentPeriod, setCurrentPeriod, upsertEvent, getSalary,
@@ -71,20 +76,22 @@ export function MonthlyView({ onNavigate }: { onNavigate: (p: PageKey) => void }
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold">每月薪資結算</h1>
+          <h2 className="text-base font-semibold">輸入當月異動</h2>
           <p className="text-sm text-muted-foreground">
             固定薪資與保費已自動帶入。大多數員工不需要動；只要替「有加班、請假或獎金」的人按「編輯」補上異動即可。
           </p>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">發薪月份</Label>
-          <Input
-            type="month"
-            className="h-9 w-40 col-input"
-            value={currentPeriod}
-            onChange={(e) => e.target.value && setCurrentPeriod(e.target.value)}
-          />
-        </div>
+        {showPeriodPicker && (
+          <div className="space-y-1">
+            <Label className="text-xs">發薪月份</Label>
+            <Input
+              type="month"
+              className="h-9 w-40 col-input"
+              value={currentPeriod}
+              onChange={(e) => e.target.value && setCurrentPeriod(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       {employees.length === 0 ? (
@@ -155,11 +162,13 @@ export function MonthlyView({ onNavigate }: { onNavigate: (p: PageKey) => void }
               </TableFooter>
             </Table>
 
-            <div className="mt-4 flex justify-end">
-              <Button onClick={() => onNavigate("review")}>
-                完成輸入，前往結算查核 <ArrowRight />
-              </Button>
-            </div>
+            {onNext && (
+              <div className="mt-4 flex justify-end">
+                <Button onClick={onNext}>
+                  完成輸入，前往查核 <ArrowRight />
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

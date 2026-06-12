@@ -8,13 +8,12 @@ import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary } from "@/store/selectors";
 import { validateAll } from "@/lib/validation";
 import { lookupBracket, monthlySalaryTotal, supplementaryBaseDifferential, bonusWithholding } from "@/lib/calc";
-import type { PageKey } from "@/App";
-import { cn, ntd, formatPeriod } from "@/lib/utils";
+import { cn, ntd } from "@/lib/utils";
 import { CheckCircle2, AlertTriangle, ArrowRight, Undo2, Users, Banknote, Wallet, Building } from "lucide-react";
 
 type Tab = "overview" | "checks" | "bonus";
 
-export function ReviewView({ onNavigate }: { onNavigate: (p: PageKey) => void }) {
+export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => void }) {
   const {
     employees, salaries, dependents, events, parameters,
     currentPeriod, confirmations, confirmPeriod, unconfirmPeriod,
@@ -47,9 +46,9 @@ export function ReviewView({ onNavigate }: { onNavigate: (p: PageKey) => void })
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold">結算查核</h1>
+          <h2 className="text-base font-semibold">查核與確認</h2>
           <p className="text-sm text-muted-foreground">
-            {formatPeriod(currentPeriod)}：請檢視全公司試算結果與系統檢查，確認無誤後按「確認本月結算」，再產出報表。
+            請檢視全公司試算結果與系統檢查，確認無誤後按「確認本月結算」，再產出報表。
           </p>
         </div>
         {confirmed ? (
@@ -168,11 +167,13 @@ export function ReviewView({ onNavigate }: { onNavigate: (p: PageKey) => void })
                 </TableRow>
               </TableFooter>
             </Table>
-            <div className="mt-4 flex justify-end">
-              <Button variant="outline" onClick={() => onNavigate("reports")}>
-                前往報表與薪資條 <ArrowRight />
-              </Button>
-            </div>
+            {onNext && (
+              <div className="mt-4 flex justify-end">
+                <Button variant="outline" onClick={onNext}>
+                  前往報表與薪資條 <ArrowRight />
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

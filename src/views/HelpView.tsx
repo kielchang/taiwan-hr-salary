@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePayrollStore } from "@/store/usePayrollStore";
-import type { PageKey } from "@/App";
+import type { Section } from "@/App";
 import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings } from "lucide-react";
 
 const MONTHLY_STEPS = [
@@ -49,7 +49,7 @@ const FAQ: [string, string][] = [
   ],
 ];
 
-export function HelpView({ onNavigate }: { onNavigate: (p: PageKey) => void }) {
+export function HelpView({ onNavigate }: { onNavigate: (s: Section) => void }) {
   const reopenSetup = usePayrollStore((s) => s.reopenSetup);
 
   return (

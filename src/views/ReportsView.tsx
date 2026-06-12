@@ -20,7 +20,7 @@ export function ReportsView() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
-          <h1 className="text-lg font-bold">報表與薪資條</h1>
+          <h2 className="text-base font-semibold">報表與薪資條</h2>
           <p className="text-sm text-muted-foreground">{formatPeriod(currentPeriod)} 的產出文件。</p>
         </div>
         {!confirmed && <Badge variant="warning">本月尚未在「結算查核」確認，以下為暫定數字</Badge>}
