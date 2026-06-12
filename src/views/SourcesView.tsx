@@ -1,13 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ExternalLink } from "lucide-react";
+import { BookOpen, ExternalLink, Layers } from "lucide-react";
+
+/** 全國法規資料庫連結工具：條文層級與整部法規 */
+const lawSingle = (pcode: string, flno: number) =>
+  `https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=${pcode}&flno=${flno}`;
+const lawAll = (pcode: string) => `https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=${pcode}`;
 
 interface SourceCard {
   title: string;
   value: string;
-  law: string;
-  agency: string;
-  url: string;
+  lawName: string; // 對應法規名稱（連結文字）
+  url: string; // 直接指向對應法規條文
   note?: string;
 }
 
@@ -17,33 +20,31 @@ const SOURCES: { group: string; items: SourceCard[] }[] = [
     items: [
       {
         title: "最低工資",
-        value: "月薪 29,500 元／時薪 196 元（115 年）",
-        law: "最低工資法第 5 條",
-        agency: "勞動部",
-        url: "https://www.mol.gov.tw/",
-        note: "每年第三季審議、年底公告次年值；月薪總額不得低於此數。",
+        value: "月薪 29,500 元／時薪 196 元（115 年度）",
+        lawName: "最低工資法",
+        url: lawAll("N0030028"),
+        note: "金額由勞動部依最低工資法審議、每年公告；月薪資總額不得低於此數。",
       },
       {
-        title: "加班費倍率與工時上限",
-        value: "平日前 2 小時 ×4/3、第 3–4 小時 ×5/3；休息日同級距加給；每月加班上限 46 小時",
-        law: "勞動基準法第 24、32、39 條",
-        agency: "勞動部",
-        url: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
-        note: "每小時工資額＝月薪資總額 ÷ 240；勞動部官網有加班費試算器可交叉核對。",
+        title: "加班費與加班上限",
+        value:
+          "平日前 2 小時 ×1⅓、第 3–4 小時 ×1⅔；休息日同級距加給；延長工時連同休息日出勤每月上限 46 小時",
+        lawName: "勞動基準法第 24、32 條",
+        url: lawSingle("N0030001", 24),
+        note: "每小時工資額＝月薪資總額 ÷ 240（勞動部函釋慣例）。",
       },
       {
         title: "特別休假",
-        value: "滿 6 個月 3 天、1 年 7 天、2 年 10 天、3 年 14 天、5 年 15 天、10 年起每年 +1 天（上限 30 天）",
-        law: "勞動基準法第 38 條",
-        agency: "勞動部",
-        url: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
+        value:
+          "滿 6 個月 3 天、1 年 7 天、2 年 10 天、3 年 14 天、5 年 15 天、10 年起每年 +1 天（上限 30 天）",
+        lawName: "勞動基準法第 38 條",
+        url: lawSingle("N0030001", 38),
       },
       {
         title: "請假扣薪規則",
         value: "事假不給薪（年 14 天內）；普通傷病假半薪（未住院年 30 天內）",
-        law: "勞工請假規則",
-        agency: "勞動部",
-        url: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030006",
+        lawName: "勞工請假規則第 4、7 條",
+        url: lawAll("N0030006"),
         note: "婚假、喪假、公假、產假等有薪假不扣款。",
       },
     ],
@@ -54,48 +55,39 @@ const SOURCES: { group: string; items: SourceCard[] }[] = [
       {
         title: "勞保＋就業保險費率",
         value: "合計 12.5%（員工 20%／公司 70%／政府 10%）",
-        law: "勞工保險條例第 13、15 條；就業保險法第 8 條",
-        agency: "勞動部勞工保險局",
-        url: "https://www.bli.gov.tw/",
-        note: "預定民國 116 年起調升為 13%。",
+        lawName: "勞工保險條例第 13 條",
+        url: lawSingle("N0050001", 13),
+        note: "負擔比例見勞保條例第 15 條、就業保險法第 8 條；預定民國 116 年起調升為 13%。",
       },
       {
         title: "職業災害保險費率",
         value: "依行業別核定（全產業平均約 0.21%），公司全額負擔",
-        law: "勞工職業災害保險及保護法第 16、19 條",
-        agency: "勞動部勞工保險局",
-        url: "https://www.bli.gov.tw/",
-        note: "請以勞保局寄發貴公司的核定通知書為準，每 3 年檢討。",
+        lawName: "勞工職業災害保險及保護法第 16、19 條",
+        url: lawSingle("N0050031", 16),
+        note: "請以勞保局核定通知書之本公司費率為準，每 3 年檢討。",
       },
       {
         title: "健保費率與眷屬計費",
-        value: "5.17%（員工 30%／公司 60%／政府 10%）；眷屬超過 3 口以 3 口計；公司負擔按平均眷口數 0.56 計",
-        law: "全民健康保險法第 18、27、29 條",
-        agency: "衛生福利部中央健康保險署",
-        url: "https://www.nhi.gov.tw/",
+        value:
+          "5.17%（員工 30%／公司 60%／政府 10%）；眷屬超過 3 口以 3 口計；公司負擔按平均眷口數 0.56 計",
+        lawName: "全民健康保險法第 18、27、29 條",
+        url: lawSingle("L0060001", 18),
+        note: "負擔比例見健保法第 27 條；眷屬計費上限見第 29 條。",
       },
       {
         title: "勞工退休金",
-        value: "公司提繳 6%（法定下限）；員工可自願提繳 0–6%，自提金額免稅",
-        law: "勞工退休金條例第 14 條",
-        agency: "勞動部勞工保險局",
-        url: "https://www.bli.gov.tw/",
-      },
-      {
-        title: "投保級距表（四種）",
-        value: "勞保 11 級（上限 45,800）／職保 21 級（上限 72,800）／健保 58 級（上限 313,000）／勞退 62 級（上限 150,000）",
-        law: "各保險主管機關年度公告",
-        agency: "勞保局／健保署",
-        url: "https://www.bli.gov.tw/",
-        note: "115 年 1 月 1 日生效；完整級距可在「系統設定」頁檢視。",
+        value: "公司提繳 6%（法定下限）；員工自願提繳 0–6%，自提額免稅",
+        lawName: "勞工退休金條例第 14 條",
+        url: lawSingle("N0030020", 14),
+        note: "員工自願提繳自當年度所得總額全數扣除（同條第 3 項）。",
       },
       {
         title: "二代健保補充保費",
-        value: "2.11%。個人：年度累計獎金超過投保金額 4 倍的部分；公司：當月支付薪資總額超過全體投保金額的差額",
-        law: "全民健康保險法第 31、34 條",
-        agency: "衛生福利部中央健康保險署",
-        url: "https://www.nhi.gov.tw/",
-        note: "健保署網站有線上試算可交叉核對；公司差額部分於次月底前自行繳納。",
+        value:
+          "2.11%。個人：年度累計獎金超過投保金額 4 倍的部分；公司：當月支付薪資總額超過全體投保金額的差額",
+        lawName: "全民健康保險法第 31、34 條",
+        url: lawSingle("L0060001", 31),
+        note: "投保單位差額制見第 34 條；公司差額部分次月底前自行繳納。",
       },
     ],
   },
@@ -104,40 +96,37 @@ const SOURCES: { group: string; items: SourceCard[] }[] = [
     items: [
       {
         title: "每月薪資扣繳（居住者，二擇一）",
-        value: "查表法：依「薪資所得扣繳稅額表」，115 年起扣標準 90,501 元（每位扶養約 +8,417）；或固定 5%：稅額 ≤2,000 元免扣",
-        law: "各類所得扣繳率標準第 2、13 條",
-        agency: "財政部",
-        url: "https://www.etax.nat.gov.tw/",
-        note: "由員工在「免稅額申報表」上勾選；未交表者依規定按固定 5% 扣繳。",
+        value:
+          "查表法：依扣繳稅額表，115 年起扣標準 90,501 元（每位扶養約 +8,417）；或固定 5%：稅額 ≤2,000 元免扣",
+        lawName: "各類所得扣繳率標準第 2、13 條",
+        url: lawSingle("G0340009", 2),
+        note: "由員工於免稅額申報表勾選；未交表者依規定按固定 5% 扣繳。免扣上限見第 13 條。",
       },
       {
         title: "獎金等一次性給付",
         value: "按 5% 扣繳；單次未達 90,501 元免扣（仍須列入年度扣繳憑單）",
-        law: "各類所得扣繳率標準第 2 條",
-        agency: "財政部",
-        url: "https://www.etax.nat.gov.tw/",
+        lawName: "各類所得扣繳率標準第 2 條",
+        url: lawSingle("G0340009", 2),
       },
       {
         title: "非居住者",
         value: "全月薪資 ≤44,250 元扣 6%；超過扣 18%（門檻＝最低工資 ×1.5）",
-        law: "各類所得扣繳率標準第 2 條",
-        agency: "財政部",
-        url: "https://www.etax.nat.gov.tw/",
+        lawName: "各類所得扣繳率標準第 2 條",
+        url: lawSingle("G0340009", 2),
         note: "課稅年度在台未滿 183 天者適用；不適用免稅額申報表。",
       },
       {
         title: "伙食津貼免稅額",
-        value: "每月 3,000 元內免計入應稅薪資（仍屬工資、計入投保級距）",
-        law: "財政部公告（114 年 1 月起調整）",
-        agency: "財政部",
-        url: "https://www.dot.gov.tw/",
+        value: "每月 3,000 元內免計入應稅所得（仍屬工資、計入投保級距）",
+        lawName: "所得稅法第 14 條",
+        url: lawSingle("G0340003", 14),
+        note: "3,000 元免稅額度由財政部公告（114 年 1 月起由 2,400 調為 3,000）。",
       },
       {
         title: "繳納與申報期限",
-        value: "代扣稅款於次月 10 日前繳庫；每年 1 月底前申報上年度扣繳憑單（2 月 10 日前填發）",
-        law: "所得稅法第 88、92 條",
-        agency: "財政部",
-        url: "https://www.etax.nat.gov.tw/",
+        value: "代扣稅款次月 10 日前繳庫；每年 1 月底前申報上年度扣繳憑單（2 月 10 日前填發）",
+        lawName: "所得稅法第 88、92 條",
+        url: lawSingle("G0340003", 88),
       },
     ],
   },
@@ -147,26 +136,51 @@ const SOURCES: { group: string; items: SourceCard[] }[] = [
       {
         title: "薪資明細與工資清冊",
         value: "每次發薪應提供各項目計算明細（薪資條）；工資清冊應保存 5 年",
-        law: "勞動基準法第 23 條",
-        agency: "勞動部",
-        url: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
+        lawName: "勞動基準法第 23 條",
+        url: lawSingle("N0030001", 23),
       },
       {
         title: "投保薪資申報調整",
-        value: "月薪總額變動時，應於 2 月底／8 月底前申報調整投保薪資",
-        law: "勞工保險條例第 14、72 條",
-        agency: "勞動部勞工保險局",
-        url: "https://www.bli.gov.tw/",
-        note: "以多報少（高薪低報）會被處短繳保費 4 倍罰鍰並追繳差額。",
+        value: "月薪資總額變動時，應於 2 月底／8 月底前申報調整投保薪資",
+        lawName: "勞工保險條例第 14、72 條",
+        url: lawSingle("N0050001", 14),
+        note: "以多報少（高薪低報）依第 72 條處短繳保費 4 倍罰鍰並追繳差額。",
       },
       {
         title: "加保與退保時點",
         value: "新進員工到職當日加保；離職當日退保；眷屬健保依附異動同步辦理",
-        law: "勞工保險條例第 11 條",
-        agency: "勞保局／健保署",
-        url: "https://www.bli.gov.tw/",
+        lawName: "勞工保險條例第 11 條",
+        url: lawSingle("N0050001", 11),
       },
     ],
+  },
+];
+
+/** 四張投保級距表的官方分級表專頁（非入口首頁） */
+const BRACKET_TABLES = [
+  {
+    name: "勞工保險投保薪資分級表",
+    detail: "11 級，下限 29,500、上限 45,800（115 年）",
+    org: "勞動部勞工保險局",
+    url: "https://www.bli.gov.tw/0005475.html",
+  },
+  {
+    name: "勞工職業災害保險投保薪資分級表",
+    detail: "21 級，下限 29,500、上限 72,800（115 年）",
+    org: "勞動部勞工保險局",
+    url: "https://www.bli.gov.tw/0103450.html",
+  },
+  {
+    name: "全民健康保險投保金額分級表",
+    detail: "58 級，下限 29,500、上限 313,000（115 年）",
+    org: "衛福部中央健康保險署",
+    url: "https://www.nhi.gov.tw/ch/cp-19421-f9533-2569-1.html",
+  },
+  {
+    name: "勞工退休金月提繳分級表",
+    detail: "62 級，下限 1,500、上限 150,000（115 年）",
+    org: "勞動部勞工保險局",
+    url: "https://www.bli.gov.tw/0012959.html",
   },
 ];
 
@@ -176,10 +190,67 @@ export function SourcesView() {
       <div>
         <h1 className="text-lg font-bold">法規與費率依據</h1>
         <p className="text-sm text-muted-foreground">
-          系統內每一條計算規則的法源與主管機關出處（適用民國 115 年度）。法規修正時，
-          只要在「系統設定」更新對應數值即可，計算方式不變。建議每年 1 月依各機關公告檢查一次。
+          系統內每一條計算規則的法源（適用民國 115 年度）。每個項目的連結直接指向「全國法規資料庫」的
+          對應條文，方便核對；投保級距表則連到各主管機關的分級表專頁。法規修正時，只要在「系統設定」
+          更新對應數值即可，計算方式不變。
         </p>
       </div>
+
+      {/* 投保級距表說明（四險） */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Layers className="size-4 text-primary" />
+            投保級距表（四險）
+          </CardTitle>
+          <CardDescription>勞保、職災保險、健保、勞退各有一張分級表，是計算保費的基礎。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
+            <p className="font-medium">級距表怎麼運作？</p>
+            <ul className="ml-4 list-disc space-y-1 text-muted-foreground">
+              <li>
+                系統用員工的「月薪資總額」去查表，找出對應的<strong>月投保金額</strong>：薪資落在某級區間，
+                就以該級的金額投保；剛好介於兩級之間者，以<strong>較高一級</strong>申報；超過最高級時，
+                一律以最高一級計（觸頂）。
+              </li>
+              <li>
+                <strong>四險各自獨立查表</strong>，因為級數與上限不同，同一位員工的四個投保金額可能不一樣
+                （例：月薪 16 萬 → 勞保 45,800／職保 72,800／健保 162,800／勞退 150,000）。
+              </li>
+              <li>
+                保費＝<strong>投保金額 × 費率 × 負擔比例</strong>；您不需要手動選級距，系統會自動帶入，
+                完整級距可在「系統設定」頁檢視。
+              </li>
+              <li>
+                <strong>申報義務</strong>：月薪資總額（含經常性給與）異動時，應於 2 月底／8 月底前申報調整投保薪資；
+                以多報少會被處短繳保費 4 倍罰鍰（勞工保險條例第 72 條）。
+              </li>
+              <li>
+                級距表<strong>每年由主管機關公告</strong>，第 1 級通常隨最低工資連動；年度更新時於「系統設定」替換即可。
+              </li>
+            </ul>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {BRACKET_TABLES.map((t) => (
+              <a
+                key={t.name}
+                href={t.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-start justify-between gap-2 rounded-md border p-3 transition-colors hover:bg-accent"
+              >
+                <span>
+                  <span className="text-sm font-medium">{t.name}</span>
+                  <span className="block text-xs text-muted-foreground">{t.detail}</span>
+                  <span className="block text-xs text-muted-foreground">{t.org}</span>
+                </span>
+                <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-sky-600" />
+              </a>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {SOURCES.map((g) => (
         <Card key={g.group}>
@@ -189,21 +260,20 @@ export function SourcesView() {
           <CardContent>
             <div className="grid gap-3 md:grid-cols-2">
               {g.items.map((s) => (
-                <div key={s.title} className="rounded-lg border p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium">{s.title}</p>
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex shrink-0 items-center gap-1 text-xs text-sky-600 hover:underline"
-                    >
-                      {s.agency} <ExternalLink className="size-3" />
-                    </a>
-                  </div>
-                  <p className="mt-1 text-sm">{s.value}</p>
-                  <Badge variant="outline" className="mt-2">{s.law}</Badge>
+                <div key={s.title} className="flex flex-col rounded-lg border p-3">
+                  <p className="text-sm font-medium">{s.title}</p>
+                  <p className="mt-1 flex-1 text-sm">{s.value}</p>
                   {s.note && <p className="mt-1.5 text-xs text-muted-foreground">{s.note}</p>}
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex w-fit items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                  >
+                    <BookOpen className="size-3.5" />
+                    {s.lawName}
+                    <ExternalLink className="size-3" />
+                  </a>
                 </div>
               ))}
             </div>

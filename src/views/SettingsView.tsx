@@ -176,7 +176,8 @@ export function SettingsView() {
             {showBrackets ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
           </CardTitle>
           <CardDescription>
-            系統依「月薪資總額」自動查表決定四種投保金額，您不需要手動選擇級距。
+            系統依「月薪資總額」自動查表決定四種投保金額，您不需要手動選擇級距：薪資落在某級區間即以該級金額投保，
+            介於兩級之間取較高一級，超過最高級則以最高級計（觸頂）。詳細說明與官方分級表連結見「法規依據」頁。
           </CardDescription>
         </CardHeader>
         {showBrackets && (
