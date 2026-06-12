@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { usePayrollStore } from "@/store/usePayrollStore";
+import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info } from "lucide-react";
 
@@ -77,7 +78,8 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
 ];
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, resetToSeed, clearAll, reopenSetup } = usePayrollStore();
+  const { parameters, brackets, setParameters, resetToSeed, clearAll } = usePayrollStore();
+  const navigate = useNavigate();
   const [showBrackets, setShowBrackets] = useState(false);
 
   const renderField = (f: Field, tone: "company" | "legal") => {
@@ -118,7 +120,7 @@ export function SettingsView() {
             通常每年 1 月依新公告更新一次即可。
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={reopenSetup}>
+        <Button variant="outline" size="sm" onClick={() => navigate("/setup")}>
           <Wand2 /> 重新執行初始設定引導
         </Button>
       </div>

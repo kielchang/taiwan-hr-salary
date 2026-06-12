@@ -1,4 +1,13 @@
-import { useState } from "react";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  NavLink,
+  useNavigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { validateAll } from "@/lib/validation";
@@ -11,50 +20,68 @@ import { HelpView } from "@/views/HelpView";
 import { SourcesView } from "@/views/SourcesView";
 import { CalendarClock, Users, Settings, BookOpen, Scale, Building2 } from "lucide-react";
 
-/** 上排選單的主題（各自獨立、聚焦單一主題） */
-export type Section = "payroll" | "master" | "settings" | "help" | "sources";
-
-const MENU: { key: Section; label: string; icon: React.ElementType }[] = [
-  { key: "payroll", label: "每月薪資作業", icon: CalendarClock },
-  { key: "master", label: "基本資料", icon: Users },
-  { key: "settings", label: "系統設定", icon: Settings },
-  { key: "help", label: "使用說明", icon: BookOpen },
-  { key: "sources", label: "法規依據", icon: Scale },
+/** 上排主選單：各自獨立主題，對應路由路徑 */
+const NAV: { to: string; match: string; label: string; icon: React.ElementType }[] = [
+  { to: "/payroll/monthly", match: "/payroll", label: "每月薪資作業", icon: CalendarClock },
+  { to: "/master", match: "/master", label: "基本資料", icon: Users },
+  { to: "/settings", match: "/settings", label: "系統設定", icon: Settings },
+  { to: "/help", match: "/help", label: "使用說明", icon: BookOpen },
+  { to: "/sources", match: "/sources", label: "法規依據", icon: Scale },
 ];
 
-export default function App() {
-  const [section, setSection] = useState<Section>("payroll");
-  const [payrollStep, setPayrollStep] = useState<PayrollStep>("monthly");
-  const {
-    setupCompleted,
-    employees,
-    salaries,
-    dependents,
-    events,
-    parameters,
-    currentPeriod,
-    confirmations,
-  } = usePayrollStore();
+const PAYROLL_STEPS: PayrollStep[] = ["monthly", "review", "reports"];
 
-  if (!setupCompleted) {
-    return (
-      <SetupWizard
-        onDone={() => {
-          setSection("payroll");
-          setPayrollStep("monthly");
-        }}
-      />
-    );
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/setup" element={<SetupRoute />} />
+      <Route element={<Layout />}>
+        <Route index element={<Navigate to="/payroll/monthly" replace />} />
+        <Route path="/payroll/:step" element={<PayrollRoute />} />
+        <Route path="/master" element={<MasterDataView />} />
+        <Route path="/settings" element={<SettingsView />} />
+        <Route path="/help" element={<HelpView />} />
+        <Route path="/sources" element={<SourcesView />} />
+        <Route path="*" element={<Navigate to="/payroll/monthly" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
+/** 初始設定引導路由 */
+function SetupRoute() {
+  const navigate = useNavigate();
+  return <SetupWizard onDone={() => navigate("/payroll/monthly", { replace: true })} />;
+}
+
+/** 每月薪資作業路由：由網址 :step 控制目前步驟 */
+function PayrollRoute() {
+  const { step } = useParams();
+  const navigate = useNavigate();
+  if (!PAYROLL_STEPS.includes(step as PayrollStep)) {
+    return <Navigate to="/payroll/monthly" replace />;
   }
+  return (
+    <PayrollFlow step={step as PayrollStep} onStep={(s) => navigate(`/payroll/${s}`)} />
+  );
+}
+
+/** 主版面：上排主選單＋內容 Outlet；未完成初始設定則導向設定引導 */
+function Layout() {
+  const { setupCompleted, employees, salaries, dependents, events, parameters, currentPeriod, confirmations } =
+    usePayrollStore();
+  const location = useLocation();
+
+  if (!setupCompleted) return <Navigate to="/setup" replace />;
 
   const periodEvents = events.filter((e) => e.period === currentPeriod);
   const issues = validateAll(employees, salaries, dependents, periodEvents, parameters);
   const errors = issues.filter((i) => i.severity === "error").length;
   const confirmed = Boolean(confirmations[currentPeriod]);
+  const onPayroll = location.pathname.startsWith("/payroll");
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* 上排主選單：聚焦各主題 */}
       <header className="sticky top-0 z-40 border-b bg-background print:hidden">
         <div className="mx-auto max-w-[1280px] px-4">
           <div className="flex items-center justify-between gap-3 py-2.5">
@@ -72,19 +99,18 @@ export default function App() {
               ) : (
                 <Badge variant="success">資料正常</Badge>
               )}
-              {section === "payroll" &&
+              {onPayroll &&
                 (confirmed ? <Badge variant="success">已確認</Badge> : <Badge variant="outline">未確認</Badge>)}
             </div>
           </div>
 
-          {/* 主題選單列 */}
           <nav className="flex gap-1 overflow-x-auto">
-            {MENU.map((m) => {
-              const active = section === m.key;
+            {NAV.map((m) => {
+              const active = location.pathname.startsWith(m.match);
               return (
-                <button
-                  key={m.key}
-                  onClick={() => setSection(m.key)}
+                <NavLink
+                  key={m.to}
+                  to={m.to}
                   className={cn(
                     "flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
                     active
@@ -94,20 +120,15 @@ export default function App() {
                 >
                   <m.icon className="size-4" />
                   {m.label}
-                </button>
+                </NavLink>
               );
             })}
           </nav>
         </div>
       </header>
 
-      {/* 內容：每個主題只顯示自己的選項 */}
       <main className="mx-auto max-w-[1280px] px-4 py-5">
-        {section === "payroll" && <PayrollFlow step={payrollStep} onStep={setPayrollStep} />}
-        {section === "master" && <MasterDataView />}
-        {section === "settings" && <SettingsView />}
-        {section === "help" && <HelpView onNavigate={setSection} />}
-        {section === "sources" && <SourcesView />}
+        <Outlet />
       </main>
     </div>
   );

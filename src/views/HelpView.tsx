@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePayrollStore } from "@/store/usePayrollStore";
-import type { Section } from "@/App";
+import { useNavigate } from "react-router-dom";
 import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings } from "lucide-react";
 
 const MONTHLY_STEPS = [
@@ -49,8 +48,8 @@ const FAQ: [string, string][] = [
   ],
 ];
 
-export function HelpView({ onNavigate }: { onNavigate: (s: Section) => void }) {
-  const reopenSetup = usePayrollStore((s) => s.reopenSetup);
+export function HelpView() {
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-4">
@@ -68,13 +67,13 @@ export function HelpView({ onNavigate }: { onNavigate: (s: Section) => void }) {
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={reopenSetup}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/setup")}>
               <Wand2 /> 重新執行初始設定引導
             </Button>
-            <Button variant="outline" size="sm" onClick={() => onNavigate("settings")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
               <Settings /> 前往系統設定
             </Button>
-            <Button variant="outline" size="sm" onClick={() => onNavigate("master")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/master")}>
               <Users /> 前往基本資料
             </Button>
           </div>
