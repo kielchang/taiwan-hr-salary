@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, createElement } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { usePayrollRows, useCompanySupplementary, type PayrollRow } from "@/stor
 import { cn, ntd, formatPeriod } from "@/lib/utils";
 import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
 import { buildPayslipMailto } from "@/lib/payslipEmail";
-import { Printer, Wand2, Lock, Mail, AlertTriangle } from "lucide-react";
+import { PayslipCard } from "@/views/PayslipCard";
+import { Printer, Wand2, Lock, Mail, AlertTriangle, Package, CheckCircle2 } from "lucide-react";
 
 type Tab = "summary" | "tax" | "payslip";
 
@@ -263,6 +264,8 @@ function PayslipReport() {
   const slipRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchMsg, setBatchMsg] = useState<string | null>(null);
 
   const r = rows.find((x) => x.employeeId === selected);
   const emp = employees.find((e) => e.id === selected);
@@ -275,7 +278,6 @@ function PayslipReport() {
     );
   }
 
-  const monthlyBonus = r.grossPay - r.salaryTotal - r.overtimePay;
   const hasId = emp.nationalId.trim().length > 0;
   const hasEmail = emp.email.trim().length > 0;
 
@@ -301,6 +303,60 @@ function PayslipReport() {
     window.location.href = buildPayslipMailto({ to: emp.email.trim(), name: emp.name, period: currentPeriod });
   };
 
+  // 批次：逐人離屏渲染薪資條 → 各自加密 PDF → 打包 ZIP，並附寄送對照清單 CSV
+  const handleBatch = async () => {
+    setBatchMsg(null);
+    setPdfError(null);
+    setBatchRunning(true);
+    const container = document.createElement("div");
+    container.style.cssText = "position:fixed; left:-10000px; top:0; width:794px; background:#ffffff;";
+    document.body.appendChild(container);
+    try {
+      const [{ default: JSZip }, { payslipPdfBlob, saveBlob }, { createRoot }] = await Promise.all([
+        import("jszip"),
+        import("@/lib/payslipPdf"),
+        import("react-dom/client"),
+      ]);
+      const root = createRoot(container);
+      const zip = new JSZip();
+      const csv = ["員工編號,姓名,Email,檔名,PDF密碼"];
+      const skipped: string[] = [];
+      let made = 0;
+      for (const e of employees) {
+        const row = rows.find((x) => x.employeeId === e.id);
+        if (!row) continue;
+        if (!e.nationalId.trim()) {
+          skipped.push(e.name);
+          csv.push(`${e.id},${e.name},${e.email},,（缺身分證未產生）`);
+          continue;
+        }
+        await new Promise<void>((res) => {
+          root.render(createElement(PayslipCard, { emp: e, r: row, period: currentPeriod }));
+          requestAnimationFrame(() => requestAnimationFrame(() => res()));
+        });
+        const node = container.firstElementChild as HTMLElement;
+        const blob = await payslipPdfBlob(node, e.nationalId.trim());
+        const fileName = `${e.name}_${e.id}_薪資明細_${currentPeriod}.pdf`;
+        zip.file(fileName, blob);
+        csv.push(`${e.id},${e.name},${e.email},${fileName},身分證字號`);
+        made += 1;
+      }
+      root.unmount();
+      zip.file(`寄送清單_${currentPeriod}.csv`, "\uFEFF" + csv.join("\r\n"));
+      const out = await zip.generateAsync({ type: "blob" });
+      saveBlob(out, `薪資明細_${currentPeriod}.zip`);
+      setBatchMsg(
+        `已產生 ${made} 份加密 PDF 並打包下載（含寄送清單）` +
+          (skipped.length ? `；${skipped.length} 人因缺身分證未產生：${skipped.join("、")}` : ""),
+      );
+    } catch (e) {
+      setPdfError(`批次產生失敗：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      container.remove();
+      setBatchRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 print:hidden">
@@ -321,7 +377,17 @@ function PayslipReport() {
         <Button variant="outline" size="sm" onClick={handleEmailDraft} disabled={!hasEmail}>
           <Mail /> Email 通知草稿
         </Button>
+        <Button variant="secondary" size="sm" onClick={handleBatch} disabled={batchRunning}>
+          <Package /> {batchRunning ? "批次產生中…" : "批次下載全部（ZIP）"}
+        </Button>
       </div>
+
+      {batchMsg && (
+        <div className="flex items-start gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900 print:hidden">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          <p>{batchMsg}</p>
+        </div>
+      )}
 
       {(!hasId || !hasEmail || pdfError) && (
         <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 print:hidden">
@@ -338,96 +404,7 @@ function PayslipReport() {
         加密 PDF 的開啟密碼為員工身分證字號（英文字母大寫）；email 採 mailto 草稿，附件請於郵件軟體手動夾帶剛下載的 PDF。
       </p>
 
-      <Card ref={slipRef} className="bg-card">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <CardTitle>薪資明細表</CardTitle>
-            <Badge variant="outline">{formatPeriod(currentPeriod)}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            <Info label="員工編號" value={emp.id} />
-            <Info label="姓名" value={emp.name} />
-            <Info label="部門" value={emp.department || "—"} />
-            <Info label="職稱" value={emp.title || "—"} />
-            <Info label="年資" value={`${Math.floor(r.seniorityMonths / 12)} 年 ${r.seniorityMonths % 12} 個月`} />
-            <Info label="本年特休" value={`${r.annualLeaveDays} 天`} />
-            <Info label="健保投保金額" value={ntd(r.insured.health)} />
-            <Info label="勞退自提率" value={`${Math.round(emp.voluntaryPensionRate * 100)}%`} />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Section
-              title="應發項目"
-              rows={[["固定薪資合計", r.salaryTotal], ["加班費", r.overtimePay], ["獎金與其他加項", monthlyBonus]]}
-              total={["應發合計", r.grossPay]}
-              totalClass="text-emerald-700"
-            />
-            <Section
-              title="代扣項目"
-              rows={[
-                ["請假扣款", r.leaveDeduction],
-                ["勞保費", r.premiums.laborEmployee],
-                ["健保費（含眷屬）", r.premiums.healthEmployee],
-                ["勞退自願提繳", r.premiums.pensionVoluntary],
-                ["二代健保補充保費", r.personalSupplementary],
-                ["代扣所得稅", r.withheldTax],
-              ]}
-              total={["代扣合計", r.totalDeductions]}
-              totalClass="text-rose-700"
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-md border-2 border-primary/20 bg-primary/5 p-4">
-            <span className="text-lg font-semibold">實發金額</span>
-            <span className="text-2xl font-bold tabular-nums">{ntd(r.netPay)} 元</span>
-          </div>
-
-          <div className="rounded-md border p-3 text-sm">
-            <p className="mb-2 font-medium text-muted-foreground">公司另行負擔（不從薪資扣除）</p>
-            <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
-              <Info label="勞保費" value={ntd(r.premiums.laborEmployer)} />
-              <Info label="職災保險費" value={ntd(r.premiums.occupationalEmployer)} />
-              <Info label="健保費" value={ntd(r.premiums.healthEmployer)} />
-              <Info label="勞退提繳 6%" value={ntd(r.premiums.pensionEmployer)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <p className="font-medium tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function Section({
-  title, rows, total, totalClass,
-}: {
-  title: string; rows: [string, number][]; total: [string, number]; totalClass?: string;
-}) {
-  return (
-    <div className="rounded-md border">
-      <div className="border-b bg-muted/40 px-3 py-2 text-sm font-medium">{title}</div>
-      <div className="divide-y">
-        {rows.map(([label, v]) => (
-          <div key={label} className="flex justify-between px-3 py-1.5 text-sm">
-            <span className="text-muted-foreground">{label}</span>
-            <span className="tabular-nums">{ntd(v)}</span>
-          </div>
-        ))}
-        <div className={`flex justify-between px-3 py-2 text-sm font-semibold ${totalClass ?? ""}`}>
-          <span>{total[0]}</span>
-          <span className="tabular-nums">{ntd(total[1])}</span>
-        </div>
-      </div>
+      <PayslipCard ref={slipRef} emp={emp} r={r} period={currentPeriod} />
     </div>
   );
 }

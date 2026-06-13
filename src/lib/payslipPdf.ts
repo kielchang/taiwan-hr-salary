@@ -7,17 +7,23 @@
 // jspdf 與 html2canvas 體積較大且僅瀏覽器可用，故以動態 import 延遲載入，
 // 不影響其他頁面與測試環境。
 
-export interface PayslipPdfOptions {
-  node: HTMLElement; // 要擷取的薪資條容器（與畫面相同）
-  password: string; // PDF 開啟密碼（身分證字號）
-  fileName: string; // 下載檔名
+/** 觸發瀏覽器下載一個 Blob */
+export function saveBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /**
- * 擷取薪資條 DOM → 產生加密 PDF 並觸發下載。
- * 回傳 Promise，完成即表示已開始下載。
+ * 擷取薪資條 DOM → 產生加密 PDF，回傳 Blob（不下載）。
+ * 供單筆下載與批次打包共用。
  */
-export async function downloadEncryptedPayslip({ node, password, fileName }: PayslipPdfOptions): Promise<void> {
+export async function payslipPdfBlob(node: HTMLElement, password: string): Promise<Blob> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import("html2canvas"),
     import("jspdf"),
@@ -56,5 +62,17 @@ export async function downloadEncryptedPayslip({ node, password, fileName }: Pay
   const x = (pageW - imgW) / 2;
 
   pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, margin, imgW, imgH);
-  pdf.save(fileName);
+  return pdf.output("blob");
+}
+
+export interface PayslipPdfOptions {
+  node: HTMLElement; // 要擷取的薪資條容器（與畫面相同）
+  password: string; // PDF 開啟密碼（身分證字號）
+  fileName: string; // 下載檔名
+}
+
+/** 單筆：擷取薪資條 DOM → 產生加密 PDF 並觸發下載。 */
+export async function downloadEncryptedPayslip({ node, password, fileName }: PayslipPdfOptions): Promise<void> {
+  const blob = await payslipPdfBlob(node, password);
+  saveBlob(blob, fileName);
 }
