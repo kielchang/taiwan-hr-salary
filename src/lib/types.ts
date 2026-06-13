@@ -79,3 +79,33 @@ export interface MonthlyEvent {
   otherDeduction: number; // 其他扣款
   withheldTax: number | null; // 代扣所得稅（人工轉填；null＝未填）
 }
+
+/* ───────────── 出勤打卡（額外模組；README 將出勤列為非目標，獨立於薪資管線） ───────────── */
+
+export type PunchType = "in" | "out"; // 上班／下班
+
+/** 單筆打卡紀錄（純前端，存於打卡當下裝置的 localStorage） */
+export interface PunchRecord {
+  id: string;
+  employeeId: string;
+  type: PunchType;
+  timestamp: string; // ISO
+  lat: number | null; // 緯度（取不到為 null）
+  lng: number | null; // 經度
+  accuracy: number | null; // 定位精度（公尺）
+  distanceM: number | null; // 距公司座標（公尺）；公司座標未設定為 null
+  withinFence: boolean; // 是否在允許半徑內
+  ip: string | null; // 公網 IP（未啟用 IP 檢查為 null）
+  ipAllowed: boolean | null; // IP 是否在允許清單（未檢查為 null）
+  note?: string;
+}
+
+/** 公司打卡設定（公司自訂，存 localStorage） */
+export interface AttendanceConfig {
+  companyLat: number | null; // 公司座標（未設定為 null → 不做距離限制）
+  companyLng: number | null;
+  radiusMeters: number; // 允許半徑（公尺）
+  blockOutOfFence: boolean; // 超出範圍是否禁止打卡（false＝仍記錄但標示）
+  ipCheckEnabled: boolean; // 是否啟用 IP 檢查（預設關閉）
+  allowedIps: string[]; // 公司對外 IP 允許清單
+}

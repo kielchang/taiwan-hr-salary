@@ -8,6 +8,8 @@ import type {
   SalaryStructure,
   Dependent,
   MonthlyEvent,
+  PunchRecord,
+  AttendanceConfig,
 } from "@/lib/types";
 import {
   SEED_EMPLOYEES,
@@ -18,6 +20,15 @@ import {
 } from "@/data/seed";
 
 const STORAGE_KEY = "taiwan-hr-salary:v1"; // localStorage 鍵
+
+const DEFAULT_ATTENDANCE: AttendanceConfig = {
+  companyLat: null,
+  companyLng: null,
+  radiusMeters: 200,
+  blockOutOfFence: false,
+  ipCheckEnabled: false,
+  allowedIps: [],
+};
 
 const blankSalary = (employeeId: string): SalaryStructure => ({
   employeeId,
@@ -56,6 +67,14 @@ interface PayrollState {
   dependents: Dependent[];
   events: MonthlyEvent[]; // 跨期間扁平儲存，以 employeeId+period 識別
   currentPeriod: string;
+
+  /** 出勤打卡（額外模組） */
+  attendance: AttendanceConfig;
+  punches: PunchRecord[];
+  setAttendance: (patch: Partial<AttendanceConfig>) => void;
+  addPunch: (record: PunchRecord) => void;
+  removePunch: (id: string) => void;
+  clearPunches: () => void;
 
   /** 初始設定引導是否已完成（false → 顯示設定精靈） */
   setupCompleted: boolean;
@@ -105,6 +124,15 @@ export const usePayrollStore = create<PayrollState>()(
       events: SEED_EVENTS,
       currentPeriod: SEED_PERIOD,
 
+      attendance: DEFAULT_ATTENDANCE,
+      punches: [],
+      setAttendance: (patch) =>
+        set((st) => ({ attendance: { ...st.attendance, ...patch } })),
+      addPunch: (record) => set((st) => ({ punches: [record, ...st.punches] })),
+      removePunch: (id) =>
+        set((st) => ({ punches: st.punches.filter((p) => p.id !== id) })),
+      clearPunches: () => set({ punches: [] }),
+
       setupCompleted: false,
       completeSetup: () => set({ setupCompleted: true }),
       reopenSetup: () => set({ setupCompleted: false }),
@@ -143,6 +171,7 @@ export const usePayrollStore = create<PayrollState>()(
           salaries: st.salaries.filter((s) => s.employeeId !== id),
           dependents: st.dependents.filter((d) => d.employeeId !== id),
           events: st.events.filter((e) => e.employeeId !== id),
+          punches: st.punches.filter((p) => p.employeeId !== id),
         })),
 
       upsertSalary: (s) =>
@@ -200,6 +229,7 @@ export const usePayrollStore = create<PayrollState>()(
           dependents: SEED_DEPENDENTS,
           events: SEED_EVENTS,
           currentPeriod: SEED_PERIOD,
+          punches: [],
         }),
       clearAll: () =>
         set({
@@ -207,6 +237,7 @@ export const usePayrollStore = create<PayrollState>()(
           salaries: [],
           dependents: [],
           events: [],
+          punches: [],
         }),
     }),
     { name: STORAGE_KEY },

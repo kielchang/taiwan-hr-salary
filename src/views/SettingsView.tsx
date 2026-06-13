@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
-import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info } from "lucide-react";
+import { parseIpList } from "@/lib/attendance";
+import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin } from "lucide-react";
 
 interface Field {
   key: keyof Parameters;
@@ -180,6 +182,8 @@ export function SettingsView() {
         )}
       </Card>
 
+      <AttendanceSettings />
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">資料管理</CardTitle>
@@ -207,5 +211,111 @@ export function SettingsView() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** 打卡設定（公司座標、半徑、超範圍處理、IP 檢查）— 黃底＝公司自訂 */
+function AttendanceSettings() {
+  const { attendance, setAttendance } = usePayrollStore();
+  const [geoMsg, setGeoMsg] = useState<string | null>(null);
+  const [ipText, setIpText] = useState(attendance.allowedIps.join("\n"));
+
+  const setFromGps = () => {
+    setGeoMsg("定位中…");
+    if (!navigator.geolocation) {
+      setGeoMsg("此裝置不支援定位");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setAttendance({ companyLat: pos.coords.latitude, companyLng: pos.coords.longitude });
+        setGeoMsg(`已設定公司座標：${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
+      },
+      (e) => setGeoMsg(`定位失敗：${e.message}`),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MapPin className="size-4 text-primary" /> 打卡設定
+        </CardTitle>
+        <CardDescription>
+          供「出勤打卡」頁使用。前端 GPS／IP 僅供輔助與稽核、可被竄改，非強制防弊。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-1">
+            <Label className="text-xs">公司緯度</Label>
+            <Input
+              type="number" className="h-8 col-assumption"
+              value={attendance.companyLat ?? ""}
+              onChange={(e) => setAttendance({ companyLat: e.target.value === "" ? null : Number(e.target.value) })}
+              placeholder="未設定"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">公司經度</Label>
+            <Input
+              type="number" className="h-8 col-assumption"
+              value={attendance.companyLng ?? ""}
+              onChange={(e) => setAttendance({ companyLng: e.target.value === "" ? null : Number(e.target.value) })}
+              placeholder="未設定"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">允許半徑（公尺）</Label>
+            <Input
+              type="number" className="h-8 col-assumption"
+              value={attendance.radiusMeters}
+              onChange={(e) => setAttendance({ radiusMeters: Number(e.target.value) || 0 })}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" onClick={setFromGps}>
+            <Crosshair /> 用目前定位設為公司座標
+          </Button>
+          {geoMsg && <span className="text-xs text-muted-foreground">{geoMsg}</span>}
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={attendance.blockOutOfFence}
+            onCheckedChange={(v) => setAttendance({ blockOutOfFence: v === true })}
+          />
+          超出公司範圍時<strong>禁止打卡</strong>（取消則仍記錄但標示「範圍外」）
+        </label>
+
+        <div className="space-y-2 rounded-md border p-3">
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={attendance.ipCheckEnabled}
+              onCheckedChange={(v) => setAttendance({ ipCheckEnabled: v === true })}
+            />
+            啟用 <strong>IP 檢查</strong>（打卡時呼叫外部服務查公網 IP 並比對下方允許清單）
+          </label>
+          {attendance.ipCheckEnabled && (
+            <div className="space-y-1">
+              <Label className="text-xs">公司對外 IP 允許清單（一行一個，或逗號分隔）</Label>
+              <textarea
+                className="h-20 w-full rounded-md border border-input bg-orange-50 p-2 text-sm"
+                value={ipText}
+                onChange={(e) => setIpText(e.target.value)}
+                onBlur={() => setAttendance({ allowedIps: parseIpList(ipText) })}
+                placeholder="203.0.113.10&#10;203.0.113.11"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                清單留空＝不限制 IP。注意：VPN 可繞過、外部查 IP 服務為第三方，僅供輔助。
+              </p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
