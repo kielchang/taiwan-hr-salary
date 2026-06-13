@@ -68,3 +68,127 @@ export function punchesToCsv(records: PunchRecord[], nameById: Record<string, st
   ]);
   return "\uFEFF" + [header, ...rows].map((cols) => cols.map(csvCell).join(",")).join("\r\n");
 }
+
+/* ───────────── 彈性上下班：每日出勤彙整（純函數） ───────────── */
+
+export interface DayAttendance {
+  employeeId: string;
+  date: string; // yyyy-mm-dd（本機）
+  firstIn: string | null; // 首次上班 ISO
+  lastOut: string | null; // 最後下班 ISO
+  workedMinutes: number | null; // 在場分鐘 − 午休（需同時有上下班）
+  expectedOutISO: string | null; // 建議下班時間（首次上班 ＋ 應工時 ＋ 午休）
+  late: boolean; // 晚於彈性最晚上班
+  missingIn: boolean; // 有下班無上班
+  missingOut: boolean; // 有上班無下班
+  shortHours: boolean; // 工時不足
+  outsideCore: boolean; // 未涵蓋核心時段
+  status: string; // 一句話狀態
+}
+
+/** 本機日期字串 yyyy-mm-dd */
+export function localDateKey(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** 取某 ISO 時間的「當日分鐘數」（0–1439，本機時區） */
+function minutesOfDay(iso: string): number {
+  const d = new Date(iso);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/** "HH:mm" → 當日分鐘數；格式錯誤回傳 null */
+export function hhmmToMinutes(hhmm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/**
+ * 將「某員工某日」的打卡紀錄，依彈性上下班設定評估為每日彙整。
+ * 配對規則：首次「上班」與最後「下班」；工時＝在場時間 − 午休。
+ */
+export function evaluateDay(
+  cfg: AttendanceConfig,
+  employeeId: string,
+  date: string,
+  dayPunches: PunchRecord[],
+): DayAttendance {
+  const ins = dayPunches.filter((p) => p.type === "in").sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const outs = dayPunches.filter((p) => p.type === "out").sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const firstIn = ins[0]?.timestamp ?? null;
+  const lastOut = outs[outs.length - 1]?.timestamp ?? null;
+
+  const missingIn = !firstIn && !!lastOut;
+  const missingOut = !!firstIn && !lastOut;
+
+  let workedMinutes: number | null = null;
+  if (firstIn && lastOut) {
+    const gross = (new Date(lastOut).getTime() - new Date(firstIn).getTime()) / 60000;
+    workedMinutes = Math.max(0, Math.round(gross - cfg.breakMinutes));
+  }
+
+  let expectedOutISO: string | null = null;
+  if (firstIn) {
+    expectedOutISO = new Date(
+      new Date(firstIn).getTime() + (cfg.requiredWorkMinutes + cfg.breakMinutes) * 60000,
+    ).toISOString();
+  }
+
+  const latestIn = hhmmToMinutes(cfg.flexLatestIn);
+  const late = cfg.flexEnabled && !!firstIn && latestIn != null && minutesOfDay(firstIn) > latestIn;
+
+  const shortHours =
+    cfg.flexEnabled && workedMinutes != null && workedMinutes < cfg.requiredWorkMinutes;
+
+  const coreS = hhmmToMinutes(cfg.coreStart);
+  const coreE = hhmmToMinutes(cfg.coreEnd);
+  const outsideCore =
+    cfg.flexEnabled &&
+    coreS != null &&
+    coreE != null &&
+    !!firstIn &&
+    !!lastOut &&
+    !(minutesOfDay(firstIn) <= coreS && minutesOfDay(lastOut) >= coreE);
+
+  let status = "正常";
+  if (missingIn || missingOut) status = "缺卡";
+  else if (!cfg.flexEnabled) status = "已打卡";
+  else {
+    const issues: string[] = [];
+    if (late) issues.push("遲到");
+    if (shortHours) issues.push("工時不足");
+    if (outsideCore) issues.push("核心未滿");
+    status = issues.length ? issues.join("・") : "正常";
+  }
+
+  return {
+    employeeId, date, firstIn, lastOut, workedMinutes, expectedOutISO,
+    late, missingIn, missingOut, shortHours, outsideCore, status,
+  };
+}
+
+/** 計算某一天、全部有打卡的員工之每日彙整 */
+export function evaluateAllForDate(
+  cfg: AttendanceConfig,
+  date: string,
+  punches: PunchRecord[],
+): DayAttendance[] {
+  const ofDate = punches.filter((p) => localDateKey(p.timestamp) === date);
+  const byEmp = new Map<string, PunchRecord[]>();
+  for (const p of ofDate) {
+    const arr = byEmp.get(p.employeeId) ?? [];
+    arr.push(p);
+    byEmp.set(p.employeeId, arr);
+  }
+  return [...byEmp.entries()].map(([eid, list]) => evaluateDay(cfg, eid, date, list));
+}
+
+/** 分鐘 → "Hh Mm" */
+export function formatMinutes(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}小時${m > 0 ? ` ${m}分` : ""}`;
+}

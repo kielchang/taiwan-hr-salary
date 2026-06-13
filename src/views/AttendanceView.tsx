@@ -7,9 +7,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { useNavigate } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import type { PunchRecord, PunchType } from "@/lib/types";
-import { evaluateFence, isIpAllowed, punchesToCsv, punchTypeLabel } from "@/lib/attendance";
 import {
-  LogIn, LogOut, MapPin, Download, AlertTriangle, CheckCircle2, ShieldAlert, Settings, Trash2,
+  evaluateFence, isIpAllowed, punchesToCsv, punchTypeLabel,
+  evaluateAllForDate, formatMinutes, localDateKey, type DayAttendance,
+} from "@/lib/attendance";
+import {
+  LogIn, LogOut, MapPin, Download, AlertTriangle, CheckCircle2, ShieldAlert, Settings, Trash2, CalendarCheck,
 } from "lucide-react";
 
 /** 取得目前定位（瀏覽器 Geolocation；可能因權限或裝置失敗） */
@@ -56,10 +59,13 @@ export function AttendanceView() {
   const [selected, setSelected] = useState(employees[0]?.id ?? "");
   const [busy, setBusy] = useState<PunchType | null>(null);
   const [result, setResult] = useState<PunchResult | null>(null);
+  const todayKey = localDateKey(new Date().toISOString());
+  const [summaryDate, setSummaryDate] = useState(todayKey);
 
   const nameById = Object.fromEntries(employees.map((e) => [e.id, e.name]));
   const today = new Date().toDateString();
   const todayPunches = punches.filter((p) => new Date(p.timestamp).toDateString() === today);
+  const daySummaries = evaluateAllForDate(attendance, summaryDate, punches);
 
   const punch = async (type: PunchType) => {
     if (!selected) return;
@@ -189,6 +195,61 @@ export function AttendanceView() {
       </Card>
 
       <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarCheck className="size-4 text-primary" /> 每日出勤彙整（彈性上下班）
+            </CardTitle>
+            <input
+              type="date"
+              className="h-8 rounded-md border border-input bg-orange-50 px-2 text-sm"
+              value={summaryDate}
+              onChange={(e) => e.target.value && setSummaryDate(e.target.value)}
+            />
+          </div>
+          <CardDescription>
+            {attendance.flexEnabled
+              ? `彈性上班 ${attendance.flexEarliestIn}–${attendance.flexLatestIn}（晚於即遲到）、應工時 ${formatMinutes(attendance.requiredWorkMinutes)}、午休 ${attendance.breakMinutes} 分${attendance.coreStart && attendance.coreEnd ? `、核心 ${attendance.coreStart}–${attendance.coreEnd}` : ""}`
+              : "彈性上下班判定未啟用（可至「系統設定 → 打卡設定」開啟）。"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {daySummaries.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">該日尚無打卡紀錄。</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>員工</TableHead>
+                  <TableHead>上班</TableHead>
+                  <TableHead>下班</TableHead>
+                  <TableHead className="text-right">工時</TableHead>
+                  <TableHead>建議下班</TableHead>
+                  <TableHead>狀態</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {daySummaries.map((d) => (
+                  <TableRow key={d.employeeId}>
+                    <TableCell className="font-medium">{nameById[d.employeeId] ?? d.employeeId}</TableCell>
+                    <TableCell className="tabular-nums">{hhmm(d.firstIn)}</TableCell>
+                    <TableCell className="tabular-nums">{hhmm(d.lastOut)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {d.workedMinutes != null ? formatMinutes(d.workedMinutes) : "—"}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{hhmm(d.expectedOutISO)}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant(d)}>{d.status}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex-row items-center justify-between pb-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -272,4 +333,18 @@ export function AttendanceView() {
       </Card>
     </div>
   );
+}
+
+/** ISO → "HH:mm"（本機）；null 顯示「—」 */
+function hhmm(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/** 每日狀態 → Badge 樣式 */
+function statusVariant(d: DayAttendance): "success" | "warning" | "destructive" | "secondary" {
+  if (d.missingIn || d.missingOut) return "destructive";
+  if (d.late || d.shortHours || d.outsideCore) return "warning";
+  if (d.status === "正常") return "success";
+  return "secondary";
 }

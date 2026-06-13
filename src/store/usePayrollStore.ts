@@ -28,6 +28,13 @@ const DEFAULT_ATTENDANCE: AttendanceConfig = {
   blockOutOfFence: false,
   ipCheckEnabled: false,
   allowedIps: [],
+  flexEnabled: true,
+  flexEarliestIn: "08:00",
+  flexLatestIn: "10:00",
+  requiredWorkMinutes: 480,
+  breakMinutes: 60,
+  coreStart: "10:00",
+  coreEnd: "16:00",
 };
 
 const blankSalary = (employeeId: string): SalaryStructure => ({
@@ -240,6 +247,18 @@ export const usePayrollStore = create<PayrollState>()(
           punches: [],
         }),
     }),
-    { name: STORAGE_KEY },
+    {
+      name: STORAGE_KEY,
+      // 與預設深度合併，使舊版 localStorage 自動補上新增欄位（如彈性工時設定）
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<PayrollState>;
+        return {
+          ...current,
+          ...p,
+          parameters: { ...current.parameters, ...(p.parameters ?? {}) },
+          attendance: { ...current.attendance, ...(p.attendance ?? {}) },
+        };
+      },
+    },
   ),
 );

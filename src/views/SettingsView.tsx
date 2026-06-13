@@ -315,6 +315,54 @@ function AttendanceSettings() {
             </div>
           )}
         </div>
+
+        <div className="space-y-3 rounded-md border p-3">
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={attendance.flexEnabled}
+              onCheckedChange={(v) => setAttendance({ flexEnabled: v === true })}
+            />
+            啟用 <strong>彈性上下班</strong>判定（每日彙整顯示遲到／工時不足／核心時段）
+          </label>
+          {attendance.flexEnabled && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-1">
+                <Label className="text-xs">彈性上班最早</Label>
+                <Input type="time" className="h-8 col-assumption" value={attendance.flexEarliestIn}
+                  onChange={(e) => setAttendance({ flexEarliestIn: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">最晚上班（晚於＝遲到）</Label>
+                <Input type="time" className="h-8 col-assumption" value={attendance.flexLatestIn}
+                  onChange={(e) => setAttendance({ flexLatestIn: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">應工作時數（小時）</Label>
+                <Input type="number" step="0.5" className="h-8 col-assumption"
+                  value={attendance.requiredWorkMinutes / 60}
+                  onChange={(e) => setAttendance({ requiredWorkMinutes: Math.round((Number(e.target.value) || 0) * 60) })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">午休（分鐘，不計工時）</Label>
+                <Input type="number" className="h-8 col-assumption" value={attendance.breakMinutes}
+                  onChange={(e) => setAttendance({ breakMinutes: Number(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">核心時段起（空＝不檢查）</Label>
+                <Input type="time" className="h-8 col-assumption" value={attendance.coreStart}
+                  onChange={(e) => setAttendance({ coreStart: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">核心時段迄</Label>
+                <Input type="time" className="h-8 col-assumption" value={attendance.coreEnd}
+                  onChange={(e) => setAttendance({ coreEnd: e.target.value })} />
+              </div>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            下班建議時間＝實際上班 ＋ 應工時 ＋ 午休。工時＝在場時間 − 午休（簡化計算）。
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

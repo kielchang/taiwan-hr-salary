@@ -57,6 +57,7 @@ describe("client mount + 路由（白屏防護）", () => {
     const div = await mountAt("/attendance");
     expect(div.textContent).toContain("出勤打卡");
     expect(div.textContent).toContain("上班打卡");
+    expect(div.textContent).toContain("每日出勤彙整"); // 彈性上下班彙整
   });
 
   it("深連結 /master → 基本資料頁", async () => {

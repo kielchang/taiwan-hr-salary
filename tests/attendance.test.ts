@@ -4,7 +4,10 @@ import type { AttendanceConfig, PunchRecord } from "@/lib/types";
 
 const cfg = (over: Partial<AttendanceConfig> = {}): AttendanceConfig => ({
   companyLat: 25.0339, companyLng: 121.5645, radiusMeters: 200,
-  blockOutOfFence: false, ipCheckEnabled: false, allowedIps: [], ...over,
+  blockOutOfFence: false, ipCheckEnabled: false, allowedIps: [],
+  flexEnabled: true, flexEarliestIn: "08:00", flexLatestIn: "10:00",
+  requiredWorkMinutes: 480, breakMinutes: 60, coreStart: "10:00", coreEnd: "16:00",
+  ...over,
 });
 
 describe("haversineMeters", () => {
@@ -62,5 +65,47 @@ describe("punchesToCsv", () => {
     expect(csv).toContain("員工編號");
     expect(csv).toContain("王小明");
     expect(csv).toContain("上班");
+  });
+});
+
+import { evaluateDay } from "@/lib/attendance";
+
+// 以本機時間建構時間戳，round-trip 在同一時區下穩定
+const at = (h: number, m: number) => new Date(2026, 5, 13, h, m, 0).toISOString();
+const punch = (type: "in" | "out", h: number, m: number): PunchRecord => ({
+  id: `${type}${h}${m}`, employeeId: "E1", type, timestamp: at(h, m),
+  lat: null, lng: null, accuracy: null, distanceM: null, withinFence: true, ip: null, ipAllowed: null,
+});
+const DATE = "2026-06-13";
+
+describe("evaluateDay（彈性上下班）", () => {
+  it("09:00–18:00 → 工時 480 分、正常", () => {
+    const d = evaluateDay(cfg(), "E1", DATE, [punch("in", 9, 0), punch("out", 18, 0)]);
+    expect(d.workedMinutes).toBe(480);
+    expect(d.late).toBe(false);
+    expect(d.shortHours).toBe(false);
+    expect(d.outsideCore).toBe(false);
+    expect(d.status).toBe("正常");
+  });
+  it("10:30 上班 → 遲到", () => {
+    const d = evaluateDay(cfg(), "E1", DATE, [punch("in", 10, 30), punch("out", 19, 30)]);
+    expect(d.late).toBe(true);
+    expect(d.status).toContain("遲到");
+  });
+  it("09:00–16:00 → 工時不足（6 小時 < 8）", () => {
+    const d = evaluateDay(cfg(), "E1", DATE, [punch("in", 9, 0), punch("out", 16, 0)]);
+    expect(d.workedMinutes).toBe(360);
+    expect(d.shortHours).toBe(true);
+    expect(d.status).toContain("工時不足");
+  });
+  it("只有上班卡 → 缺卡", () => {
+    const d = evaluateDay(cfg(), "E1", DATE, [punch("in", 9, 0)]);
+    expect(d.missingOut).toBe(true);
+    expect(d.workedMinutes).toBeNull();
+    expect(d.status).toBe("缺卡");
+  });
+  it("建議下班＝上班＋應工時＋午休（09:00＋8h＋1h＝18:00）", () => {
+    const d = evaluateDay(cfg(), "E1", DATE, [punch("in", 9, 0)]);
+    expect(new Date(d.expectedOutISO!).getHours()).toBe(18);
   });
 });

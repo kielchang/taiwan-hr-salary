@@ -108,4 +108,13 @@ export interface AttendanceConfig {
   blockOutOfFence: boolean; // 超出範圍是否禁止打卡（false＝仍記錄但標示）
   ipCheckEnabled: boolean; // 是否啟用 IP 檢查（預設關閉）
   allowedIps: string[]; // 公司對外 IP 允許清單
+
+  // —— 彈性上下班 ——
+  flexEnabled: boolean; // 是否啟用彈性上下班判定
+  flexEarliestIn: string; // 彈性上班最早 "HH:mm"
+  flexLatestIn: string; // 彈性上班最晚 "HH:mm"（晚於此＝遲到）
+  requiredWorkMinutes: number; // 應工作時數（分鐘，不含午休）
+  breakMinutes: number; // 午休（分鐘，不計工時）
+  coreStart: string; // 核心時段起 "HH:mm"（空字串＝不檢查）
+  coreEnd: string; // 核心時段迄 "HH:mm"
 }
