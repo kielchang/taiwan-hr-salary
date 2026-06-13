@@ -25,6 +25,8 @@ export interface Employee {
   withholdingMethod: WithholdingMethod; // 扣繳方式
   exemptionFormReceivedDate: string | null; // 免稅額申報表收件日（空 → V6 警示＋預設固定5%）
   voluntaryPensionRate: number; // 勞退自提率 0~0.06
+  nationalId: string; // 身分證字號／居留證號（薪資條加密 PDF 之開啟密碼）
+  email: string; // 員工 Email（薪資條 email 通知收件人）
   note?: string;
 }
 

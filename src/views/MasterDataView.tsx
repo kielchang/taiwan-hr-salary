@@ -37,6 +37,8 @@ const blankEmployee = (): Employee => ({
   withholdingMethod: "固定5%",
   exemptionFormReceivedDate: null,
   voluntaryPensionRate: 0,
+  nationalId: "",
+  email: "",
 });
 
 const blankSalary = (id: string): SalaryStructure => ({
@@ -269,6 +271,23 @@ export function MasterDataView() {
               </Field>
               <Field label="專案別（選填）" help="供匯總報表分類">
                 <Input className="col-input" value={draftEmp.project} onChange={(e) => setEmp("project", e.target.value)} />
+              </Field>
+              <Field label="身分證字號" help="作為薪資條加密 PDF 的開啟密碼；英文字母請大寫">
+                <Input
+                  className="col-input"
+                  value={draftEmp.nationalId}
+                  onChange={(e) => setEmp("nationalId", e.target.value.toUpperCase())}
+                  placeholder="A123456789"
+                />
+              </Field>
+              <Field label="Email" help="薪資條 email 通知的收件人">
+                <Input
+                  type="email"
+                  className="col-input"
+                  value={draftEmp.email}
+                  onChange={(e) => setEmp("email", e.target.value)}
+                  placeholder="name@example.com"
+                />
               </Field>
             </div>
           )}

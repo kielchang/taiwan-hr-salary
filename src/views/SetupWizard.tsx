@@ -76,6 +76,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
       withholdingMethod: "固定5%",
       exemptionFormReceivedDate: null,
       voluntaryPensionRate: 0,
+      nationalId: "",
+      email: "",
     };
     upsertEmployee(emp);
     upsertSalary({

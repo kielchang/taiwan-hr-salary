@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,9 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary, type PayrollRow } from "@/store/selectors";
 import { cn, ntd, formatPeriod } from "@/lib/utils";
-import { Printer, Wand2 } from "lucide-react";
+import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
+import { buildPayslipMailto } from "@/lib/payslipEmail";
+import { Printer, Wand2, Lock, Mail, AlertTriangle } from "lucide-react";
 
 type Tab = "summary" | "tax" | "payslip";
 
@@ -258,6 +260,9 @@ function PayslipReport() {
   const { employees, currentPeriod } = usePayrollStore();
   const rows = usePayrollRows();
   const [selected, setSelected] = useState(employees[0]?.id ?? "");
+  const slipRef = useRef<HTMLDivElement>(null);
+  const [generating, setGenerating] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const r = rows.find((x) => x.employeeId === selected);
   const emp = employees.find((e) => e.id === selected);
@@ -271,10 +276,34 @@ function PayslipReport() {
   }
 
   const monthlyBonus = r.grossPay - r.salaryTotal - r.overtimePay;
+  const hasId = emp.nationalId.trim().length > 0;
+  const hasEmail = emp.email.trim().length > 0;
+
+  const handleDownloadPdf = async () => {
+    if (!slipRef.current || !hasId) return;
+    setPdfError(null);
+    setGenerating(true);
+    try {
+      await downloadEncryptedPayslip({
+        node: slipRef.current,
+        password: emp.nationalId.trim(),
+        fileName: `${emp.name}_薪資明細_${currentPeriod}.pdf`,
+      });
+    } catch (e) {
+      setPdfError(`PDF 產生失敗：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleEmailDraft = () => {
+    if (!hasEmail) return;
+    window.location.href = buildPayslipMailto({ to: emp.email.trim(), name: emp.name, period: currentPeriod });
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 print:hidden">
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
         <Select value={selected} onValueChange={setSelected}>
           <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -284,11 +313,32 @@ function PayslipReport() {
           </SelectContent>
         </Select>
         <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Printer /> 列印此薪資條
+          <Printer /> 列印
+        </Button>
+        <Button size="sm" onClick={handleDownloadPdf} disabled={!hasId || generating}>
+          <Lock /> {generating ? "產生中…" : "下載加密 PDF"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleEmailDraft} disabled={!hasEmail}>
+          <Mail /> Email 通知草稿
         </Button>
       </div>
 
-      <Card>
+      {(!hasId || !hasEmail || pdfError) && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 print:hidden">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <div className="space-y-0.5">
+            {!hasId && <p>此員工尚未填「身分證字號」，無法產生加密 PDF（密碼即身分證字號）。請至「基本資料」補填。</p>}
+            {!hasEmail && <p>此員工尚未填「Email」，無法開啟通知草稿。請至「基本資料」補填。</p>}
+            {pdfError && <p>{pdfError}</p>}
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground print:hidden">
+        加密 PDF 的開啟密碼為員工身分證字號（英文字母大寫）；email 採 mailto 草稿，附件請於郵件軟體手動夾帶剛下載的 PDF。
+      </p>
+
+      <Card ref={slipRef} className="bg-card">
         <CardHeader>
           <div className="flex items-start justify-between">
             <CardTitle>薪資明細表</CardTitle>
