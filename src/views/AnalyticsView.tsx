@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,14 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows, type PayrollRow } from "@/store/selectors";
 import { saveBlob } from "@/lib/payslipPdf";
-import { cn, ntd, pct } from "@/lib/utils";
+import { cn, ntd, pct, formatPeriod } from "@/lib/utils";
 import {
   percentileSet, coefficientOfVariation, gini, lorenzPoints, histogram,
   buildBasis, simulateBonusPool, simulateRaise, type BonusSimResult, type RaiseSimResult,
 } from "@/lib/analytics";
 import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, PALETTE } from "@/components/charts";
-import { BarChart3, Plus, Trash2, Download, Info } from "lucide-react";
+import { downloadNodeAsPdf } from "@/lib/reportPdf";
+import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer } from "lucide-react";
 
 type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "glossary";
 const TABS: [Tab, string][] = [
@@ -33,18 +34,42 @@ function csvDownload(headers: string[], rows: (string | number)[][], fileName: s
 export function AnalyticsView() {
   const [tab, setTab] = useState<Tab>("cost");
   const rows = usePayrollRows();
+  const currentPeriod = usePayrollStore((s) => s.currentPeriod);
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const tabLabel = TABS.find(([k]) => k === tab)?.[1] ?? "";
+  const exportPdf = async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      await downloadNodeAsPdf(reportRef.current, `薪酬分析_${tabLabel}_${currentPeriod}.pdf`);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="flex items-center gap-2 text-lg font-bold"><BarChart3 className="size-5 text-primary" /> 薪酬分析</h1>
-        <p className="text-sm text-muted-foreground">
-          以「自我檢討」角度分析薪資結構、獎金、分紅與績效換算，並做預算試算。僅讀取當期薪資資料；
-          試算為規劃沙盒，<strong>不會寫回薪資結算</strong>。
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
+        <div>
+          <h1 className="flex items-center gap-2 text-lg font-bold"><BarChart3 className="size-5 text-primary" /> 薪酬分析</h1>
+          <p className="text-sm text-muted-foreground">
+            以「自我檢討」角度分析薪資結構、獎金、分紅與績效換算，並做預算試算。僅讀取當期薪資資料；
+            試算為規劃沙盒，<strong>不會寫回薪資結算</strong>。
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer /> 列印
+          </Button>
+          <Button size="sm" onClick={exportPdf} disabled={exporting || (rows.length === 0 && tab !== "glossary")}>
+            <FileDown /> {exporting ? "產生中…" : "匯出 PDF 月報"}
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 print:hidden">
         {TABS.map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={cn("rounded-md px-3 py-1.5 text-sm", tab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
@@ -53,20 +78,28 @@ export function AnalyticsView() {
         ))}
       </div>
 
-      {rows.length === 0 && tab !== "glossary" ? (
-        <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-          尚無薪資資料。請先到「基本資料」建立員工與薪資結構，並於「每月薪資作業」確認當期。
-        </CardContent></Card>
-      ) : (
-        <>
-          {tab === "cost" && <CostTab rows={rows} />}
-          {tab === "dist" && <DistTab rows={rows} />}
-          {tab === "grade" && <GradeTab rows={rows} />}
-          {tab === "bonus" && <BonusTab rows={rows} />}
-          {tab === "raise" && <RaiseTab rows={rows} />}
-          {tab === "glossary" && <GlossaryTab />}
-        </>
-      )}
+      <div ref={reportRef} className="space-y-4 bg-background">
+        {/* PDF/列印標題（畫面上以較小字呈現） */}
+        <div className="border-b pb-2">
+          <p className="text-sm font-semibold">薪酬分析月報 — {tabLabel}</p>
+          <p className="text-xs text-muted-foreground">期間 {formatPeriod(currentPeriod)}（分析基於本機當期資料；試算為規劃沙盒）</p>
+        </div>
+
+        {rows.length === 0 && tab !== "glossary" ? (
+          <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
+            尚無薪資資料。請先到「基本資料」建立員工與薪資結構，並於「每月薪資作業」確認當期。
+          </CardContent></Card>
+        ) : (
+          <>
+            {tab === "cost" && <CostTab rows={rows} />}
+            {tab === "dist" && <DistTab rows={rows} />}
+            {tab === "grade" && <GradeTab rows={rows} />}
+            {tab === "bonus" && <BonusTab rows={rows} />}
+            {tab === "raise" && <RaiseTab rows={rows} />}
+            {tab === "glossary" && <GlossaryTab />}
+          </>
+        )}
+      </div>
     </div>
   );
 }

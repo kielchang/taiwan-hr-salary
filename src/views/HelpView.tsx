@@ -1,7 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings } from "lucide-react";
+import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings, BarChart3 } from "lucide-react";
+
+const ANALYTICS_GUIDE: [string, string][] = [
+  ["成本結構", "看人事總成本由本薪/加給/加班/獎金/雇主負擔的組成、部門別比較與成本集中度（Pareto），抓結構失衡。"],
+  ["分布與公平", "百分位、變異係數 CV、Gini／Lorenz、部門中位差、薪資 vs 年資，檢視內部公平與薪資壓縮。"],
+  ["級距與 compa-ratio", "建立薪資級距並指派員工 → 看每人相對中位的 compa-ratio 與區間滲透率、部門×級距熱圖。"],
+  ["獎金／分紅試算", "設定獎金池與分配法（均分/按本薪/按績效/merit matrix），逐人試算獎金與二代健保概估、預算差異。"],
+  ["年度／季度調薪試算", "設定調薪預算與分配法，逐人看調幅、調後薪資與 compa-ratio、年化雇主成本，及調薪前後公平性對比。"],
+  ["指標說明", "compa-ratio、CV、Gini、merit matrix、分配法等指標的白話定義與用途。"],
+];
 
 const MONTHLY_STEPS = [
   {
@@ -100,6 +109,33 @@ export function HelpView() {
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BarChart3 className="size-4 text-primary" /> 薪酬分析與試算
+          </CardTitle>
+          <CardDescription>上排「薪酬分析」：從 HR 自我檢討角度看成本與公平，並做獎金/分紅與調薪預算試算（不影響實際薪資）。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid gap-3 md:grid-cols-2">
+            {ANALYTICS_GUIDE.map(([t, d]) => (
+              <div key={t} className="rounded-md border p-3">
+                <p className="text-sm font-medium">{t}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{d}</p>
+              </div>
+            ))}
+          </div>
+          <ul className="ml-5 list-disc space-y-1 text-xs text-muted-foreground">
+            <li>compa-ratio／區間滲透率需先在「級距與 compa-ratio」建立薪資級距並指派員工；未建級距則只顯示內部分布指標。</li>
+            <li>「獎金／分紅試算」「調薪試算」可調績效評等與係數，並以 CSV 或「匯出 PDF 月報」帶走結果；<strong>試算不會寫回薪資結算</strong>。</li>
+            <li>調薪試算的年化成本已把「基薪上升 → 投保金額變動 → 雇主保費」一併重算。</li>
+          </ul>
+          <Button variant="outline" size="sm" onClick={() => navigate("/analytics")}>
+            <BarChart3 /> 前往薪酬分析
+          </Button>
         </CardContent>
       </Card>
 
