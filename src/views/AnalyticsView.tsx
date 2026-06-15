@@ -16,8 +16,11 @@ import {
   buildBasis, simulateBonusPool, simulateRaise, type BonusSimResult, type RaiseSimResult,
 } from "@/lib/analytics";
 import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, PALETTE } from "@/components/charts";
+import {
+  analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise, type Insight,
+} from "@/lib/insights";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
-import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer } from "lucide-react";
+import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb } from "lucide-react";
 
 type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "glossary";
 const TABS: [Tab, string][] = [
@@ -150,8 +153,17 @@ function CostTab({ rows }: { rows: PayrollRow[] }) {
     deptMap.set(d, cur);
   });
 
+  const insights = analyzeCost({
+    totalCost,
+    ot: totals.ot,
+    bonus: totals.bonus,
+    burden: totals.burden,
+    costPerHead: rows.map((r) => r.employerTotalCost),
+  });
+
   return (
     <div className="space-y-4">
+      <InsightList insights={insights} />
       <div className="grid gap-3 sm:grid-cols-4">
         <Stat label="人事總成本（含雇主負擔）" value={`${ntd(totalCost)} 元`} />
         <Stat label="平均每人成本" value={`${ntd(rows.length ? totalCost / rows.length : 0)} 元`} />
@@ -211,8 +223,11 @@ function DistTab({ rows }: { rows: PayrollRow[] }) {
     return { label: d, value: s[Math.floor((s.length - 1) / 2)] ?? 0 };
   });
 
+  const insights = analyzeDistribution(pays, deptMedian);
+
   return (
     <div className="space-y-4">
+      <InsightList insights={insights} />
       <div className="grid gap-3 sm:grid-cols-5">
         <Stat label="P10" value={ntd(ps.p10)} /><Stat label="P25" value={ntd(ps.p25)} />
         <Stat label="中位數" value={ntd(ps.median)} /><Stat label="P75" value={ntd(ps.p75)} /><Stat label="P90" value={ntd(ps.p90)} />
@@ -278,8 +293,14 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
     }),
   );
 
+  const insights = analyzeGrades(
+    basis.map((b) => ({ compaRatio: b.compaRatio, pay: b.base, min: b.grade?.min ?? null, max: b.grade?.max ?? null })),
+    hasGrades,
+  );
+
   return (
     <div className="space-y-4">
+      <InsightList insights={insights} />
       <Card>
         <CardHeader className="flex-row items-center justify-between pb-2">
           <div>
@@ -370,8 +391,16 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
     `獎金試算_${new Date().toISOString().slice(0, 10)}.csv`,
   );
 
+  const insights = analyzeBonus({
+    method: sc.method,
+    totalBonus: result.totalBonus,
+    targetBudget: sc.targetBudget,
+    rows: result.rows.map((r) => ({ coefficient: r.coefficient, bonus: r.bonus })),
+  });
+
   return (
     <div className="space-y-4">
+      <InsightList insights={insights} />
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">情境設定</CardTitle></CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -480,8 +509,17 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
     `調薪試算_${new Date().toISOString().slice(0, 10)}.csv`,
   );
 
+  const insights = analyzeRaise({
+    totalAnnualizedCostDelta: result.totalAnnualizedCostDelta,
+    targetBudget: rs.targetBudget,
+    giniBefore: result.giniBefore,
+    giniAfter: result.giniAfter,
+    avgRaisePct: result.avgRaisePct,
+  });
+
   return (
     <div className="space-y-4">
+      <InsightList insights={insights} />
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">調薪情境設定</CardTitle></CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -571,32 +609,123 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
   );
 }
 
-/* ───────── 指標說明 ───────── */
+/* ───────── 指標說明（用途＋怎麼看，非公式） ───────── */
+interface GlossaryItem {
+  term: string;
+  purpose: string; // 這個數字想表達什麼（用途）
+  reading: string; // 該怎麼讀、落在哪些區間代表什麼
+}
 function GlossaryTab() {
-  const items: [string, string][] = [
-    ["compa-ratio（薪酬比較比）", "實際薪資 ÷ 級距中位。1.0＝在中位；<0.9 偏低、>1.1 偏高，用於檢視市場/內部定位。"],
-    ["range penetration（區間滲透率）", "(實薪 − 級距下限) ÷ (上限 − 下限)。看員工在級距內的進程位置（0%～100%）。"],
-    ["百分位 P10–P90", "把全體薪資排序後的分位點，看整體水準與差距結構。"],
-    ["變異係數 CV", "標準差 ÷ 平均。衡量薪資離散程度，越小越集中。"],
-    ["Gini 係數 / Lorenz 曲線", "薪資不均度指標（0 完全平均、趨近 1 極不均）；Lorenz 曲線越偏離對角線越不均。"],
-    ["獎金/本薪比、變動薪酬比", "獎金或（加班＋獎金）占比，評估薪酬中固定 vs 變動的結構。"],
-    ["merit matrix（績效×級距）", "綜合績效評等與級距位置決定獎金/調幅：高績效且級距偏低者加碼，兼顧績效與內部公平。"],
-    ["分配方法", "均分／按本薪比例／按績效係數／merit matrix；績效係數預設 S1.3、A1.1、B1.0、C0.8（可調）。"],
-    ["年化成本增額", "調薪每月增額（含投保保費重算後的雇主負擔變化）×12，估算全年人事成本影響。"],
+  const items: GlossaryItem[] = [
+    {
+      term: "compa-ratio（薪酬比較比）",
+      purpose: "回答「這個人薪水相對於同職級的『標準價』是高還是低」，用來檢查薪資定位是否合理、有沒有人被低估或過度給付。",
+      reading: "以 1.0 為基準（剛好在級距中位）。落在 0.9～1.1 算健康；低於 0.9 代表偏低、留才風險高，可優先調薪；高於 1.1 代表已偏高、再調空間有限，宜改用獎金激勵。",
+    },
+    {
+      term: "range penetration（區間滲透率）",
+      purpose: "看一個人在自己職級的薪資帶裡「走到哪了」，判斷還有多少往上的空間，常用於規劃調薪幅度。",
+      reading: "0% 在下限、100% 到上限。新人或剛升遷者通常偏低（如 20～40%）很正常；長年資者仍偏低要留意，已接近 100% 表示快觸頂、需用升級或獎金而非加薪。",
+    },
+    {
+      term: "百分位 P10–P90",
+      purpose: "把全體由低到高排隊，看不同位置的人各拿多少，用來了解整體薪資水準與「頭尾差距」，比平均數更不受極端值干擾。",
+      reading: "中位數（P50）是最具代表性的「中間水準」。比較 P90 與 P10 的倍數可看差距：倍數越大代表高低拉得越開；觀察 P10 是否過低（偏低薪族群）。",
+    },
+    {
+      term: "變異係數 CV",
+      purpose: "用一個百分比總結「大家的薪水差異有多大」，方便跨部門、跨期間比較離散程度。",
+      reading: "越小代表越集中、齊頭；越大代表差異越大。一般 20～40% 屬常見；過低可能是齊頭式、缺乏差異化，過高要確認是否由少數極端薪資造成。",
+    },
+    {
+      term: "Gini 係數 / Lorenz 曲線",
+      purpose: "衡量薪資分配「公不公平／平不平均」的單一指標，Lorenz 曲線則把它畫成圖，一眼看出不均程度。",
+      reading: "Gini 介於 0～1：越接近 0 越平均。小於 0.25 偏平均、0.25～0.4 多數公司的常見區間、大於 0.4 差距偏大需檢視。Lorenz 曲線越貼對角線越平均、越下凹越不均。",
+    },
+    {
+      term: "獎金/本薪比、變動薪酬比",
+      purpose: "看薪酬中「固定 vs 變動」的比重，評估激勵彈性與每月成本的波動風險。",
+      reading: "比例高＝激勵彈性大但成本較不穩定、編預算要留緩衝；比例低＝成本穩定但激勵空間小。沒有絕對標準，重點看是否符合公司策略與產業慣例。",
+    },
+    {
+      term: "成本集中度（前 20% 占比／Pareto）",
+      purpose: "檢視人事成本是否過度集中在少數人身上，藉以評估關鍵人力依賴與單點風險。",
+      reading: "前 20% 人員若占超過一半成本，代表對少數人高度依賴，需確認接班與留任計畫；分布越分散，人力結構越平衡。",
+    },
+    {
+      term: "merit matrix（績效×級距）",
+      purpose: "把「績效高低」和「目前在級距的位置」一起納入，決定誰該多調、多給，兼顧獎優與內部公平。",
+      reading: "原則：績效好且目前薪資偏低者加碼最多；績效好但已偏高者幅度收斂。用於避免「好人才卡在低薪」又不讓高薪者無限上漲。",
+    },
+    {
+      term: "分配方法（均分／按本薪／按績效／merit matrix）",
+      purpose: "決定一筆獎金池或加薪預算「怎麼分給每個人」，不同方法反映不同的管理取向。",
+      reading: "均分＝最公平但與績效無關；按本薪＝與職級連動但不看當期表現；按績效／merit matrix＝獎優汰劣、與表現連動。想強化績效差異化就往後者走。",
+    },
+    {
+      term: "年化成本增額",
+      purpose: "把調薪的影響換算成「整年公司要多付多少」，且把基薪調高後連帶增加的雇主保費一併算進去，作為預算決策依據。",
+      reading: "這個數字＝每月增額（含雇主負擔變化）×12。與年度預算相比即可知是否超支；季度調薪也一律換算成年化，方便不同方案放在同一基準比較。",
+    },
   ];
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">指標與分析方法說明</CardTitle>
-        <CardDescription>借鑑業界薪酬分析常用指標（compa-ratio、merit matrix、利潤分享 pro-rata 等）。</CardDescription>
+        <CardTitle className="text-base">指標怎麼用、怎麼看</CardTitle>
+        <CardDescription>每個指標不講公式，只說明「能告訴你什麼（用途）」與「數字落在哪代表什麼（怎麼看）」。借鑑業界常用薪酬分析方法（compa-ratio、merit matrix、利潤分享 pro-rata 等）。</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-2">
-        {items.map(([t, d]) => (
-          <div key={t} className="rounded-md border p-3">
-            <p className="text-sm font-medium">{t}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{d}</p>
+        {items.map((it) => (
+          <div key={it.term} className="rounded-md border p-3">
+            <p className="text-sm font-medium">{it.term}</p>
+            <p className="mt-1.5 text-xs leading-relaxed">
+              <span className="font-medium text-foreground">用途：</span>
+              <span className="text-muted-foreground">{it.purpose}</span>
+            </p>
+            <p className="mt-1 text-xs leading-relaxed">
+              <span className="font-medium text-foreground">怎麼看：</span>
+              <span className="text-muted-foreground">{it.reading}</span>
+            </p>
           </div>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ───────── 口語化意見回饋 ───────── */
+const INSIGHT_STYLE = {
+  good: { wrap: "border-emerald-200 bg-emerald-50", icon: CheckCircle2, iconColor: "text-emerald-600", title: "text-emerald-900", tag: "良好" },
+  info: { wrap: "border-sky-200 bg-sky-50", icon: Lightbulb, iconColor: "text-sky-600", title: "text-sky-900", tag: "提醒" },
+  warn: { wrap: "border-amber-300 bg-amber-50", icon: AlertTriangle, iconColor: "text-amber-600", title: "text-amber-900", tag: "需注意" },
+} as const;
+
+function InsightList({ insights }: { insights: Insight[] }) {
+  if (insights.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base"><Lightbulb className="size-4 text-primary" /> 重點意見（白話解讀）</CardTitle>
+        <CardDescription>系統根據本期數據自動判讀，給出結論與建議；下方圖表與數字為佐證依據。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {insights.map((it, i) => {
+          const s = INSIGHT_STYLE[it.level];
+          const Icon = s.icon;
+          return (
+            <div key={i} className={cn("flex items-start gap-2.5 rounded-md border p-3", s.wrap)}>
+              <Icon className={cn("mt-0.5 size-4 shrink-0", s.iconColor)} />
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-sm font-semibold", s.title)}>
+                  <span className="mr-1.5 rounded bg-white/70 px-1 py-0.5 text-[10px] font-medium align-middle">{s.tag}</span>
+                  {it.title}
+                </p>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{it.detail}</p>
+                {it.evidence && <p className="mt-1 text-[11px] text-muted-foreground/80">佐證：{it.evidence}</p>}
+              </div>
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );

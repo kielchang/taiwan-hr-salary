@@ -9,7 +9,7 @@ const ANALYTICS_GUIDE: [string, string][] = [
   ["級距與 compa-ratio", "建立薪資級距並指派員工 → 看每人相對中位的 compa-ratio 與區間滲透率、部門×級距熱圖。"],
   ["獎金／分紅試算", "設定獎金池與分配法（均分/按本薪/按績效/merit matrix），逐人試算獎金與二代健保概估、預算差異。"],
   ["年度／季度調薪試算", "設定調薪預算與分配法，逐人看調幅、調後薪資與 compa-ratio、年化雇主成本，及調薪前後公平性對比。"],
-  ["指標說明", "compa-ratio、CV、Gini、merit matrix、分配法等指標的白話定義與用途。"],
+  ["指標說明", "每個指標不講公式，只說明「能告訴你什麼（用途）」與「數字落在哪代表什麼（怎麼看）」。"],
 ];
 
 const MONTHLY_STEPS = [
@@ -129,6 +129,7 @@ export function HelpView() {
             ))}
           </div>
           <ul className="ml-5 list-disc space-y-1 text-xs text-muted-foreground">
+            <li>每個分頁最上方會有「<strong>重點意見（白話解讀）</strong>」：系統依當期數據自動判讀，直接給結論與建議（良好／提醒／需注意），下方圖表與數字僅作佐證——不必懂統計也能看懂。</li>
             <li>compa-ratio／區間滲透率需先在「級距與 compa-ratio」建立薪資級距並指派員工；未建級距則只顯示內部分布指標。</li>
             <li>「獎金／分紅試算」「調薪試算」可調績效評等與係數，並以 CSV 或「匯出 PDF 月報」帶走結果；<strong>試算不會寫回薪資結算</strong>。</li>
             <li>調薪試算的年化成本已把「基薪上升 → 投保金額變動 → 雇主保費」一併重算。</li>

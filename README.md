@@ -31,7 +31,7 @@ taiwan-hr-salary/
 | `tests/` | 自動化測試 | 以 §9 驗收案例為基準測試集（TC-1～TC-9）；§8 不變量納入驗證層（`src/lib/validation.ts`） |
 
 > **網站延伸功能（核心薪資管線之外、只讀薪資不影響結算）**：除依本規格的薪資結算（含薪資條加密 PDF／mailto 通知／批次 ZIP）外，網站另含
-> **薪酬分析**（成本結構、分布與公平之 CV/Gini/Lorenz、compa-ratio 與薪資級距、獎金·分紅試算、年度/季度調薪試算，零相依 SVG 圖表＋CSV／PDF 月報）
+> **薪酬分析**（成本結構、分布與公平之 CV/Gini/Lorenz、compa-ratio 與薪資級距、獎金·分紅試算、年度/季度調薪試算，零相依 SVG 圖表＋CSV／PDF 月報；每分頁最上方並依數據自動產生**白話「重點意見」**——直接給結論與建議，數據僅作佐證）
 > 與**出勤打卡**（GPS 軟性圍欄＋選用 IP、彈性上下班每日彙整）。均為純前端、資料存瀏覽器 localStorage，並以 react-router-dom（HashRouter）控制路由、GitHub Actions 部署至 GitHub Pages。詳見[附錄C](docs/appendix/附錄C_網站實作架構.md)。
 
 ## 目錄
