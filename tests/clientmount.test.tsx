@@ -52,6 +52,14 @@ describe("client mount + 路由（白屏防護）", () => {
     expect(div.textContent).toContain("投保級距表（四險）");
   });
 
+  it("深連結 /analytics → 薪酬分析頁", async () => {
+    seedDone();
+    const div = await mountAt("/analytics");
+    expect(div.textContent).toContain("薪酬分析");
+    expect(div.textContent).toContain("成本結構");
+    expect(div.textContent).toContain("年度／季度調薪試算");
+  });
+
   it("深連結 /attendance → 出勤打卡頁", async () => {
     seedDone();
     const div = await mountAt("/attendance");

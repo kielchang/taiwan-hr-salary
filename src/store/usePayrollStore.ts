@@ -10,7 +10,13 @@ import type {
   MonthlyEvent,
   PunchRecord,
   AttendanceConfig,
+  AnalyticsConfig,
+  PayGrade,
+  RatingTier,
+  BonusScenario,
+  RaiseScenario,
 } from "@/lib/types";
+import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import {
   SEED_EMPLOYEES,
   SEED_SALARIES,
@@ -83,6 +89,16 @@ interface PayrollState {
   removePunch: (id: string) => void;
   clearPunches: () => void;
 
+  /** 薪酬分析與試算（額外模組；試算不寫回薪資） */
+  analytics: AnalyticsConfig;
+  setBonusScenario: (patch: Partial<BonusScenario>) => void;
+  setRaiseScenario: (patch: Partial<RaiseScenario>) => void;
+  upsertPayGrade: (grade: PayGrade) => void;
+  removePayGrade: (id: string) => void;
+  setEmployeeGrade: (employeeId: string, gradeId: string | null) => void;
+  setEmployeeRating: (employeeId: string, ratingKey: string) => void;
+  setRatingTiers: (tiers: RatingTier[]) => void;
+
   /** 初始設定引導是否已完成（false → 顯示設定精靈） */
   setupCompleted: boolean;
   completeSetup: () => void;
@@ -139,6 +155,50 @@ export const usePayrollStore = create<PayrollState>()(
       removePunch: (id) =>
         set((st) => ({ punches: st.punches.filter((p) => p.id !== id) })),
       clearPunches: () => set({ punches: [] }),
+
+      analytics: DEFAULT_ANALYTICS,
+      setBonusScenario: (patch) =>
+        set((st) => ({ analytics: { ...st.analytics, scenario: { ...st.analytics.scenario, ...patch } } })),
+      setRaiseScenario: (patch) =>
+        set((st) => ({ analytics: { ...st.analytics, raiseScenario: { ...st.analytics.raiseScenario, ...patch } } })),
+      upsertPayGrade: (grade) =>
+        set((st) => ({
+          analytics: {
+            ...st.analytics,
+            payGrades: st.analytics.payGrades.some((g) => g.id === grade.id)
+              ? st.analytics.payGrades.map((g) => (g.id === grade.id ? grade : g))
+              : [...st.analytics.payGrades, grade],
+          },
+        })),
+      removePayGrade: (id) =>
+        set((st) => {
+          const gradeByEmployee = Object.fromEntries(
+            Object.entries(st.analytics.gradeByEmployee).filter(([, gid]) => gid !== id),
+          );
+          return {
+            analytics: {
+              ...st.analytics,
+              payGrades: st.analytics.payGrades.filter((g) => g.id !== id),
+              gradeByEmployee,
+            },
+          };
+        }),
+      setEmployeeGrade: (employeeId, gradeId) =>
+        set((st) => {
+          const gradeByEmployee = { ...st.analytics.gradeByEmployee };
+          if (gradeId) gradeByEmployee[employeeId] = gradeId;
+          else delete gradeByEmployee[employeeId];
+          return { analytics: { ...st.analytics, gradeByEmployee } };
+        }),
+      setEmployeeRating: (employeeId, ratingKey) =>
+        set((st) => ({
+          analytics: {
+            ...st.analytics,
+            performanceByEmployee: { ...st.analytics.performanceByEmployee, [employeeId]: ratingKey },
+          },
+        })),
+      setRatingTiers: (tiers) =>
+        set((st) => ({ analytics: { ...st.analytics, ratingTiers: tiers } })),
 
       setupCompleted: false,
       completeSetup: () => set({ setupCompleted: true }),
@@ -237,6 +297,7 @@ export const usePayrollStore = create<PayrollState>()(
           events: SEED_EVENTS,
           currentPeriod: SEED_PERIOD,
           punches: [],
+          analytics: DEFAULT_ANALYTICS,
         }),
       clearAll: () =>
         set({
@@ -245,6 +306,7 @@ export const usePayrollStore = create<PayrollState>()(
           dependents: [],
           events: [],
           punches: [],
+          analytics: DEFAULT_ANALYTICS,
         }),
     }),
     {
@@ -257,6 +319,12 @@ export const usePayrollStore = create<PayrollState>()(
           ...p,
           parameters: { ...current.parameters, ...(p.parameters ?? {}) },
           attendance: { ...current.attendance, ...(p.attendance ?? {}) },
+          analytics: {
+            ...current.analytics,
+            ...(p.analytics ?? {}),
+            scenario: { ...current.analytics.scenario, ...(p.analytics?.scenario ?? {}) },
+            raiseScenario: { ...current.analytics.raiseScenario, ...(p.analytics?.raiseScenario ?? {}) },
+          },
         };
       },
     },

@@ -118,3 +118,56 @@ export interface AttendanceConfig {
   coreStart: string; // 核心時段起 "HH:mm"（空字串＝不檢查）
   coreEnd: string; // 核心時段迄 "HH:mm"
 }
+
+/* ───────────── 薪酬分析與試算（額外模組；只讀薪資資料，試算不寫回） ───────────── */
+
+/** 薪資級距（HR 自訂；compa-ratio／區間滲透率參照） */
+export interface PayGrade {
+  id: string;
+  name: string; // 例：P3、管理職一級
+  min: number;
+  mid: number; // 中位
+  max: number;
+}
+
+/** 績效評等係數（預設 S1.3 / A1.1 / B1.0 / C0.8） */
+export interface RatingTier {
+  key: string;
+  label: string;
+  coefficient: number;
+}
+
+export type BonusPoolMode = "amount" | "percentOfPayroll";
+export type AllocationMethod = "equal" | "proRataBase" | "byPerformance" | "meritMatrix";
+
+/** 獎金／分紅試算情境 */
+export interface BonusScenario {
+  poolMode: BonusPoolMode;
+  poolAmount: number; // poolMode=amount
+  poolPercent: number; // poolMode=percentOfPayroll，% 以 Σ月薪資總額為基數
+  method: AllocationMethod;
+  targetBudget: number; // 預算差異基準
+  includeSupplementary: boolean; // 是否含個人二代健保補充費概估
+}
+
+export type RaiseMethod = "uniformPercent" | "proRataBase" | "byPerformance" | "meritMatrix";
+
+/** 年度／季度調薪試算情境 */
+export interface RaiseScenario {
+  cadence: "annual" | "quarterly"; // 期間別
+  budgetMode: "pct" | "amount"; // 調薪預算：占 Σ月薪資總額 % 或固定加薪池（月增額）
+  budgetValue: number;
+  method: RaiseMethod;
+  uniformPct: number; // method=uniformPercent 時的一致調幅（%）
+  targetBudget: number; // 年化雇主成本差異基準
+}
+
+/** 薪酬分析設定（持久化於 localStorage） */
+export interface AnalyticsConfig {
+  payGrades: PayGrade[];
+  gradeByEmployee: Record<string, string>; // employeeId → gradeId
+  ratingTiers: RatingTier[];
+  performanceByEmployee: Record<string, string>; // employeeId → ratingTier.key
+  scenario: BonusScenario;
+  raiseScenario: RaiseScenario;
+}
