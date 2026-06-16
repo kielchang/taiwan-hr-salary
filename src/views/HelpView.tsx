@@ -131,6 +131,7 @@ export function HelpView() {
           </div>
           <ul className="ml-5 list-disc space-y-1 text-xs text-muted-foreground">
             <li>每個分頁最上方會有「<strong>重點意見（白話解讀）</strong>」：系統依當期數據自動判讀，直接給結論與建議（良好／提醒／需注意），下方圖表與數字僅作佐證——不必懂統計也能看懂。</li>
+            <li>圖表可<strong>互動</strong>：滑鼠移到（或手機點按）長條／點上會高亮並顯示數據；<strong>點擊</strong>長條、散布點或部門列，下方會展開對應的員工明細清單。</li>
             <li>compa-ratio／區間滲透率需先在「級距與 compa-ratio」建立薪資級距並指派員工；未建級距則只顯示內部分布指標。</li>
             <li>「獎金／分紅試算」「調薪試算」可調績效評等與係數，並以 CSV 或「匯出 PDF 月報」帶走結果；<strong>試算不會寫回薪資結算</strong>。</li>
             <li>調薪試算的年化成本已把「基薪上升 → 投保金額變動 → 雇主保費」一併重算。</li>

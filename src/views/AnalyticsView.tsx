@@ -113,6 +113,8 @@ export function AnalyticsView() {
 /* ───────── 成本結構 ───────── */
 function CostTab({ rows }: { rows: PayrollRow[] }) {
   const { salaries, events, currentPeriod } = usePayrollStore();
+  const [selDept, setSelDept] = useState<string | null>(null);
+  const [selEmp, setSelEmp] = useState<string | null>(null);
   const baseOf = (id: string) => salaries.find((s) => s.employeeId === id)?.baseSalary ?? 0;
   const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.monthlyBonus ?? 0;
   const otherOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.otherAddition ?? 0;
@@ -186,20 +188,69 @@ function CostTab({ rows }: { rows: PayrollRow[] }) {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">部門別成本組成</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">部門別成本組成</CardTitle>
+          <CardDescription>點任一部門列，下方展開該部門逐人成本明細。</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-3">
-          <StackedBar rows={[...deptMap.entries()].map(([d, t]) => ({ label: d, segments: SEGS.map((s) => ({ label: s.label, value: t[s.key], color: s.color })) }))} />
+          <StackedBar
+            rows={[...deptMap.entries()].map(([d, t]) => ({ label: d, segments: SEGS.map((s) => ({ label: s.label, value: t[s.key], color: s.color })) }))}
+            onSelectRow={(d) => { setSelDept((cur) => (cur === d ? null : d)); setSelEmp(null); }}
+            selectedRow={selDept}
+          />
           <Legend items={SEGS.map((s) => ({ label: s.label, color: s.color }))} />
         </CardContent>
       </Card>
 
+      {selDept && (
+        <DetailPanel title={`部門明細：${selDept}`} onClose={() => setSelDept(null)}>
+          <Table>
+            <TableHeader><TableRow><TableHead>員工</TableHead>{SEGS.map((s) => <TableHead key={s.key} className="text-right">{s.label}</TableHead>)}<TableHead className="text-right">總成本</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {rows.filter((r) => (r.department || "（未填）") === selDept).map((r) => {
+                const c = comp(r);
+                return (
+                  <TableRow key={r.employeeId}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    {SEGS.map((s) => <TableCell key={s.key} className="text-right tabular-nums">{ntd(c[s.key])}</TableCell>)}
+                    <TableCell className="text-right font-medium tabular-nums">{ntd(r.employerTotalCost)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </DetailPanel>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">員工成本 Pareto（集中度 80/20）</CardTitle>
-          <CardDescription>少數高成本人力佔總成本比例，評估關鍵人力與集中風險。</CardDescription>
+          <CardDescription>少數高成本人力佔總成本比例，評估關鍵人力與集中風險。點任一長條看該員成本組成。</CardDescription>
         </CardHeader>
-        <CardContent><Pareto data={rows.map((r) => ({ label: r.name, value: r.employerTotalCost }))} /></CardContent>
+        <CardContent><Pareto data={rows.map((r) => ({ label: r.name, value: r.employerTotalCost, id: r.employeeId }))} onSelect={(it) => { setSelEmp((cur) => (cur === it.id ? null : it.id ?? null)); setSelDept(null); }} /></CardContent>
       </Card>
+
+      {selEmp && (() => {
+        const r = rows.find((x) => x.employeeId === selEmp);
+        if (!r) return null;
+        const c = comp(r);
+        return (
+          <DetailPanel title={`員工成本明細：${r.name}`} onClose={() => setSelEmp(null)}>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {SEGS.map((s) => (
+                <div key={s.key} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                  <span className="flex items-center gap-1.5 text-muted-foreground"><span className="size-2.5 rounded-sm" style={{ background: s.color }} />{s.label}</span>
+                  <span className="font-medium tabular-nums">{ntd(c[s.key])}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between rounded-md border-2 border-primary/30 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">雇主總成本</span>
+                <span className="font-bold tabular-nums">{ntd(r.employerTotalCost)}</span>
+              </div>
+            </div>
+          </DetailPanel>
+        );
+      })()}
     </div>
   );
 }
@@ -207,6 +258,9 @@ function CostTab({ rows }: { rows: PayrollRow[] }) {
 /* ───────── 分布與公平 ───────── */
 function DistTab({ rows }: { rows: PayrollRow[] }) {
   const { events, currentPeriod } = usePayrollStore();
+  const [selBin, setSelBin] = useState<number | null>(null);
+  const [selDept, setSelDept] = useState<string | null>(null);
+  const [selEmp, setSelEmp] = useState<string | null>(null);
   const pays = rows.map((r) => r.salaryTotal);
   const ps = percentileSet(pays);
   const cv = coefficientOfVariation(pays);
@@ -244,8 +298,11 @@ function DistTab({ rows }: { rows: PayrollRow[] }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">月薪資總額分布（直方圖）</CardTitle></CardHeader>
-          <CardContent><BarChart data={hist.map((b) => ({ label: ntd(b.start), value: b.count }))} valueFmt={(n) => `${n} 人`} color={PALETTE[0]} /></CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">月薪資總額分布（直方圖）</CardTitle>
+            <CardDescription>點任一桶，看落在該薪資區間的員工。</CardDescription>
+          </CardHeader>
+          <CardContent><BarChart data={hist.map((b) => ({ label: ntd(b.start), value: b.count }))} valueFmt={(n) => `${n} 人`} color={PALETTE[0]} selectedIndex={selBin} onSelect={(_, i) => { setSelBin((cur) => (cur === i ? null : i)); setSelDept(null); setSelEmp(null); }} /></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
@@ -256,21 +313,65 @@ function DistTab({ rows }: { rows: PayrollRow[] }) {
         </Card>
       </div>
 
+      {selBin !== null && hist[selBin] && (
+        <DetailPanel title={`薪資區間 ${ntd(Math.round(hist[selBin].start))} ～ ${ntd(Math.round(hist[selBin].end))} 的員工`} onClose={() => setSelBin(null)}>
+          <EmployeeMiniTable rows={rows.filter((r) => r.salaryTotal >= hist[selBin].start && (selBin === hist.length - 1 ? r.salaryTotal <= hist[selBin].end : r.salaryTotal < hist[selBin].end))} />
+        </DetailPanel>
+      )}
+
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">部門薪資中位數比較</CardTitle></CardHeader>
-        <CardContent><BarChart data={deptMedian} color={PALETTE[1]} /></CardContent>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">部門薪資中位數比較</CardTitle>
+          <CardDescription>點任一部門長條，看該部門員工薪資。</CardDescription>
+        </CardHeader>
+        <CardContent><BarChart data={deptMedian} color={PALETTE[1]} selectedIndex={selDept ? deptMedian.findIndex((d) => d.label === selDept) : null} onSelect={(it) => { setSelDept((cur) => (cur === it.label ? null : it.label)); setSelBin(null); setSelEmp(null); }} /></CardContent>
       </Card>
+
+      {selDept && (
+        <DetailPanel title={`部門明細：${selDept}`} onClose={() => setSelDept(null)}>
+          <EmployeeMiniTable rows={rows.filter((r) => (r.department || "（未填）") === selDept)} />
+        </DetailPanel>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">薪資 vs 年資（薪資壓縮檢視）</CardTitle>
-          <CardDescription>年資高但薪資未相稱，可能為薪資壓縮（pay compression）。</CardDescription>
+          <CardDescription>年資高但薪資未相稱，可能為薪資壓縮（pay compression）。點任一點看該員。</CardDescription>
         </CardHeader>
         <CardContent>
-          <Scatter xLabel="年資(月)" yLabel="月薪" points={rows.map((r) => ({ x: r.seniorityMonths, y: r.salaryTotal, label: `${r.name}：年資 ${r.seniorityMonths} 月、${ntd(r.salaryTotal)}` }))} />
+          <Scatter xLabel="年資(月)" yLabel="月薪"
+            points={rows.map((r) => ({ x: r.seniorityMonths, y: r.salaryTotal, id: r.employeeId, label: `${r.name}：年資 ${r.seniorityMonths} 月、${ntd(r.salaryTotal)}` }))}
+            onSelect={(p) => { setSelEmp((cur) => (cur === p.id ? null : p.id ?? null)); setSelBin(null); setSelDept(null); }} />
         </CardContent>
       </Card>
+
+      {selEmp && (() => {
+        const r = rows.find((x) => x.employeeId === selEmp);
+        return r ? <DetailPanel title={`員工明細：${r.name}`} onClose={() => setSelEmp(null)}><EmployeeMiniTable rows={[r]} /></DetailPanel> : null;
+      })()}
     </div>
+  );
+}
+
+/** 共用：員工薪資小表（鑽取明細用） */
+function EmployeeMiniTable({ rows }: { rows: PayrollRow[] }) {
+  if (rows.length === 0) return <p className="py-4 text-center text-sm text-muted-foreground">此範圍沒有員工。</p>;
+  return (
+    <Table>
+      <TableHeader><TableRow><TableHead>員工</TableHead><TableHead>部門</TableHead><TableHead className="text-right">年資(月)</TableHead><TableHead className="text-right">月薪資總額</TableHead><TableHead className="text-right">實發</TableHead><TableHead className="text-right">雇主總成本</TableHead></TableRow></TableHeader>
+      <TableBody>
+        {rows.map((r) => (
+          <TableRow key={r.employeeId}>
+            <TableCell className="font-medium">{r.name}</TableCell>
+            <TableCell className="text-sm">{r.department}</TableCell>
+            <TableCell className="text-right tabular-nums">{r.seniorityMonths}</TableCell>
+            <TableCell className="text-right tabular-nums">{ntd(r.salaryTotal)}</TableCell>
+            <TableCell className="text-right tabular-nums">{ntd(r.netPay)}</TableCell>
+            <TableCell className="text-right tabular-nums">{ntd(r.employerTotalCost)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -392,6 +493,7 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
   const { analytics, parameters, brackets, setBonusScenario, setEmployeeRating, setRatingTiers } = usePayrollStore();
   const sc = analytics.scenario;
   const result: BonusSimResult = simulateBonusPool(rows, analytics, parameters, brackets);
+  const [selEmp, setSelEmp] = useState<string | null>(null);
 
   const exportCsv = () => csvDownload(
     ["員工編號", "姓名", "部門", "月薪", "績效", "係數", "權重", "試算獎金", "二代健保概估"],
@@ -484,17 +586,35 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">試算獎金分布</CardTitle></CardHeader>
-          <CardContent><BarChart data={result.rows.map((r) => ({ label: r.name, value: r.bonus }))} color={PALETTE[3]} /></CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">試算獎金分布</CardTitle>
+            <CardDescription>點任一長條看該員試算細項。</CardDescription>
+          </CardHeader>
+          <CardContent><BarChart data={result.rows.map((r) => ({ label: r.name, value: r.bonus, id: r.employeeId }))} color={PALETTE[3]} selectedIndex={selEmp ? result.rows.findIndex((r) => r.employeeId === selEmp) : null} onSelect={(it) => setSelEmp((cur) => (cur === it.id ? null : it.id ?? null))} /></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">績效係數 vs 試算獎金</CardTitle>
-            <CardDescription>檢視 pay-for-performance 對齊度。</CardDescription>
+            <CardDescription>檢視 pay-for-performance 對齊度。點任一點看該員。</CardDescription>
           </CardHeader>
-          <CardContent><Scatter xLabel="績效係數" yLabel="獎金" points={result.rows.map((r) => ({ x: r.coefficient, y: r.bonus, label: `${r.name}：${r.ratingKey}、${ntd(r.bonus)}` }))} /></CardContent>
+          <CardContent><Scatter xLabel="績效係數" yLabel="獎金" color={PALETTE[3]} points={result.rows.map((r) => ({ x: r.coefficient, y: r.bonus, id: r.employeeId, label: `${r.name}：${r.ratingKey}、${ntd(r.bonus)}` }))} onSelect={(p) => setSelEmp((cur) => (cur === p.id ? null : p.id ?? null))} /></CardContent>
         </Card>
       </div>
+
+      {selEmp && (() => {
+        const r = result.rows.find((x) => x.employeeId === selEmp);
+        return r ? (
+          <DetailPanel title={`獎金試算明細：${r.name}`} onClose={() => setSelEmp(null)}>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {[["部門", r.department], ["績效評等", r.ratingKey], ["績效係數", r.coefficient.toFixed(2)], ["月薪資總額", ntd(r.base)], ["分配權重", ntd(Math.round(r.weight))], ["試算獎金", ntd(r.bonus)], ["二代健保概估", ntd(r.supplementary)]].map(([k, v]) => (
+                <div key={k} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">{k}</span><span className="font-medium tabular-nums">{v}</span>
+                </div>
+              ))}
+            </div>
+          </DetailPanel>
+        ) : null;
+      })()}
     </div>
   );
 }
@@ -505,6 +625,7 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
   const rs = analytics.raiseScenario;
   const result: RaiseSimResult = simulateRaise(rows, analytics, parameters, brackets);
   const quarterly = rs.cadence === "quarterly";
+  const [selRating, setSelRating] = useState<string | null>(null);
 
   // 調幅% by 績效
   const byRating = new Map<string, number[]>();
@@ -614,9 +735,32 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">平均調幅% by 績效</CardTitle></CardHeader>
-        <CardContent><BarChart data={raiseByRating} valueFmt={(n) => `${n.toFixed(1)}%`} color={PALETTE[2]} /></CardContent>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">平均調幅% by 績效</CardTitle>
+          <CardDescription>點任一評等，看該評等員工的逐人調薪。</CardDescription>
+        </CardHeader>
+        <CardContent><BarChart data={raiseByRating} valueFmt={(n) => `${n.toFixed(1)}%`} color={PALETTE[2]} selectedIndex={selRating ? raiseByRating.findIndex((d) => d.label === selRating) : null} onSelect={(it) => setSelRating((cur) => (cur === it.label ? null : it.label))} /></CardContent>
       </Card>
+
+      {selRating && (
+        <DetailPanel title={`評等 ${selRating} 的逐人調薪`} onClose={() => setSelRating(null)}>
+          <Table>
+            <TableHeader><TableRow><TableHead>員工</TableHead><TableHead className="text-right">現職月薪</TableHead><TableHead className="text-right">調幅%</TableHead><TableHead className="text-right">調後月薪</TableHead><TableHead className="text-right">月增額</TableHead><TableHead className="text-right">年化成本增額</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {result.rows.filter((r) => r.ratingKey === selRating).map((r) => (
+                <TableRow key={r.employeeId}>
+                  <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(r.currentSalary)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.raisePct.toFixed(1)}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(r.newSalary)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(r.monthlyIncrease)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(r.annualizedCostDelta)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DetailPanel>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
@@ -668,6 +812,9 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
 
   const trendInsights = analyzeTrend(snapshots);
   const budgetInsights = analyzeBudget({ annualBudget, currentAnnualizedCost, plannedDelta });
+  const [selPeriod, setSelPeriod] = useState<string | null>(null);
+  const selIdx = selPeriod ? sorted.findIndex((s) => s.period === selPeriod) : null;
+  const togglePeriod = (label: string) => setSelPeriod((cur) => (cur === label ? null : label));
 
   const save = () => saveSnapshot(buildSnapshot(rows, currentPeriod, bonusTotal));
 
@@ -716,22 +863,22 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
               <div className="grid gap-4 lg:grid-cols-3">
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">人事總成本</p>
-                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: s.totalCost }))} color={PALETTE[4]} />
+                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: s.totalCost }))} color={PALETTE[4]} selectedIndex={selIdx} onSelect={(it) => togglePeriod(it.label)} />
                 </div>
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">薪資中位數</p>
-                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: s.medianSalary }))} color={PALETTE[0]} />
+                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: s.medianSalary }))} color={PALETTE[0]} selectedIndex={selIdx} onSelect={(it) => togglePeriod(it.label)} />
                 </div>
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">Gini（公平性）</p>
-                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: Number(s.gini.toFixed(3)) }))} color={PALETTE[3]} valueFmt={(n) => n.toFixed(2)} zeroBased={false} />
+                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: Number(s.gini.toFixed(3)) }))} color={PALETTE[3]} valueFmt={(n) => n.toFixed(2)} zeroBased={false} selectedIndex={selIdx} onSelect={(it) => togglePeriod(it.label)} />
                 </div>
               </div>
               <Table>
                 <TableHeader><TableRow><TableHead>期間</TableHead><TableHead className="text-right">人數</TableHead><TableHead className="text-right">月薪資總額</TableHead><TableHead className="text-right">中位薪資</TableHead><TableHead className="text-right">總成本</TableHead><TableHead className="text-right">加班費</TableHead><TableHead className="text-right">獎金</TableHead><TableHead className="text-right">Gini</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
                 <TableBody>
                   {sorted.map((s) => (
-                    <TableRow key={s.period}>
+                    <TableRow key={s.period} className={cn("cursor-pointer", selPeriod === s.period && "bg-accent/60")} onClick={() => togglePeriod(s.period)}>
                       <TableCell className="font-medium">{s.period}</TableCell>
                       <TableCell className="text-right tabular-nums">{s.headcount}</TableCell>
                       <TableCell className="text-right tabular-nums">{ntd(s.totalSalary)}</TableCell>
@@ -902,6 +1049,17 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-xs">{label}</Label>{children}</div>;
+}
+function DetailPanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <Card className="border-primary/40 ring-1 ring-primary/20">
+      <CardHeader className="flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+        <Button variant="ghost" size="sm" onClick={onClose}>關閉明細</Button>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
 }
 function RatingEditor({ tiers, onChange }: { tiers: { key: string; label: string; coefficient: number }[]; onChange: (t: typeof tiers) => void }) {
   return (
