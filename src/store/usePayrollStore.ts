@@ -15,6 +15,8 @@ import type {
   RatingTier,
   BonusScenario,
   RaiseScenario,
+  PlanningConfig,
+  PayrollSnapshot,
 } from "@/lib/types";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import {
@@ -98,6 +100,13 @@ interface PayrollState {
   setEmployeeGrade: (employeeId: string, gradeId: string | null) => void;
   setEmployeeRating: (employeeId: string, ratingKey: string) => void;
   setRatingTiers: (tiers: RatingTier[]) => void;
+  setPlanning: (patch: Partial<PlanningConfig>) => void;
+
+  /** 薪酬趨勢快照（每期一筆，供趨勢儀表板） */
+  snapshots: PayrollSnapshot[];
+  saveSnapshot: (snapshot: PayrollSnapshot) => void;
+  removeSnapshot: (period: string) => void;
+  clearSnapshots: () => void;
 
   /** 初始設定引導是否已完成（false → 顯示設定精靈） */
   setupCompleted: boolean;
@@ -199,6 +208,20 @@ export const usePayrollStore = create<PayrollState>()(
         })),
       setRatingTiers: (tiers) =>
         set((st) => ({ analytics: { ...st.analytics, ratingTiers: tiers } })),
+      setPlanning: (patch) =>
+        set((st) => ({ analytics: { ...st.analytics, planning: { ...st.analytics.planning, ...patch } } })),
+
+      snapshots: [],
+      saveSnapshot: (snapshot) =>
+        set((st) => ({
+          snapshots: [
+            ...st.snapshots.filter((s) => s.period !== snapshot.period),
+            snapshot,
+          ].sort((a, b) => a.period.localeCompare(b.period)),
+        })),
+      removeSnapshot: (period) =>
+        set((st) => ({ snapshots: st.snapshots.filter((s) => s.period !== period) })),
+      clearSnapshots: () => set({ snapshots: [] }),
 
       setupCompleted: false,
       completeSetup: () => set({ setupCompleted: true }),
@@ -298,6 +321,7 @@ export const usePayrollStore = create<PayrollState>()(
           currentPeriod: SEED_PERIOD,
           punches: [],
           analytics: DEFAULT_ANALYTICS,
+          snapshots: [],
         }),
       clearAll: () =>
         set({
@@ -307,6 +331,7 @@ export const usePayrollStore = create<PayrollState>()(
           events: [],
           punches: [],
           analytics: DEFAULT_ANALYTICS,
+          snapshots: [],
         }),
     }),
     {
@@ -324,7 +349,9 @@ export const usePayrollStore = create<PayrollState>()(
             ...(p.analytics ?? {}),
             scenario: { ...current.analytics.scenario, ...(p.analytics?.scenario ?? {}) },
             raiseScenario: { ...current.analytics.raiseScenario, ...(p.analytics?.raiseScenario ?? {}) },
+            planning: { ...current.analytics.planning, ...(p.analytics?.planning ?? {}) },
           },
+          snapshots: p.snapshots ?? current.snapshots,
         };
       },
     },

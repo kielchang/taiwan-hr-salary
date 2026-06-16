@@ -128,6 +128,10 @@ export interface PayGrade {
   min: number;
   mid: number; // 中位
   max: number;
+  // —— 市場行情對標（選填；填了才會算「對市場」compa-ratio）——
+  marketP25?: number; // 市場 P25
+  marketMid?: number; // 市場中位（市場 compa-ratio 之分母）
+  marketP75?: number; // 市場 P75
 }
 
 /** 績效評等係數（預設 S1.3 / A1.1 / B1.0 / C0.8） */
@@ -162,6 +166,29 @@ export interface RaiseScenario {
   targetBudget: number; // 年化雇主成本差異基準
 }
 
+/** 年度薪酬預算規劃（持久化） */
+export interface PlanningConfig {
+  annualPayrollBudget: number; // 年度人事預算（以雇主總成本計，全年）
+}
+
+/**
+ * 薪酬趨勢快照：每期保存一次彙總指標，供趨勢儀表板畫時間序列。
+ * 資料為當期結算後的彙總值（不含個資），存於 localStorage。
+ */
+export interface PayrollSnapshot {
+  period: string; // yyyy-mm
+  savedAt: string; // ISO 保存時間
+  headcount: number;
+  totalSalary: number; // Σ月薪資總額
+  meanSalary: number;
+  medianSalary: number;
+  totalCost: number; // Σ雇主總成本（含負擔）
+  employerBurden: number; // Σ雇主法定負擔
+  overtimePay: number; // Σ加班費
+  bonusTotal: number; // Σ當月獎金
+  gini: number; // 月薪資總額之 Gini
+}
+
 /** 薪酬分析設定（持久化於 localStorage） */
 export interface AnalyticsConfig {
   payGrades: PayGrade[];
@@ -170,4 +197,5 @@ export interface AnalyticsConfig {
   performanceByEmployee: Record<string, string>; // employeeId → ratingTier.key
   scenario: BonusScenario;
   raiseScenario: RaiseScenario;
+  planning: PlanningConfig;
 }

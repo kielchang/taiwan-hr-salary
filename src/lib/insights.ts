@@ -2,6 +2,7 @@
 // 數據僅作為佐證（evidence）。每條意見含等級：good（良好）/ info（提醒）/ warn（需注意）。
 import { ntd, pct } from "./utils";
 import { gini, coefficientOfVariation, percentile } from "./analytics";
+import type { PayrollSnapshot } from "./types";
 
 export type InsightLevel = "good" | "info" | "warn";
 export interface Insight {
@@ -176,5 +177,75 @@ export function analyzeRaise(input: {
     if (v > 0) out.push({ level: "warn", title: "年化成本超出目標預算", detail: "目前調薪情境會超出年度預算，建議調降幅度或調整分配。", evidence: `超出 ${ntd(v)} 元` });
     else out.push({ level: "good", title: "在年度預算內", detail: "年化成本增額未超過目標預算。", evidence: `結餘 ${ntd(-v)} 元` });
   }
+  return out;
+}
+
+/* ───────── 市場行情對標 ───────── */
+export function analyzeMarket(items: { marketCompaRatio: number | null }[]): Insight[] {
+  const out: Insight[] = [];
+  const rated = items.filter((i) => i.marketCompaRatio != null);
+  if (rated.length === 0) {
+    out.push({ level: "info", title: "尚未填入市場行情，無法評估競爭力", detail: "在級距填上「市場中位」後，系統會算出每個人相對市場的薪資水位（市場 compa-ratio），才能判斷我們是領先還是落後同業、有沒有挖角風險。", evidence: "市場 compa-ratio 需要級距的市場中位數" });
+    return out;
+  }
+  const below = rated.filter((i) => (i.marketCompaRatio as number) < 0.9).length;
+  const above = rated.filter((i) => (i.marketCompaRatio as number) > 1.1).length;
+  const vals = rated.map((i) => i.marketCompaRatio as number);
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+
+  if (below > 0)
+    out.push({ level: "warn", title: `${below} 人薪資低於市場一成以上`, detail: "市場 compa-ratio < 0.9 代表低於同業中位甚多，被挖角風險高；若是關鍵人才，建議優先檢視是否需向市場靠攏。", evidence: `市場 compa-ratio < 0.90 之人數 ${below}` });
+  if (above > 0)
+    out.push({ level: "info", title: `${above} 人薪資高於市場一成以上`, detail: "高於市場中位一成以上，留才上有優勢但成本較高；可確認是否對應稀缺性或績效，避免無差別偏高。", evidence: `市場 compa-ratio > 1.10 之人數 ${above}` });
+  if (avg < 0.95)
+    out.push({ level: "warn", title: "整體薪資略低於市場", detail: "平均市場 compa-ratio 偏低，整體競爭力不足；招募與留才可能吃力，宜納入年度調薪規劃。", evidence: `平均市場 compa-ratio ${avg.toFixed(2)}` });
+  else if (avg <= 1.1)
+    out.push({ level: "good", title: "整體薪資與市場相當", detail: "平均落在市場中位附近，競爭力健康。", evidence: `平均市場 compa-ratio ${avg.toFixed(2)}` });
+  else
+    out.push({ level: "info", title: "整體薪資高於市場", detail: "平均高於市場中位，留才有利但要留意人事成本合理性。", evidence: `平均市場 compa-ratio ${avg.toFixed(2)}` });
+  return out;
+}
+
+/* ───────── 薪酬趨勢 ───────── */
+export function analyzeTrend(snapshots: PayrollSnapshot[]): Insight[] {
+  const out: Insight[] = [];
+  if (snapshots.length < 2) {
+    out.push({ level: "info", title: "趨勢需要至少兩期快照", detail: "每次結算後按「保存本期快照」留下彙總；累積兩期以上，就能看人事成本、薪資中位與公平性的走勢，規劃時才有依據。", evidence: `目前已保存 ${snapshots.length} 期` });
+    return out;
+  }
+  const sorted = [...snapshots].sort((a, b) => a.period.localeCompare(b.period));
+  const first = sorted[0], last = sorted[sorted.length - 1];
+
+  if (first.totalCost > 0) {
+    const chg = (last.totalCost - first.totalCost) / first.totalCost;
+    const level: InsightLevel = chg > 0.1 ? "warn" : chg < -0.02 ? "info" : "good";
+    out.push({ level, title: `人事總成本${chg >= 0 ? "上升" : "下降"} ${pct(Math.abs(chg))}`, detail: chg > 0.1 ? "成本成長偏快，確認是人數增加、調薪或加班/獎金所致，並對照預算。" : "成本走勢平穩，符合多數情況；持續觀察單月波動來源。", evidence: `${first.period} ${ntd(first.totalCost)} → ${last.period} ${ntd(last.totalCost)}` });
+  }
+  if (first.medianSalary > 0) {
+    const chg = (last.medianSalary - first.medianSalary) / first.medianSalary;
+    out.push({ level: chg > 0 ? "good" : "info", title: `薪資中位${chg >= 0 ? "成長" : "下降"} ${pct(Math.abs(chg))}`, detail: "中位數比平均更能代表「一般員工」的薪資走向；持續成長代表整體往上，停滯則要留意競爭力。", evidence: `${ntd(first.medianSalary)} → ${ntd(last.medianSalary)}` });
+  }
+  const giniChg = last.gini - first.gini;
+  if (Math.abs(giniChg) >= 0.01)
+    out.push({ level: giniChg < 0 ? "good" : "info", title: `薪資差距${giniChg < 0 ? "縮小" : "擴大"}`, detail: giniChg < 0 ? "整體公平性隨時間改善。" : "差距隨時間擴大，確認是否因高薪集中成長所致。", evidence: `Gini ${first.gini.toFixed(3)} → ${last.gini.toFixed(3)}` });
+  return out;
+}
+
+/* ───────── 年度預算追蹤 ───────── */
+export function analyzeBudget(input: { annualBudget: number; currentAnnualizedCost: number; plannedDelta: number }): Insight[] {
+  const { annualBudget, currentAnnualizedCost, plannedDelta } = input;
+  const out: Insight[] = [];
+  if (annualBudget <= 0) {
+    out.push({ level: "info", title: "尚未設定年度人事預算", detail: "填入全年人事預算後，系統會把「目前年化成本＋試算調整」和預算相比，隨時告訴你還剩多少、會不會超支。", evidence: "年度預算為規劃用，不影響實際薪資" });
+    return out;
+  }
+  const projected = currentAnnualizedCost + plannedDelta;
+  const util = projected / annualBudget;
+  if (util > 1)
+    out.push({ level: "warn", title: "預估全年人事成本超出預算", detail: "把目前薪資年化、加上試算中的調薪/獎金後會超支；建議調降調整幅度或重新檢視預算。", evidence: `預估 ${ntd(projected)} / 預算 ${ntd(annualBudget)}（達 ${pct(util)}）` });
+  else if (util > 0.95)
+    out.push({ level: "info", title: "預算使用接近上限", detail: "已逼近年度預算，後續調整空間有限，留意臨時性加班與獎金。", evidence: `預估占預算 ${pct(util)}，結餘 ${ntd(annualBudget - projected)}` });
+  else
+    out.push({ level: "good", title: "預算可控，仍有空間", detail: "預估全年成本在預算內，尚有調整餘裕。", evidence: `預估占預算 ${pct(util)}，結餘 ${ntd(annualBudget - projected)}` });
   return out;
 }

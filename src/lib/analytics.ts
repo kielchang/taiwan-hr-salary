@@ -5,6 +5,7 @@ import type {
   BonusScenario,
   RaiseScenario,
   PayGrade,
+  PayrollSnapshot,
 } from "./types";
 import type { Parameters } from "@/config/parameters";
 import type { InsuranceBrackets } from "@/config/brackets";
@@ -168,8 +169,9 @@ export interface EmpBasis {
   ratingKey: string;
   coefficient: number;
   grade: PayGrade | null;
-  compaRatio: number | null;
+  compaRatio: number | null; // 對內部級距中位
   rangePenetration: number | null;
+  marketCompaRatio: number | null; // 對市場中位（grade.marketMid 填了才有）
 }
 
 export function gradeForEmployee(cfg: AnalyticsConfig, employeeId: string): PayGrade | null {
@@ -197,6 +199,7 @@ export function buildBasis(rows: PayrollRow[], cfg: AnalyticsConfig): EmpBasis[]
       grade,
       compaRatio: grade ? compaRatio(r.salaryTotal, grade.mid) : null,
       rangePenetration: grade ? rangePenetration(r.salaryTotal, grade.min, grade.max) : null,
+      marketCompaRatio: grade?.marketMid ? compaRatio(r.salaryTotal, grade.marketMid) : null,
     };
   });
 }
@@ -404,4 +407,68 @@ export function simulateRaise(
     cvBefore: coefficientOfVariation(beforeVals),
     cvAfter: coefficientOfVariation(afterVals),
   };
+}
+
+/* ───────────── 薪酬趨勢快照 ───────────── */
+
+/** 由當期結算列＋當月獎金合計，計算可保存的趨勢快照（不含個資） */
+export function buildSnapshot(rows: PayrollRow[], period: string, bonusTotal: number): PayrollSnapshot {
+  const salaries = rows.map((r) => r.salaryTotal);
+  return {
+    period,
+    savedAt: new Date().toISOString(),
+    headcount: rows.length,
+    totalSalary: salaries.reduce((a, b) => a + b, 0),
+    meanSalary: round(mean(salaries)),
+    medianSalary: round(percentile(salaries, 0.5)),
+    totalCost: rows.reduce((a, r) => a + r.employerTotalCost, 0),
+    employerBurden: rows.reduce((a, r) => a + r.employerBurden, 0),
+    overtimePay: rows.reduce((a, r) => a + r.overtimePay, 0),
+    bonusTotal,
+    gini: gini(salaries),
+  };
+}
+
+/* ───────────── 調薪方案並排比較（同預算下比較分配法） ───────────── */
+
+export interface RaiseMethodCompareRow {
+  method: RaiseScenario["method"];
+  label: string;
+  totalMonthlyIncrease: number;
+  totalAnnualizedCostDelta: number;
+  avgRaisePct: number;
+  giniAfter: number;
+  variance: number; // 年化 − 目標預算
+}
+
+const RAISE_METHOD_LABELS: Record<RaiseScenario["method"], string> = {
+  uniformPercent: "一致調幅 %",
+  proRataBase: "按本薪分配",
+  byPerformance: "按績效係數",
+  meritMatrix: "merit matrix",
+};
+
+/**
+ * 以目前情境的預算/調幅設定，分別套用四種分配法跑 simulateRaise，
+ * 回傳各法的年化成本、平均調幅、調後 Gini 與預算差異，供並排比較。
+ */
+export function compareRaiseMethods(
+  rows: PayrollRow[],
+  cfg: AnalyticsConfig,
+  parameters: Parameters,
+  brackets: InsuranceBrackets,
+): RaiseMethodCompareRow[] {
+  const methods: RaiseScenario["method"][] = ["uniformPercent", "proRataBase", "byPerformance", "meritMatrix"];
+  return methods.map((method) => {
+    const r = simulateRaise(rows, { ...cfg, raiseScenario: { ...cfg.raiseScenario, method } }, parameters, brackets);
+    return {
+      method,
+      label: RAISE_METHOD_LABELS[method],
+      totalMonthlyIncrease: r.totalMonthlyIncrease,
+      totalAnnualizedCostDelta: r.totalAnnualizedCostDelta,
+      avgRaisePct: r.avgRaisePct,
+      giniAfter: r.giniAfter,
+      variance: r.variance,
+    };
+  });
 }

@@ -13,19 +13,21 @@ import { saveBlob } from "@/lib/payslipPdf";
 import { cn, ntd, pct, formatPeriod } from "@/lib/utils";
 import {
   percentileSet, coefficientOfVariation, gini, lorenzPoints, histogram,
-  buildBasis, simulateBonusPool, simulateRaise, type BonusSimResult, type RaiseSimResult,
+  buildBasis, simulateBonusPool, simulateRaise, buildSnapshot, compareRaiseMethods,
+  type BonusSimResult, type RaiseSimResult,
 } from "@/lib/analytics";
-import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, PALETTE } from "@/components/charts";
+import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, TrendChart, PALETTE } from "@/components/charts";
 import {
-  analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise, type Insight,
+  analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
+  analyzeMarket, analyzeTrend, analyzeBudget, type Insight,
 } from "@/lib/insights";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
-import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb } from "lucide-react";
+import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb, Save, TrendingUp } from "lucide-react";
 
-type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "glossary";
+type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "trend" | "glossary";
 const TABS: [Tab, string][] = [
   ["cost", "成本結構"], ["dist", "分布與公平"], ["grade", "級距與 compa-ratio"],
-  ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["glossary", "指標說明"],
+  ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["trend", "趨勢與預算"], ["glossary", "指標說明"],
 ];
 
 function csvDownload(headers: string[], rows: (string | number)[][], fileName: string) {
@@ -66,7 +68,7 @@ export function AnalyticsView() {
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer /> 列印
           </Button>
-          <Button size="sm" onClick={exportPdf} disabled={exporting || (rows.length === 0 && tab !== "glossary")}>
+          <Button size="sm" onClick={exportPdf} disabled={exporting || (rows.length === 0 && tab !== "glossary" && tab !== "trend")}>
             <FileDown /> {exporting ? "產生中…" : "匯出 PDF 月報"}
           </Button>
         </div>
@@ -88,7 +90,7 @@ export function AnalyticsView() {
           <p className="text-xs text-muted-foreground">期間 {formatPeriod(currentPeriod)}（分析基於本機當期資料；試算為規劃沙盒）</p>
         </div>
 
-        {rows.length === 0 && tab !== "glossary" ? (
+        {rows.length === 0 && tab !== "glossary" && tab !== "trend" ? (
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
             尚無薪資資料。請先到「基本資料」建立員工與薪資結構，並於「每月薪資作業」確認當期。
           </CardContent></Card>
@@ -99,6 +101,7 @@ export function AnalyticsView() {
             {tab === "grade" && <GradeTab rows={rows} />}
             {tab === "bonus" && <BonusTab rows={rows} />}
             {tab === "raise" && <RaiseTab rows={rows} />}
+            {tab === "trend" && <TrendTab rows={rows} />}
             {tab === "glossary" && <GlossaryTab />}
           </>
         )}
@@ -280,7 +283,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
   const hasGrades = grades.length > 0;
 
   const addGrade = () => upsertPayGrade({ id: `G${Date.now()}`, name: `級距${grades.length + 1}`, min: 30000, mid: 40000, max: 50000 });
-  const patchGrade = (id: string, patch: Partial<{ name: string; min: number; mid: number; max: number }>) => {
+  const patchGrade = (id: string, patch: Partial<{ name: string; min: number; mid: number; max: number; marketMid: number }>) => {
     const g = grades.find((x) => x.id === id); if (g) upsertPayGrade({ ...g, ...patch });
   };
 
@@ -293,10 +296,13 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
     }),
   );
 
-  const insights = analyzeGrades(
-    basis.map((b) => ({ compaRatio: b.compaRatio, pay: b.base, min: b.grade?.min ?? null, max: b.grade?.max ?? null })),
-    hasGrades,
-  );
+  const insights = [
+    ...analyzeGrades(
+      basis.map((b) => ({ compaRatio: b.compaRatio, pay: b.base, min: b.grade?.min ?? null, max: b.grade?.max ?? null })),
+      hasGrades,
+    ),
+    ...(hasGrades ? analyzeMarket(basis.map((b) => ({ marketCompaRatio: b.marketCompaRatio }))) : []),
+  ];
 
   return (
     <div className="space-y-4">
@@ -304,8 +310,8 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
       <Card>
         <CardHeader className="flex-row items-center justify-between pb-2">
           <div>
-            <CardTitle className="text-base">薪資級距（min / 中位 / max）</CardTitle>
-            <CardDescription>用於計算 compa-ratio 與區間滲透率；未設定時下方僅顯示內部分布。</CardDescription>
+            <CardTitle className="text-base">薪資級距（min / 中位 / max ＋市場中位）</CardTitle>
+            <CardDescription>內部 min/中位/max 用於 compa-ratio 與區間滲透率；「市場中位」選填，填了才算「對市場」compa-ratio（競爭力）。</CardDescription>
           </div>
           <Button size="sm" onClick={addGrade}><Plus /> 新增級距</Button>
         </CardHeader>
@@ -314,7 +320,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
             <p className="text-sm text-muted-foreground">尚未建立級距。</p>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>名稱</TableHead><TableHead className="text-right">下限</TableHead><TableHead className="text-right">中位</TableHead><TableHead className="text-right">上限</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>名稱</TableHead><TableHead className="text-right">下限</TableHead><TableHead className="text-right">中位</TableHead><TableHead className="text-right">上限</TableHead><TableHead className="text-right">市場中位</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
               <TableBody>
                 {grades.map((g) => (
                   <TableRow key={g.id}>
@@ -322,6 +328,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
                     <TableCell className="text-right"><Input type="number" className="h-8 w-24 col-input text-right" value={g.min} onChange={(e) => patchGrade(g.id, { min: Number(e.target.value) || 0 })} /></TableCell>
                     <TableCell className="text-right"><Input type="number" className="h-8 w-24 col-input text-right" value={g.mid} onChange={(e) => patchGrade(g.id, { mid: Number(e.target.value) || 0 })} /></TableCell>
                     <TableCell className="text-right"><Input type="number" className="h-8 w-24 col-input text-right" value={g.max} onChange={(e) => patchGrade(g.id, { max: Number(e.target.value) || 0 })} /></TableCell>
+                    <TableCell className="text-right"><Input type="number" placeholder="選填" className="h-8 w-24 col-input text-right" value={g.marketMid ?? ""} onChange={(e) => patchGrade(g.id, { marketMid: Number(e.target.value) || 0 })} /></TableCell>
                     <TableCell><Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => removePayGrade(g.id)}><Trash2 className="size-3.5" /></Button></TableCell>
                   </TableRow>
                 ))}
@@ -341,7 +348,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">員工級距指派與 compa-ratio</CardTitle></CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>員工</TableHead><TableHead>部門</TableHead><TableHead className="text-right">月薪</TableHead><TableHead>級距</TableHead><TableHead className="text-right">compa-ratio</TableHead><TableHead className="text-right">區間滲透率</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>員工</TableHead><TableHead>部門</TableHead><TableHead className="text-right">月薪</TableHead><TableHead>級距</TableHead><TableHead className="text-right">compa-ratio</TableHead><TableHead className="text-right">市場 compa</TableHead><TableHead className="text-right">區間滲透率</TableHead></TableRow></TableHeader>
             <TableBody>
               {basis.map((b) => (
                 <TableRow key={b.employeeId}>
@@ -358,6 +365,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
                     </Select>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{b.compaRatio == null ? "—" : b.compaRatio.toFixed(2)}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums", b.marketCompaRatio != null && b.marketCompaRatio < 0.9 && "text-amber-600 font-medium")}>{b.marketCompaRatio == null ? "—" : b.marketCompaRatio.toFixed(2)}</TableCell>
                   <TableCell className="text-right tabular-nums">{b.rangePenetration == null ? "—" : pct(b.rangePenetration)}</TableCell>
                 </TableRow>
               ))}
@@ -503,6 +511,10 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
   result.rows.forEach((r) => byRating.set(r.ratingKey, [...(byRating.get(r.ratingKey) ?? []), r.raisePct]));
   const raiseByRating = [...byRating.entries()].map(([k, arr]) => ({ label: k, value: arr.reduce((a, b) => a + b, 0) / arr.length }));
 
+  // 方案並排比較：同預算/調幅設定下，四種分配法的結果
+  const compare = compareRaiseMethods(rows, analytics, parameters, brackets);
+  const bestFair = Math.min(...compare.map((c) => c.giniAfter));
+
   const exportCsv = () => csvDownload(
     ["員工編號", "姓名", "部門", "績效", "現職月薪", "調幅%", "調後月薪", "月增額", "Δ雇主負擔", "年化成本增額", "調後compa"],
     result.rows.map((r) => [r.employeeId, r.name, r.department, r.ratingKey, r.currentSalary, r.raisePct.toFixed(2), r.newSalary, r.monthlyIncrease, r.employerDelta, r.annualizedCostDelta, r.newCompaRatio == null ? "" : r.newCompaRatio.toFixed(2)]),
@@ -605,6 +617,138 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">平均調幅% by 績效</CardTitle></CardHeader>
         <CardContent><BarChart data={raiseByRating} valueFmt={(n) => `${n.toFixed(1)}%`} color={PALETTE[2]} /></CardContent>
       </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">分配方法並排比較</CardTitle>
+          <CardDescription>用目前的預算/調幅設定，把四種分配法跑一遍並列；同樣花費下，哪種更公平、是否在預算內，一眼比較。目前選用：<Badge variant="outline">{compare.find((c) => c.method === rs.method)?.label}</Badge></CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader><TableRow><TableHead>分配法</TableHead><TableHead className="text-right">月增額合計</TableHead><TableHead className="text-right">年化成本增額</TableHead><TableHead className="text-right">平均調幅</TableHead><TableHead className="text-right">調後 Gini</TableHead>{rs.targetBudget > 0 && <TableHead className="text-right">預算差異</TableHead>}</TableRow></TableHeader>
+            <TableBody>
+              {compare.map((c) => (
+                <TableRow key={c.method} className={cn(c.method === rs.method && "bg-accent/50")}>
+                  <TableCell className="font-medium">
+                    {c.label}{c.method === rs.method && <Badge variant="outline" className="ml-1.5 text-[10px]">目前</Badge>}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(c.totalMonthlyIncrease)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(c.totalAnnualizedCostDelta)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.avgRaisePct.toFixed(1)}%</TableCell>
+                  <TableCell className={cn("text-right tabular-nums", c.giniAfter === bestFair && "font-bold text-emerald-600")}>{c.giniAfter.toFixed(3)}</TableCell>
+                  {rs.targetBudget > 0 && <TableCell className={cn("text-right tabular-nums", c.variance > 0 ? "text-red-600" : "text-emerald-600")}>{c.variance > 0 ? `超 ${ntd(c.variance)}` : `餘 ${ntd(-c.variance)}`}</TableCell>}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className="mt-2 text-xs text-muted-foreground">綠色＝四法中調後最公平（Gini 最低）。一致調幅與按本薪不看績效；按績效/merit matrix 會向高績效（與級距偏低者）傾斜。切換上方「分配方法」即可套用。</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ───────── 趨勢與預算 ───────── */
+function TrendTab({ rows }: { rows: PayrollRow[] }) {
+  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameters, brackets, setPlanning } = usePayrollStore();
+
+  const bonusTotal = rows.reduce((a, r) => a + (events.find((e) => e.employeeId === r.employeeId && e.period === currentPeriod)?.monthlyBonus ?? 0), 0);
+  const canSave = rows.length > 0;
+  const sorted = [...snapshots].sort((a, b) => a.period.localeCompare(b.period));
+  const alreadySaved = snapshots.some((s) => s.period === currentPeriod);
+
+  // 年度預算追蹤
+  const annualBudget = analytics.planning.annualPayrollBudget;
+  const currentMonthlyCost = rows.reduce((a, r) => a + r.employerTotalCost, 0);
+  const currentAnnualizedCost = currentMonthlyCost * 12;
+  const raise = simulateRaise(rows, analytics, parameters, brackets);
+  const bonus = simulateBonusPool(rows, analytics, parameters, brackets);
+  const plannedDelta = raise.totalAnnualizedCostDelta + bonus.totalBonus; // 調薪年化 + 獎金（一次性）
+  const projected = currentAnnualizedCost + plannedDelta;
+
+  const trendInsights = analyzeTrend(snapshots);
+  const budgetInsights = analyzeBudget({ annualBudget, currentAnnualizedCost, plannedDelta });
+
+  const save = () => saveSnapshot(buildSnapshot(rows, currentPeriod, bonusTotal));
+
+  return (
+    <div className="space-y-4">
+      {/* 年度預算追蹤 */}
+      <InsightList insights={budgetInsights} />
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">年度人事預算追蹤</CardTitle>
+          <CardDescription>把「目前薪資年化」加上「試算中的調薪＋獎金」與年度預算相比，看還剩多少、會不會超支（規劃用，不影響實際薪資）。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:max-w-xs">
+            <Field label="年度人事預算（雇主總成本，全年）">
+              <Input type="number" step="100000" className="col-input" value={annualBudget} onChange={(e) => setPlanning({ annualPayrollBudget: Number(e.target.value) || 0 })} />
+            </Field>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Stat label="目前年化成本" value={`${ntd(currentAnnualizedCost)} 元`} hint="當期雇主總成本 ×12" />
+            <Stat label="試算調薪（年化）" value={`${ntd(raise.totalAnnualizedCostDelta)} 元`} hint="含投保保費重算" />
+            <Stat label="試算獎金（一次性）" value={`${ntd(bonus.totalBonus)} 元`} />
+            <Stat label="預估全年合計" value={`${ntd(projected)} 元`} />
+          </div>
+          {annualBudget > 0 && <Bullet label="預估全年人事成本 vs 年度預算" value={projected} target={annualBudget} />}
+        </CardContent>
+      </Card>
+
+      {/* 薪酬趨勢 */}
+      <InsightList insights={trendInsights} />
+      <Card>
+        <CardHeader className="flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="size-4 text-primary" /> 薪酬趨勢（歷期快照）</CardTitle>
+            <CardDescription>每期結算後按右側保存一次彙總，累積即可看走勢。快照只存彙總數字、不含個資，留在本機。</CardDescription>
+          </div>
+          <Button size="sm" onClick={save} disabled={!canSave}>
+            <Save /> {alreadySaved ? `更新 ${currentPeriod} 快照` : `保存 ${currentPeriod} 快照`}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {sorted.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">尚無快照。{canSave ? "按右上角保存本期，開始累積趨勢。" : "請先於「每月薪資作業」建立當期薪資。"}</p>
+          ) : (
+            <>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">人事總成本</p>
+                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: s.totalCost }))} color={PALETTE[4]} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">薪資中位數</p>
+                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: s.medianSalary }))} color={PALETTE[0]} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Gini（公平性）</p>
+                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: Number(s.gini.toFixed(3)) }))} color={PALETTE[3]} valueFmt={(n) => n.toFixed(2)} zeroBased={false} />
+                </div>
+              </div>
+              <Table>
+                <TableHeader><TableRow><TableHead>期間</TableHead><TableHead className="text-right">人數</TableHead><TableHead className="text-right">月薪資總額</TableHead><TableHead className="text-right">中位薪資</TableHead><TableHead className="text-right">總成本</TableHead><TableHead className="text-right">加班費</TableHead><TableHead className="text-right">獎金</TableHead><TableHead className="text-right">Gini</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
+                <TableBody>
+                  {sorted.map((s) => (
+                    <TableRow key={s.period}>
+                      <TableCell className="font-medium">{s.period}</TableCell>
+                      <TableCell className="text-right tabular-nums">{s.headcount}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(s.totalSalary)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(s.medianSalary)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(s.totalCost)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(s.overtimePay)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(s.bonusTotal)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{s.gini.toFixed(3)}</TableCell>
+                      <TableCell><Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => removeSnapshot(s.period)}><Trash2 className="size-3.5" /></Button></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -666,6 +810,21 @@ function GlossaryTab() {
       term: "年化成本增額",
       purpose: "把調薪的影響換算成「整年公司要多付多少」，且把基薪調高後連帶增加的雇主保費一併算進去，作為預算決策依據。",
       reading: "這個數字＝每月增額（含雇主負擔變化）×12。與年度預算相比即可知是否超支；季度調薪也一律換算成年化，方便不同方案放在同一基準比較。",
+    },
+    {
+      term: "市場 compa-ratio（對外競爭力）",
+      purpose: "和一般 compa-ratio 一樣是「實薪 ÷ 中位」，但分母換成『市場中位』，回答「我們相對同業是高是低」，是招募與留才決策最直接的依據。",
+      reading: "以 1.0 為市場中位。低於 0.9 代表明顯落後同業、挖角風險高；0.9～1.1 與市場相當；高於 1.1 領先市場、留才有利但成本較高。需先在級距填入『市場中位』才會顯示。",
+    },
+    {
+      term: "薪酬趨勢（歷期快照）",
+      purpose: "把每期的人事成本、薪資中位、公平性留成時間序列，看「往哪個方向走」，規劃時用趨勢而非單月數字判斷。",
+      reading: "看斜率與轉折：總成本持續陡升要找原因（人數/調薪/加班）；中位數穩定成長代表整體往上；Gini 往下代表差距縮小。至少要兩期快照才有趨勢。",
+    },
+    {
+      term: "年度預算使用率",
+      purpose: "把「目前薪資年化＋試算調整」對比全年預算，隨時知道預算還剩多少、這次調整會不會爆，避免年底才發現超支。",
+      reading: "＝預估全年成本 ÷ 年度預算。低於 95% 尚有餘裕；95～100% 接近上限、調整要謹慎；超過 100% 表示會超支，需調降幅度或重訂預算。",
     },
   ];
   return (

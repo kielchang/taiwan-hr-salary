@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   percentile, percentileSet, mean, coefficientOfVariation, gini, lorenzPoints, histogram,
   compaRatio, rangePenetration, distributeRounded, simulateBonusPool, simulateRaise,
+  buildBasis, buildSnapshot, compareRaiseMethods,
 } from "@/lib/analytics";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { DEFAULT_PARAMETERS as P } from "@/config/parameters";
@@ -160,5 +161,54 @@ describe("simulateRaise", () => {
     const snapshot = JSON.stringify(rows);
     simulateRaise(rows, DEFAULT_ANALYTICS, P, B);
     expect(JSON.stringify(rows)).toBe(snapshot);
+  });
+});
+
+describe("buildBasis 市場 compa-ratio", () => {
+  it("有市場中位 → 算 marketCompaRatio；無則 null", () => {
+    const cfg: AnalyticsConfig = {
+      ...DEFAULT_ANALYTICS,
+      payGrades: [{ id: "G1", name: "P3", min: 30000, mid: 40000, max: 50000, marketMid: 50000 }],
+      gradeByEmployee: { E1: "G1" },
+    };
+    const basis = buildBasis([row("E1", "甲", 40000), row("E2", "乙", 40000)], cfg);
+    expect(basis[0].compaRatio).toBe(1); // 40000/40000
+    expect(basis[0].marketCompaRatio).toBeCloseTo(0.8, 5); // 40000/50000
+    expect(basis[1].marketCompaRatio).toBeNull(); // 未指派級距
+  });
+});
+
+describe("buildSnapshot", () => {
+  it("彙總人數/總薪/中位/總成本/獎金", () => {
+    const rows = [
+      row("E1", "甲", 30000, { employerTotalCost: 36000, employerBurden: 6000, overtimePay: 1000 }),
+      row("E2", "乙", 50000, { employerTotalCost: 60000, employerBurden: 10000 }),
+      row("E3", "丙", 40000, { employerTotalCost: 48000, employerBurden: 8000 }),
+    ];
+    const snap = buildSnapshot(rows, "2026-06", 20000);
+    expect(snap.period).toBe("2026-06");
+    expect(snap.headcount).toBe(3);
+    expect(snap.totalSalary).toBe(120000);
+    expect(snap.medianSalary).toBe(40000);
+    expect(snap.totalCost).toBe(144000);
+    expect(snap.overtimePay).toBe(1000);
+    expect(snap.bonusTotal).toBe(20000);
+    expect(snap.gini).toBeGreaterThan(0);
+  });
+});
+
+describe("compareRaiseMethods", () => {
+  it("回傳四種分配法，皆有年化成本與調後 Gini", () => {
+    const rows = [row("E1", "甲", 40000), row("E2", "乙", 60000), row("E3", "丙", 80000)];
+    const cfg: AnalyticsConfig = {
+      ...DEFAULT_ANALYTICS,
+      raiseScenario: { cadence: "annual", budgetMode: "pct", budgetValue: 5, method: "meritMatrix", uniformPct: 3, targetBudget: 0 },
+    };
+    const cmp = compareRaiseMethods(rows, cfg, P, B);
+    expect(cmp.map((c) => c.method)).toEqual(["uniformPercent", "proRataBase", "byPerformance", "meritMatrix"]);
+    cmp.forEach((c) => {
+      expect(c.totalAnnualizedCostDelta).toBeGreaterThanOrEqual(0);
+      expect(c.giniAfter).toBeGreaterThanOrEqual(0);
+    });
   });
 });

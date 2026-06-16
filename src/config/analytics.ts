@@ -29,4 +29,7 @@ export const DEFAULT_ANALYTICS: AnalyticsConfig = {
     uniformPct: 3,
     targetBudget: 0,
   },
+  planning: {
+    annualPayrollBudget: 0,
+  },
 };

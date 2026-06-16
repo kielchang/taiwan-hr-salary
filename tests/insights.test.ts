@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   top20Share, analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
+  analyzeMarket, analyzeTrend, analyzeBudget,
 } from "../src/lib/insights";
+import type { PayrollSnapshot } from "../src/lib/types";
 
 describe("top20Share", () => {
   it("空陣列回 0", () => expect(top20Share([])).toBe(0));
@@ -110,5 +112,53 @@ describe("analyzeRaise", () => {
   it("永遠先報平均調幅", () => {
     const out = analyzeRaise({ totalAnnualizedCostDelta: 0, targetBudget: 0, giniBefore: 0.3, giniAfter: 0.3, avgRaisePct: 2.5 });
     expect(out[0].title).toMatch(/平均調幅/);
+  });
+});
+
+describe("analyzeMarket", () => {
+  it("無市場資料 → info 提示先填市場中位", () => {
+    const out = analyzeMarket([{ marketCompaRatio: null }, { marketCompaRatio: null }]);
+    expect(out).toHaveLength(1);
+    expect(out[0].level).toBe("info");
+  });
+  it("低於市場者 → warn", () => {
+    const out = analyzeMarket([{ marketCompaRatio: 0.8 }, { marketCompaRatio: 0.85 }]);
+    expect(out.some((i) => i.level === "warn" && /低於市場/.test(i.title))).toBe(true);
+  });
+  it("與市場相當 → good", () => {
+    const out = analyzeMarket([{ marketCompaRatio: 1.0 }, { marketCompaRatio: 1.02 }]);
+    expect(out.some((i) => i.level === "good")).toBe(true);
+  });
+});
+
+describe("analyzeTrend", () => {
+  const snap = (period: string, totalCost: number, medianSalary: number, g: number): PayrollSnapshot => ({
+    period, savedAt: "", headcount: 5, totalSalary: 0, meanSalary: 0, medianSalary,
+    totalCost, employerBurden: 0, overtimePay: 0, bonusTotal: 0, gini: g,
+  });
+  it("少於兩期 → info", () => {
+    expect(analyzeTrend([snap("2026-01", 100, 40000, 0.3)])[0].level).toBe("info");
+  });
+  it("成本大幅上升 → warn", () => {
+    const out = analyzeTrend([snap("2026-01", 1000000, 40000, 0.3), snap("2026-06", 1200000, 42000, 0.3)]);
+    expect(out.some((i) => i.level === "warn" && /人事總成本/.test(i.title))).toBe(true);
+  });
+  it("Gini 下降 → good（差距縮小）", () => {
+    const out = analyzeTrend([snap("2026-01", 1000000, 40000, 0.35), snap("2026-06", 1010000, 41000, 0.30)]);
+    expect(out.some((i) => i.level === "good" && /縮小/.test(i.title))).toBe(true);
+  });
+});
+
+describe("analyzeBudget", () => {
+  it("未設預算 → info", () => {
+    expect(analyzeBudget({ annualBudget: 0, currentAnnualizedCost: 100, plannedDelta: 0 })[0].level).toBe("info");
+  });
+  it("超出預算 → warn", () => {
+    const out = analyzeBudget({ annualBudget: 1000000, currentAnnualizedCost: 950000, plannedDelta: 100000 });
+    expect(out.some((i) => i.level === "warn")).toBe(true);
+  });
+  it("尚有空間 → good", () => {
+    const out = analyzeBudget({ annualBudget: 2000000, currentAnnualizedCost: 1000000, plannedDelta: 100000 });
+    expect(out.some((i) => i.level === "good")).toBe(true);
   });
 });

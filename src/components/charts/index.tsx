@@ -260,6 +260,50 @@ export function Heatmap({
   );
 }
 
+/** 時間序列折線（趨勢用）：x 為類別標籤、y 自動縮放，含點與數值提示。 */
+export function TrendChart({
+  data, height = 170, color = PALETTE[0], valueFmt = ntd, zeroBased = true,
+}: {
+  data: { label: string; value: number }[];
+  height?: number;
+  color?: string;
+  valueFmt?: (n: number) => string;
+  zeroBased?: boolean;
+}) {
+  if (data.length === 0) return <Empty />;
+  const W = 320;
+  const H = height;
+  const pad = { l: 44, r: 12, t: 12, b: 24 };
+  const vals = data.map((d) => d.value);
+  const rawMin = Math.min(...vals);
+  const rawMax = Math.max(...vals);
+  const yMin = zeroBased ? Math.min(0, rawMin) : rawMin;
+  const yMax = rawMax === yMin ? yMin + 1 : rawMax;
+  const n = data.length;
+  const sx = (i: number) => pad.l + (n === 1 ? 0.5 : i / (n - 1)) * (W - pad.l - pad.r);
+  const sy = (v: number) => H - pad.b - ((v - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
+  const path = data.map((d, i) => `${i === 0 ? "M" : "L"}${sx(i).toFixed(1)},${sy(d.value).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
+      <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
+      <text x={pad.l - 4} y={sy(yMax) + 3} textAnchor="end" fontSize="7" fill={TEXT}>{valueFmt(Math.round(yMax))}</text>
+      <text x={pad.l - 4} y={sy(yMin) + 3} textAnchor="end" fontSize="7" fill={TEXT}>{valueFmt(Math.round(yMin))}</text>
+      <path d={path} fill="none" stroke={color} strokeWidth={1.5} />
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={sx(i)} cy={sy(d.value)} r={2.2} fill={color}>
+            <title>{`${d.label}：${valueFmt(d.value)}`}</title>
+          </circle>
+          <text x={sx(i)} y={H - pad.b + 9} textAnchor="middle" fontSize="6.5" fill={TEXT}>
+            {d.label.length > 7 ? d.label.slice(2) : d.label}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function Empty() {
   return <p className="py-8 text-center text-xs text-muted-foreground">無資料</p>;
 }
