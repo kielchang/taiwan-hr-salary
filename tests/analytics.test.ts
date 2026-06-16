@@ -197,6 +197,25 @@ describe("buildSnapshot", () => {
   });
 });
 
+describe("buildDemoData（多月示範）", () => {
+  it("產生 6 期快照、回填過去 5 月事件、人數隨時間成長、當月不覆蓋", async () => {
+    const { buildDemoData, SEED_EMPLOYEES, SEED_SALARIES, SEED_DEPENDENTS, SEED_EVENTS, SEED_PERIOD } = await import("@/data/seed");
+    const { events, snapshots } = buildDemoData(SEED_EMPLOYEES, SEED_SALARIES, SEED_DEPENDENTS, P, B, SEED_PERIOD, SEED_EVENTS, 6);
+    expect(snapshots).toHaveLength(6);
+    // 最後一期＝當月，且期間連續遞增
+    expect(snapshots[5].period).toBe(SEED_PERIOD);
+    for (let i = 1; i < snapshots.length; i++) expect(snapshots[i].period > snapshots[i - 1].period).toBe(true);
+    // 人數成長（早期 < 當期）
+    expect(snapshots[0].headcount).toBeLessThan(snapshots[5].headcount);
+    // 回填事件不含當月（避免覆蓋）
+    expect(events.every((e) => e.period !== SEED_PERIOD)).toBe(true);
+    // 當月快照之獎金合計＝種子當月獎金（E003 5萬＋E008 10萬）
+    expect(snapshots[5].bonusTotal).toBe(150000);
+    // 每期都有正的總成本
+    snapshots.forEach((s) => expect(s.totalCost).toBeGreaterThan(0));
+  });
+});
+
 describe("compareRaiseMethods", () => {
   it("回傳四種分配法，皆有年化成本與調後 Gini", () => {
     const rows = [row("E1", "甲", 40000), row("E2", "乙", 60000), row("E3", "丙", 80000)];

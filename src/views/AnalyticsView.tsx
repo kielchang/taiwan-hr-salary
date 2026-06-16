@@ -794,7 +794,7 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
 
 /* ───────── 趨勢與預算 ───────── */
 function TrendTab({ rows }: { rows: PayrollRow[] }) {
-  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameters, brackets, setPlanning } = usePayrollStore();
+  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameters, brackets, setPlanning, loadDemoData } = usePayrollStore();
 
   const bonusTotal = rows.reduce((a, r) => a + (events.find((e) => e.employeeId === r.employeeId && e.period === currentPeriod)?.monthlyBonus ?? 0), 0);
   const canSave = rows.length > 0;
@@ -857,7 +857,14 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
         </CardHeader>
         <CardContent className="space-y-4">
           {sorted.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">尚無快照。{canSave ? "按右上角保存本期，開始累積趨勢。" : "請先於「每月薪資作業」建立當期薪資。"}</p>
+            <div className="space-y-3 py-6 text-center">
+              <p className="text-sm text-muted-foreground">尚無快照。{canSave ? "按右上角保存本期，或一鍵載入多月示範資料看趨勢。" : "請先於「每月薪資作業」建立當期薪資。"}</p>
+              {canSave && (
+                <Button variant="outline" size="sm" onClick={() => loadDemoData(6)}>
+                  <TrendingUp /> 載入多月示範資料（6 個月）
+                </Button>
+              )}
+            </div>
           ) : (
             <>
               <div className="grid gap-4 lg:grid-cols-3">

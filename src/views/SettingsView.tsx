@@ -10,7 +10,7 @@ import { usePayrollStore } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
 import { parseIpList } from "@/lib/attendance";
-import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange } from "lucide-react";
 
 interface Field {
   key: keyof Parameters;
@@ -80,7 +80,7 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
 ];
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, resetToSeed, clearAll } = usePayrollStore();
+  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots } = usePayrollStore();
   const navigate = useNavigate();
   const [showBrackets, setShowBrackets] = useState(false);
 
@@ -198,6 +198,18 @@ export function SettingsView() {
             }}
           >
             <RotateCcw /> 還原為範例公司資料
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (confirm("將回填過去 5 個月的示範結算資料並產生 6 個月趨勢快照（當月資料保留）。可在「薪酬分析 → 趨勢與預算」查看。確定？")) {
+                loadDemoData(6);
+                alert("已載入多月示範資料。請到「薪酬分析 → 趨勢與預算」查看走勢，或在「每月薪資作業」切換月份。");
+              }
+            }}
+          >
+            <CalendarRange /> 載入多月示範資料{snapshots.length > 0 ? `（已有 ${snapshots.length} 期快照）` : ""}
           </Button>
           <Button
             variant="outline"

@@ -25,6 +25,7 @@ import {
   SEED_DEPENDENTS,
   SEED_EVENTS,
   SEED_PERIOD,
+  buildDemoData,
 } from "@/data/seed";
 
 const STORAGE_KEY = "taiwan-hr-salary:v1"; // localStorage 鍵
@@ -107,6 +108,8 @@ interface PayrollState {
   saveSnapshot: (snapshot: PayrollSnapshot) => void;
   removeSnapshot: (period: string) => void;
   clearSnapshots: () => void;
+  /** 一鍵載入多月示範資料（回填過去數月事件＋趨勢快照；當月資料保留） */
+  loadDemoData: (months?: number) => void;
 
   /** 初始設定引導是否已完成（false → 顯示設定精靈） */
   setupCompleted: boolean;
@@ -222,6 +225,16 @@ export const usePayrollStore = create<PayrollState>()(
       removeSnapshot: (period) =>
         set((st) => ({ snapshots: st.snapshots.filter((s) => s.period !== period) })),
       clearSnapshots: () => set({ snapshots: [] }),
+      loadDemoData: (months = 6) =>
+        set((st) => {
+          const { events, snapshots } = buildDemoData(
+            st.employees, st.salaries, st.dependents, st.parameters, st.brackets, st.currentPeriod, st.events, months,
+          );
+          const demoPeriods = new Set(snapshots.map((s) => s.period));
+          // 保留當月與非示範月份的既有事件，換上回填的過去月份事件
+          const keep = st.events.filter((e) => e.period === st.currentPeriod || !demoPeriods.has(e.period));
+          return { events: [...keep, ...events], snapshots };
+        }),
 
       setupCompleted: false,
       completeSetup: () => set({ setupCompleted: true }),

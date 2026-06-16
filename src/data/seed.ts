@@ -5,7 +5,12 @@ import type {
   SalaryStructure,
   Dependent,
   MonthlyEvent,
+  PayrollSnapshot,
 } from "@/lib/types";
+import { calculatePayroll } from "@/lib/calc";
+import { buildSnapshot } from "@/lib/analytics";
+import type { Parameters } from "@/config/parameters";
+import type { InsuranceBrackets } from "@/config/brackets";
 
 export const SEED_PERIOD = "2026-01";
 
@@ -122,3 +127,64 @@ export const SEED_EVENTS: MonthlyEvent[] = [
   evt("E007", { personalLeaveHours: 8, sickLeaveHours: 16 }),
   evt("E008", { monthlyBonus: 100000, cumulativeBonus: 700000, withheldTax: 12000 }),
 ];
+
+/* ───────────── 多月示範資料（讓報表/趨勢有歷史可看） ───────────── */
+
+/** period（yyyy-mm）加減月份 */
+function addMonths(period: string, delta: number): string {
+  const [y, m] = period.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * 以目前員工/薪資結構為基礎，回填過去數月的變動事件並為每月計算一張趨勢快照：
+ * - 加班呈季節性起伏、某月發季獎金；
+ * - 模擬最後幾名員工為「新進」，早期月份尚未到職 → 人數與成本隨時間成長；
+ * - 當月（currentPeriod）沿用呼叫端既有事件、不覆蓋。
+ * 回傳僅含「過去月份」的事件與全部月份的快照，供 store 合併。
+ */
+export function buildDemoData(
+  employees: Employee[],
+  salaries: SalaryStructure[],
+  dependents: Dependent[],
+  parameters: Parameters,
+  brackets: InsuranceBrackets,
+  currentPeriod: string,
+  currentEvents: MonthlyEvent[],
+  months = 6,
+): { events: MonthlyEvent[]; snapshots: PayrollSnapshot[] } {
+  const periods = Array.from({ length: months }, (_, k) => addMonths(currentPeriod, -(months - 1 - k))); // 舊→新
+  const otPattern = [3, 6, 4, 9, 5, 7]; // 各月加班強度（依索引取模）
+  const bonusMonthIndex = 1; // 第 2 個月發季獎金
+  const newHires = Math.min(2, Math.max(0, employees.length - 4));
+  const activeCountAt = (j: number) =>
+    j < 2 ? employees.length - newHires : j < 4 ? employees.length - Math.min(1, newHires) : employees.length;
+  const salaryOf = (id: string) => salaries.find((s) => s.employeeId === id) ?? salary(id, {});
+
+  const genEvents: MonthlyEvent[] = [];
+  const snapshots: PayrollSnapshot[] = [];
+
+  periods.forEach((period, j) => {
+    const isCurrent = j === months - 1;
+    const active = employees.slice(0, activeCountAt(j));
+    const periodEvents: MonthlyEvent[] = isCurrent
+      ? currentEvents.filter((e) => e.period === period)
+      : active.map((emp, i) => {
+          const ot = i % 2 === 0 ? otPattern[j % otPattern.length] + (i % 3) : 0;
+          const bonus = j === bonusMonthIndex && i % 2 === 1 ? 20000 + (i % 3) * 5000 : 0;
+          return { ...evt(emp.id, { overtimeWeekday1: ot, monthlyBonus: bonus, cumulativeBonus: bonus }), period };
+        });
+    if (!isCurrent) genEvents.push(...periodEvents);
+
+    const rows = active.map((emp) => {
+      const ev = periodEvents.find((e) => e.employeeId === emp.id) ?? { ...evt(emp.id, {}), period };
+      const result = calculatePayroll(emp, salaryOf(emp.id), dependents, ev, parameters, brackets);
+      return { ...result, name: emp.name, department: emp.department, costCenter: emp.costCenter, project: emp.project };
+    });
+    const bonusTotal = periodEvents.reduce((a, e) => a + e.monthlyBonus, 0);
+    snapshots.push(buildSnapshot(rows, period, bonusTotal));
+  });
+
+  return { events: genEvents, snapshots };
+}
