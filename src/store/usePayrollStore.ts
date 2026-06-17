@@ -25,16 +25,12 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { serializeState, type BackupEnvelope } from "@/lib/backup";
-import {
-  SEED_EMPLOYEES,
-  SEED_SALARIES,
-  SEED_DEPENDENTS,
-  SEED_EVENTS,
-  SEED_PERIOD,
-  SEED_PROJECTS,
-  SEED_ALLOCATIONS,
-  buildDemoData,
-} from "@/data/seed";
+import { buildDemoData } from "@/data/seed";
+import { buildDemoCompany } from "@/data/demoCompany";
+
+// 開箱預設＝示範公司（約 60 人，含多月歷史與各種狀態）。
+// persist 水合後若已有本機資料則覆蓋此預設；僅新安裝/還原/清空後套用。
+const DEMO = buildDemoCompany();
 
 const STORAGE_KEY = "taiwan-hr-salary:v1"; // localStorage 鍵
 export const STORE_VERSION = 2; // 資料結構版本（v2：新增專案主檔與工時分攤）
@@ -209,14 +205,14 @@ export const usePayrollStore = create<PayrollState>()(
     (set, get) => ({
       parameters: DEFAULT_PARAMETERS,
       brackets: DEFAULT_BRACKETS,
-      employees: SEED_EMPLOYEES,
-      salaries: SEED_SALARIES,
-      dependents: SEED_DEPENDENTS,
-      events: SEED_EVENTS,
-      currentPeriod: SEED_PERIOD,
+      employees: DEMO.employees,
+      salaries: DEMO.salaries,
+      dependents: DEMO.dependents,
+      events: DEMO.events,
+      currentPeriod: DEMO.currentPeriod,
 
       attendance: DEFAULT_ATTENDANCE,
-      punches: [],
+      punches: DEMO.punches,
       setAttendance: (patch) =>
         set((st) => ({ attendance: { ...st.attendance, ...patch } })),
       addPunch: (record) => set((st) => ({ punches: [record, ...st.punches] })),
@@ -233,7 +229,7 @@ export const usePayrollStore = create<PayrollState>()(
         set((st) => ({ punches: st.punches.filter((p) => p.id !== id) })),
       clearPunches: () => set({ punches: [] }),
 
-      analytics: DEFAULT_ANALYTICS,
+      analytics: DEMO.analytics,
       setBonusScenario: (patch) =>
         set((st) => ({ analytics: { ...st.analytics, scenario: { ...st.analytics.scenario, ...patch } } })),
       setRaiseScenario: (patch) =>
@@ -279,7 +275,7 @@ export const usePayrollStore = create<PayrollState>()(
       setPlanning: (patch) =>
         set((st) => ({ analytics: { ...st.analytics, planning: { ...st.analytics.planning, ...patch } } })),
 
-      snapshots: [],
+      snapshots: DEMO.snapshots,
       saveSnapshot: (snapshot) =>
         set((st) => ({
           snapshots: [
@@ -294,7 +290,7 @@ export const usePayrollStore = create<PayrollState>()(
       operatorName: "",
       setOperatorName: (name) => set({ operatorName: name }),
 
-      auditLog: [],
+      auditLog: DEMO.auditLog,
       clearAuditLog: () => set({ auditLog: [] }),
 
       importEmployees: (rows) =>
@@ -331,10 +327,10 @@ export const usePayrollStore = create<PayrollState>()(
           };
         }),
 
-      declaredInsured: [],
+      declaredInsured: DEMO.declaredInsured,
       setDeclaredBaseline: (list) => set({ declaredInsured: list }),
 
-      projects: SEED_PROJECTS,
+      projects: DEMO.projects,
       upsertProject: (p) =>
         set((st) => {
           const exists = st.projects.some((x) => x.id === p.id);
@@ -355,7 +351,7 @@ export const usePayrollStore = create<PayrollState>()(
           auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "project", `刪除專案 ${id}`, { targetId: id })),
         })),
 
-      allocations: SEED_ALLOCATIONS,
+      allocations: DEMO.allocations,
       upsertAllocation: (a) =>
         set((st) => ({
           allocations: st.allocations.some((x) => x.employeeId === a.employeeId && x.period === a.period)
@@ -380,7 +376,7 @@ export const usePayrollStore = create<PayrollState>()(
       completeSetup: () => set({ setupCompleted: true }),
       reopenSetup: () => set({ setupCompleted: false }),
 
-      confirmations: {},
+      confirmations: DEMO.confirmations,
       confirmPeriod: (period) =>
         set((st) => ({
           confirmations: { ...st.confirmations, [period]: new Date().toISOString() },
@@ -496,22 +492,26 @@ export const usePayrollStore = create<PayrollState>()(
           (e) => e.employeeId === employeeId && e.period === period,
         ) ?? blankEvent(employeeId, period),
 
-      resetToSeed: () =>
+      resetToSeed: () => {
+        const demo = buildDemoCompany();
         set({
           parameters: DEFAULT_PARAMETERS,
           brackets: DEFAULT_BRACKETS,
-          employees: SEED_EMPLOYEES,
-          salaries: SEED_SALARIES,
-          dependents: SEED_DEPENDENTS,
-          events: SEED_EVENTS,
-          currentPeriod: SEED_PERIOD,
-          punches: [],
-          analytics: DEFAULT_ANALYTICS,
-          snapshots: [],
-          declaredInsured: [],
-          projects: SEED_PROJECTS,
-          allocations: SEED_ALLOCATIONS,
-        }),
+          employees: demo.employees,
+          salaries: demo.salaries,
+          dependents: demo.dependents,
+          events: demo.events,
+          currentPeriod: demo.currentPeriod,
+          punches: demo.punches,
+          analytics: demo.analytics,
+          snapshots: demo.snapshots,
+          confirmations: demo.confirmations,
+          auditLog: demo.auditLog,
+          declaredInsured: demo.declaredInsured,
+          projects: demo.projects,
+          allocations: demo.allocations,
+        });
+      },
       clearAll: () =>
         set({
           employees: [],

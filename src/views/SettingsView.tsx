@@ -331,10 +331,10 @@ export function SettingsView() {
             variant="outline"
             size="sm"
             onClick={() => {
-              if (confirm("將以 8 名範例員工覆蓋目前所有資料，確定？")) resetToSeed();
+              if (confirm("將以示範公司（約 60 名員工，含多月歷史、確認/稽核、加退保與各種狀態）覆蓋目前所有資料，確定？")) resetToSeed();
             }}
           >
-            <RotateCcw /> 還原為範例公司資料
+            <RotateCcw /> 還原為示範公司資料
           </Button>
           <Button
             variant="outline"

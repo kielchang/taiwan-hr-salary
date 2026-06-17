@@ -27,7 +27,7 @@ export const SEED_EMPLOYEES: Employee[] = [
   { id: "E008", name: "蔡佩珊", department: "總經理室", title: "特助", hireDate: "2013-08-01", costCenter: "CC-100 管理", project: "PJ-2026A", taxResidency: "居住者", withholdingMethod: "依扣繳稅額表", exemptionFormReceivedDate: "2026-01-10", voluntaryPensionRate: 0.06, note: "勞/職/退級距均達上限測試", nationalId: "H223456787", email: "pei.tsai@example.com" },
 ];
 
-function salary(
+export function salary(
   employeeId: string,
   v: Partial<Omit<SalaryStructure, "employeeId">>,
 ): SalaryStructure {
@@ -56,7 +56,7 @@ export const SEED_SALARIES: SalaryStructure[] = [
   salary("E008", { baseSalary: 135000, managerAllowance: 15000, dutyAllowance: 5000, mealAllowance: 3000, transportAllowance: 2000 }),
 ];
 
-function dep(
+export function dep(
   id: string,
   employeeId: string,
   name: string,
@@ -96,7 +96,7 @@ export const SEED_DEPENDENTS: Dependent[] = [
   dep("D012", "E008", "蔡配偶", "配偶", true, true),
 ];
 
-function evt(
+export function evt(
   employeeId: string,
   v: Partial<Omit<MonthlyEvent, "employeeId" | "period">>,
 ): MonthlyEvent {
@@ -147,10 +147,25 @@ export const SEED_ALLOCATIONS: Allocation[] = [
 /* ───────────── 多月示範資料（讓報表/趨勢有歷史可看） ───────────── */
 
 /** period（yyyy-mm）加減月份 */
-function addMonths(period: string, delta: number): string {
+export function addMonths(period: string, delta: number): string {
   const [y, m] = period.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 該期末日 yyyy-mm-dd */
+function lastDayOf(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  const d = new Date(y, m, 0);
+  return `${period}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** 員工於該期是否在職（用於歷史快照人數隨到/離職與留停自然變化） */
+function activeInPeriod(e: Employee, period: string): boolean {
+  if (e.status === "留停") return false;
+  if (e.hireDate && e.hireDate > lastDayOf(period)) return false; // 尚未到職
+  if (e.status === "離職" && e.leaveDate && e.leaveDate < `${period}-01`) return false; // 已離職
+  return true;
 }
 
 /**
@@ -173,9 +188,6 @@ export function buildDemoData(
   const periods = Array.from({ length: months }, (_, k) => addMonths(currentPeriod, -(months - 1 - k))); // 舊→新
   const otPattern = [3, 6, 4, 9, 5, 7]; // 各月加班強度（依索引取模）
   const bonusMonthIndex = 1; // 第 2 個月發季獎金
-  const newHires = Math.min(2, Math.max(0, employees.length - 4));
-  const activeCountAt = (j: number) =>
-    j < 2 ? employees.length - newHires : j < 4 ? employees.length - Math.min(1, newHires) : employees.length;
   const salaryOf = (id: string) => salaries.find((s) => s.employeeId === id) ?? salary(id, {});
 
   const genEvents: MonthlyEvent[] = [];
@@ -183,7 +195,7 @@ export function buildDemoData(
 
   periods.forEach((period, j) => {
     const isCurrent = j === months - 1;
-    const active = employees.slice(0, activeCountAt(j));
+    const active = employees.filter((e) => activeInPeriod(e, period));
     const periodEvents: MonthlyEvent[] = isCurrent
       ? currentEvents.filter((e) => e.period === period)
       : active.map((emp, i) => {

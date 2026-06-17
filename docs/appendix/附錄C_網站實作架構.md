@@ -57,7 +57,8 @@ src/
 ├── components/ui/           shadcn 元件（button/card/tabs/table/dialog/select…）
 ├── components/charts/       零相依 SVG 圖表（薪酬分析用）
 ├── views/                   依 HR 工作流程組織的操作頁（見 C3）；HashRouter 路由
-└── data/seed.ts             8 名測試員工（TC-9 基準），設定精靈可載入
+├── data/seed.ts             8 名測試員工（TC-9 驗收基準＋buildDemoData 歷史回填工具），測試用，維持不變
+└── data/demoCompany.ts      開箱預設：約 60 人「示範公司」（12 部門/8 專案/4 職等，含多月歷史·確認·稽核·加退保·離職/留停·出勤·級距申報基準·驗證警告/錯誤），重用 buildDemoData 產生快照
 tests/*.test.ts(x)           §9 驗收＋analytics/attendance/payslip 純函數＋路由掛載（白屏防護）
 ```
 
