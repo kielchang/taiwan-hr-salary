@@ -8,8 +8,11 @@ import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary } from "@/store/selectors";
 import { validateAll } from "@/lib/validation";
 import { lookupBracket, monthlySalaryTotal, supplementaryBaseDifferential, bonusWithholding } from "@/lib/calc";
+import { buildSnapshot } from "@/lib/analytics";
+import { simulateAnnual } from "@/lib/reports/annual";
+import { Bullet } from "@/components/charts";
 import { cn, ntd } from "@/lib/utils";
-import { CheckCircle2, AlertTriangle, ArrowRight, Undo2, Users, Banknote, Wallet, Building } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ArrowRight, Undo2, Users, Banknote, Wallet, Building, TrendingUp } from "lucide-react";
 
 type Tab = "overview" | "checks" | "bonus";
 
@@ -17,6 +20,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
   const {
     employees, salaries, dependents, events, parameters,
     currentPeriod, confirmations, confirmPeriod, unconfirmPeriod,
+    snapshots, saveSnapshot, analytics,
   } = usePayrollStore();
   const [tab, setTab] = useState<Tab>("overview");
 
@@ -42,6 +46,16 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
     { gross: 0, net: 0, employer: 0 },
   );
 
+  // 模擬年度（以本月為 run-rate 外推）＋月結確認時自動保存快照
+  const bonusTotal = rows.reduce((a, r) => a + (periodEvents.find((e) => e.employeeId === r.employeeId)?.monthlyBonus ?? 0), 0);
+  const year = currentPeriod.slice(0, 4);
+  const sim = simulateAnnual(year, currentPeriod, totals.employer, snapshots);
+  const annualBudget = analytics.planning.annualPayrollBudget;
+  const doConfirm = () => {
+    saveSnapshot(buildSnapshot(rows, currentPeriod, bonusTotal)); // 留存當月實際，供年報累計
+    confirmPeriod(currentPeriod);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -60,7 +74,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
           </div>
         ) : (
           <Button
-            onClick={() => confirmPeriod(currentPeriod)}
+            onClick={doConfirm}
             disabled={errors.length > 0 || pendingTax.length > 0}
           >
             <CheckCircle2 /> 確認本月結算
@@ -88,6 +102,28 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
         <StatCard icon={Wallet} label="實發總額" value={`${ntd(totals.net)} 元`} />
         <StatCard icon={Building} label="公司總成本" value={`${ntd(totals.employer)} 元`} hint="含公司負擔之四項保費" />
       </div>
+
+      {/* 本月分析＋模擬年度（試算情境：以本月暫定數字外推全年） */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="size-4 text-primary" /> 模擬年度（以本月推估）
+            <Badge variant={confirmed ? "success" : "warning"}>{confirmed ? "已確認實際" : "試算暫定"}</Badge>
+          </CardTitle>
+          <CardDescription>
+            以本月{confirmed ? "" : "（暫定）"}公司總成本為 run-rate，接上當年已確認月份外推全年；正式年報（實際累計）見「薪酬分析 → 年報」。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <MiniStat label="本月公司總成本" value={`${ntd(totals.employer)} 元`} />
+            <MiniStat label={`當年已實際累計（${sim.monthsBefore} 個月）`} value={`${ntd(sim.ytdBefore)} 元`} />
+            <MiniStat label="剩餘月數（含本月）" value={`${sim.remainingMonths} 個月`} />
+            <MiniStat label="模擬全年總成本" value={`${ntd(sim.projectedAnnual)} 元`} hint="已實際＋剩餘月×本月" />
+          </div>
+          {annualBudget > 0 && <Bullet label="模擬全年 vs 年度預算" value={sim.projectedAnnual} target={annualBudget} />}
+        </CardContent>
+      </Card>
 
       <div className="flex gap-1">
         {(
@@ -262,6 +298,16 @@ function StatCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function MiniStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-md border p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 font-bold tabular-nums">{value}</p>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
   );
 }
 

@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { usePayrollStore } from "@/store/usePayrollStore";
-import { usePayrollRows, type PayrollRow } from "@/store/selectors";
+import { usePayrollRows, usePayrollRowsFor, buildPayrollRows, type PayrollRow } from "@/store/selectors";
+import { annualMonths, annualTotals, simulateAnnual } from "@/lib/reports/annual";
 import { saveBlob } from "@/lib/payslipPdf";
 import { csvSerialize } from "@/lib/csv";
 import { cn, ntd, pct, formatPeriod } from "@/lib/utils";
@@ -31,7 +32,7 @@ import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle
 type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "project" | "trend" | "glossary";
 const TABS: [Tab, string][] = [
   ["cost", "成本結構"], ["dist", "分布與公平"], ["grade", "級距與 compa-ratio"],
-  ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["project", "專案成本"], ["trend", "趨勢與預算"], ["glossary", "指標說明"],
+  ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["project", "專案成本"], ["trend", "年報（趨勢·預算）"], ["glossary", "指標說明"],
 ];
 const RAISE_LABEL: Record<string, string> = {
   uniformPercent: "一致調幅 %", proRataBase: "按本薪分配", byPerformance: "按績效係數", meritMatrix: "merit matrix",
@@ -41,19 +42,31 @@ function csvDownload(headers: string[], rows: (string | number)[][], fileName: s
   saveBlob(new Blob([csvSerialize(headers, rows)], { type: "text/csv;charset=utf-8" }), fileName);
 }
 
+// 月報（描述性、依選定月份）vs 規劃/年報（依當期或跨期）
+const MONTH_TABS: Tab[] = ["cost", "dist", "grade", "project"];
+
 export function AnalyticsView() {
   const [tab, setTab] = useState<Tab>("cost");
-  const rows = usePayrollRows();
   const currentPeriod = usePayrollStore((s) => s.currentPeriod);
+  const confirmations = usePayrollStore((s) => s.confirmations);
+  const [viewPeriod, setViewPeriod] = useState(currentPeriod);
+  const currentRows = usePayrollRows();
+  const viewRows = usePayrollRowsFor(viewPeriod);
   const reportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+
+  const isMonthTab = MONTH_TABS.includes(tab);
+  const shownPeriod = isMonthTab ? viewPeriod : currentPeriod;
+  const activeRows = isMonthTab ? viewRows : currentRows;
+  const confirmedView = !!confirmations[viewPeriod];
+  const isTrial = viewPeriod === currentPeriod && !confirmedView;
 
   const tabLabel = TABS.find(([k]) => k === tab)?.[1] ?? "";
   const exportPdf = async () => {
     if (!reportRef.current) return;
     setExporting(true);
     try {
-      await downloadNodeAsPdf(reportRef.current, `薪酬分析_${tabLabel}_${currentPeriod}.pdf`);
+      await downloadNodeAsPdf(reportRef.current, `薪酬分析_${tabLabel}_${shownPeriod}.pdf`);
     } finally {
       setExporting(false);
     }
@@ -65,16 +78,15 @@ export function AnalyticsView() {
         <div>
           <h1 className="flex items-center gap-2 text-lg font-bold"><BarChart3 className="size-5 text-primary" /> 薪酬分析</h1>
           <p className="text-sm text-muted-foreground">
-            以「自我檢討」角度分析薪資結構、獎金、分紅與績效換算，並做預算試算。僅讀取當期薪資資料；
-            試算為規劃沙盒，<strong>不會寫回薪資結算</strong>。
+            月報依「檢視月份」呈現該月數據；獎金/調薪為規劃沙盒、<strong>不寫回薪資</strong>；年報為跨月累計與全年推估。
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer /> 列印
           </Button>
-          <Button size="sm" onClick={exportPdf} disabled={exporting || (rows.length === 0 && tab !== "glossary" && tab !== "trend")}>
-            <FileDown /> {exporting ? "產生中…" : "匯出 PDF 月報"}
+          <Button size="sm" onClick={exportPdf} disabled={exporting || (activeRows.length === 0 && tab !== "glossary" && tab !== "trend")}>
+            <FileDown /> {exporting ? "產生中…" : "匯出 PDF"}
           </Button>
         </div>
       </div>
@@ -88,26 +100,40 @@ export function AnalyticsView() {
         ))}
       </div>
 
+      {/* 月份選擇器與情境（僅月報相關分頁） */}
+      {isMonthTab && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2 print:hidden">
+          <label className="text-xs text-muted-foreground">檢視月份</label>
+          <Input type="month" className="h-8 w-36 col-input" value={viewPeriod} onChange={(e) => e.target.value && setViewPeriod(e.target.value)} />
+          {isTrial ? <Badge variant="warning">試算暫定（當期未確認）</Badge>
+            : confirmedView ? <Badge variant="success">已確認實際</Badge>
+            : <Badge variant="outline">未確認月份</Badge>}
+          {viewPeriod !== currentPeriod && (
+            <Button variant="ghost" size="sm" onClick={() => setViewPeriod(currentPeriod)}>回到當期</Button>
+          )}
+        </div>
+      )}
+
       <div ref={reportRef} className="space-y-4 bg-background">
         {/* PDF/列印標題（畫面上以較小字呈現） */}
         <div className="border-b pb-2">
-          <p className="text-sm font-semibold">薪酬分析月報 — {tabLabel}</p>
-          <p className="text-xs text-muted-foreground">期間 {formatPeriod(currentPeriod)}（分析基於本機當期資料；試算為規劃沙盒）</p>
+          <p className="text-sm font-semibold">薪酬分析 — {tabLabel}{isMonthTab ? `（${isTrial ? "試算暫定" : confirmedView ? "已確認" : "未確認"}）` : ""}</p>
+          <p className="text-xs text-muted-foreground">期間 {formatPeriod(shownPeriod)}（資料基於本機；月報依檢視月份、年報為跨月累計）</p>
         </div>
 
-        {rows.length === 0 && tab !== "glossary" && tab !== "trend" ? (
+        {activeRows.length === 0 && tab !== "glossary" && tab !== "trend" ? (
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-            尚無薪資資料。請先到「基本資料」建立員工與薪資結構，並於「每月薪資作業」確認當期。
+            {isMonthTab ? "此月份尚無薪資資料。請改選其他月份，或先於「每月薪資作業」建立。" : "尚無薪資資料。請先到「基本資料」建立員工與薪資結構。"}
           </CardContent></Card>
         ) : (
           <>
-            {tab === "cost" && <CostTab rows={rows} />}
-            {tab === "dist" && <DistTab rows={rows} />}
-            {tab === "grade" && <GradeTab rows={rows} />}
-            {tab === "bonus" && <BonusTab rows={rows} />}
-            {tab === "raise" && <RaiseTab rows={rows} />}
-            {tab === "project" && <ProjectCostTab rows={rows} />}
-            {tab === "trend" && <TrendTab rows={rows} />}
+            {tab === "cost" && <CostTab rows={viewRows} period={viewPeriod} />}
+            {tab === "dist" && <DistTab rows={viewRows} period={viewPeriod} />}
+            {tab === "grade" && <GradeTab rows={viewRows} />}
+            {tab === "bonus" && <BonusTab rows={currentRows} />}
+            {tab === "raise" && <RaiseTab rows={currentRows} />}
+            {tab === "project" && <ProjectCostTab rows={viewRows} period={viewPeriod} />}
+            {tab === "trend" && <TrendTab rows={currentRows} />}
             {tab === "glossary" && <GlossaryTab />}
           </>
         )}
@@ -117,13 +143,13 @@ export function AnalyticsView() {
 }
 
 /* ───────── 成本結構 ───────── */
-function CostTab({ rows }: { rows: PayrollRow[] }) {
-  const { salaries, events, currentPeriod } = usePayrollStore();
+function CostTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
+  const { salaries, events } = usePayrollStore();
   const [selDept, setSelDept] = useState<string | null>(null);
   const [selEmp, setSelEmp] = useState<string | null>(null);
   const baseOf = (id: string) => salaries.find((s) => s.employeeId === id)?.baseSalary ?? 0;
-  const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.monthlyBonus ?? 0;
-  const otherOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.otherAddition ?? 0;
+  const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === period)?.monthlyBonus ?? 0;
+  const otherOf = (id: string) => events.find((e) => e.employeeId === id && e.period === period)?.otherAddition ?? 0;
 
   const comp = (r: PayrollRow) => {
     const base = baseOf(r.employeeId);
@@ -262,8 +288,8 @@ function CostTab({ rows }: { rows: PayrollRow[] }) {
 }
 
 /* ───────── 分布與公平 ───────── */
-function DistTab({ rows }: { rows: PayrollRow[] }) {
-  const { events, currentPeriod } = usePayrollStore();
+function DistTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
+  const { events } = usePayrollStore();
   const [selBin, setSelBin] = useState<number | null>(null);
   const [selDept, setSelDept] = useState<string | null>(null);
   const [selEmp, setSelEmp] = useState<string | null>(null);
@@ -274,7 +300,7 @@ function DistTab({ rows }: { rows: PayrollRow[] }) {
   const lorenz = lorenzPoints(pays);
   const hist = histogram(pays, 8);
   const sumBase = pays.reduce((a, b) => a + b, 0);
-  const sumBonus = rows.reduce((a, r) => a + (events.find((e) => e.employeeId === r.employeeId && e.period === currentPeriod)?.monthlyBonus ?? 0), 0);
+  const sumBonus = rows.reduce((a, r) => a + (events.find((e) => e.employeeId === r.employeeId && e.period === period)?.monthlyBonus ?? 0), 0);
   const sumVariable = sumBonus + rows.reduce((a, r) => a + r.overtimePay, 0);
   const sumGross = rows.reduce((a, r) => a + r.grossPay, 0);
 
@@ -844,10 +870,11 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
 }
 
 /* ───────── 專案成本 ───────── */
-function ProjectCostTab({ rows }: { rows: PayrollRow[] }) {
-  const { salaries, events, dependents, brackets, projects, allocations, parameters, currentPeriod, employees } = usePayrollStore();
-  const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.monthlyBonus ?? 0;
-  const otherOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.otherAddition ?? 0;
+function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
+  const { salaries, events, dependents, brackets, projects, allocations, parameters, employees } = usePayrollStore();
+  const currentPeriod = period;
+  const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === period)?.monthlyBonus ?? 0;
+  const otherOf = (id: string) => events.find((e) => e.employeeId === id && e.period === period)?.otherAddition ?? 0;
   const codeToId = new Map(projects.map((p) => [p.code, p.id]));
   const input = {
     rows, allocations, projects, period: currentPeriod, monthlyWorkHours: parameters.monthlyWorkHours,
@@ -1041,7 +1068,7 @@ function ProjectCostTab({ rows }: { rows: PayrollRow[] }) {
 
 /* ───────── 趨勢與預算 ───────── */
 function TrendTab({ rows }: { rows: PayrollRow[] }) {
-  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameters, brackets, setPlanning, loadDemoData } = usePayrollStore();
+  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameters, brackets, setPlanning, loadDemoData, employees, salaries, dependents } = usePayrollStore();
 
   const bonusTotal = rows.reduce((a, r) => a + (events.find((e) => e.employeeId === r.employeeId && e.period === currentPeriod)?.monthlyBonus ?? 0), 0);
   const canSave = rows.length > 0;
@@ -1065,8 +1092,50 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
 
   const save = () => saveSnapshot(buildSnapshot(rows, currentPeriod, bonusTotal));
 
+  // 年報：當年累計（實際，快照優先、缺則回推估算）＋模擬全年（YTD＋剩餘月 run-rate）
+  const year = currentPeriod.slice(0, 4);
+  const candidatePeriods = [...new Set(events.map((e) => e.period))];
+  const recompute = (p: string) =>
+    buildSnapshot(buildPayrollRows(p, { employees, salaries, dependents, events, parameters, brackets }), p, events.filter((e) => e.period === p).reduce((a, e) => a + e.monthlyBonus, 0));
+  const aMonths = annualMonths(year, currentPeriod, snapshots, candidatePeriods, recompute);
+  const aTot = annualTotals(aMonths);
+  const estimatedCount = aMonths.filter((m) => m.estimated).length;
+  const sim = simulateAnnual(year, currentPeriod, currentMonthlyCost, snapshots);
+
   return (
     <div className="space-y-4">
+      {/* 年報：當年累計與全年推估 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">{year} 年累計與全年推估</CardTitle>
+          <CardDescription>
+            「實際累計」為當年各月已確認月結快照之加總（缺快照月份以目前資料回推、標示估算）；
+            「模擬全年」＝當年已實際 ＋ 剩餘月以本月 run-rate 外推。
+            {estimatedCount > 0 && <span className="text-amber-700">　含 {estimatedCount} 個估算月份（建議於各月結算後確認以留存快照）。</span>}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Stat label={`實際累計成本（${aTot.months} 個月）`} value={`${ntd(aTot.totalCost)} 元`} />
+            <Stat label="實際累計獎金" value={`${ntd(aTot.bonusTotal)} 元`} />
+            <Stat label="模擬全年總成本" value={`${ntd(sim.projectedAnnual)} 元`} hint={`剩餘 ${sim.remainingMonths} 月以本月推估`} />
+            <Stat label="年度預算" value={annualBudget > 0 ? `${ntd(annualBudget)} 元` : "未設定"} />
+          </div>
+          {annualBudget > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Bullet label="實際累計 vs 年度預算" value={aTot.totalCost} target={annualBudget} />
+              <Bullet label="模擬全年 vs 年度預算" value={sim.projectedAnnual} target={annualBudget} />
+            </div>
+          )}
+          {aMonths.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">各月人事成本（實際／估算）</p>
+              <TrendChart data={aMonths.map((m) => ({ label: m.period, value: m.snapshot.totalCost }))} color={PALETTE[4]} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* 年度預算追蹤 */}
       <InsightList insights={budgetInsights} />
       <Card>

@@ -3,9 +3,7 @@
 import type { Employee, SalaryStructure, Dependent, MonthlyEvent, Project, Allocation } from "@/lib/types";
 import type { Parameters } from "@/config/parameters";
 import type { InsuranceBrackets } from "@/config/brackets";
-import { calculatePayroll } from "@/lib/calc";
-import { isActiveInPeriod } from "@/store/selectors";
-import { blankEvent } from "@/store/usePayrollStore";
+import { isActiveInPeriod, buildPayrollRows } from "@/store/selectors";
 import { computeProjectCost, type ProjectCostResult } from "./projectCost";
 
 export interface ProjectTrendInput {
@@ -19,11 +17,6 @@ export interface ProjectTrendInput {
   brackets: InsuranceBrackets;
 }
 
-const blankSalary = (employeeId: string): SalaryStructure => ({
-  employeeId, baseSalary: 0, managerAllowance: 0, dutyAllowance: 0, professionalAllowance: 0,
-  mealAllowance: 0, transportAllowance: 0, attendanceBonus: 0, otherFixedAllowance: 0,
-});
-
 /** 逐期重算專案成本（每期＝重建當期 rows → computeProjectCost） */
 export function projectCostByPeriod(input: ProjectTrendInput, periods: string[]): Map<string, ProjectCostResult> {
   const { employees, salaries, dependents, events, allocations, projects, parameters, brackets } = input;
@@ -36,12 +29,7 @@ export function projectCostByPeriod(input: ProjectTrendInput, periods: string[])
 
   for (const period of periods) {
     const active = employees.filter((e) => isActiveInPeriod(e, period));
-    const rows = active.map((emp) => {
-      const salary = salaries.find((s) => s.employeeId === emp.id) ?? blankSalary(emp.id);
-      const event = events.find((e) => e.employeeId === emp.id && e.period === period) ?? blankEvent(emp.id, period);
-      const r = calculatePayroll(emp, salary, dependents, event, parameters, brackets, { period });
-      return { ...r, name: emp.name, department: emp.department, costCenter: emp.costCenter, project: emp.project };
-    });
+    const rows = buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets });
     const eventOf = (id: string) => events.find((e) => e.employeeId === id && e.period === period);
     out.set(period, computeProjectCost({
       rows, allocations, projects, period, monthlyWorkHours: parameters.monthlyWorkHours,
