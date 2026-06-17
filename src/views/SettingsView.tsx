@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import type { Project, ProjectStatus } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
@@ -15,11 +18,11 @@ import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
 import { csvSerialize } from "@/lib/csv";
 import type { AuditAction } from "@/lib/types";
-import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban } from "lucide-react";
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
   salary: "薪資異動", employee: "員工異動", event: "結算異動", confirm: "月結確認",
-  raiseApply: "調薪核定", import: "批次匯入", restore: "整檔還原",
+  raiseApply: "調薪核定", import: "批次匯入", restore: "整檔還原", project: "專案異動",
 };
 
 interface Field {
@@ -230,6 +233,8 @@ export function SettingsView() {
 
       <AttendanceSettings />
 
+      <ProjectMasterCard />
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">資料備份與還原</CardTitle>
@@ -341,6 +346,81 @@ export function SettingsView() {
 }
 
 /** 打卡設定（公司座標、半徑、超範圍處理、IP 檢查）— 黃底＝公司自訂 */
+/** 專案主檔 CRUD（供工時分攤與專案成本報表） */
+function ProjectMasterCard() {
+  const { projects, upsertProject, removeProject } = usePayrollStore();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Project | null>(null);
+  const blank = (): Project => ({ id: `PJ${Date.now()}`, code: "", name: "", manager: "", client: "", budget: 0, startDate: "", endDate: "", status: "進行中" });
+  const set = <K extends keyof Project>(k: K, v: Project[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between pb-3">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base"><FolderKanban className="size-4 text-primary" /> 專案主檔</CardTitle>
+          <CardDescription>建立專案（含預算/起訖）後，可於每月薪資作業設定工時分攤，並於報表/分析看專案人事成本與預算 vs 實際。</CardDescription>
+        </div>
+        <Button size="sm" onClick={() => { setDraft(blank()); setOpen(true); }}><Plus /> 新增專案</Button>
+      </CardHeader>
+      <CardContent>
+        {projects.length === 0 ? (
+          <p className="text-sm text-muted-foreground">尚未建立專案。</p>
+        ) : (
+          <Table>
+            <TableHeader><TableRow><TableHead>代號</TableHead><TableHead>名稱</TableHead><TableHead>PM</TableHead><TableHead className="text-right">預算</TableHead><TableHead>期間</TableHead><TableHead>狀態</TableHead><TableHead className="w-16" /></TableRow></TableHeader>
+            <TableBody>
+              {projects.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">{p.code}</TableCell>
+                  <TableCell>{p.name}</TableCell>
+                  <TableCell className="text-sm">{p.manager}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.budget ? p.budget.toLocaleString() : "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{p.startDate || "—"}～{p.endDate || "—"}</TableCell>
+                  <TableCell><Badge variant={p.status === "進行中" ? "success" : "secondary"}>{p.status}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="size-7" onClick={() => { setDraft({ ...p }); setOpen(true); }}><Pencil className="size-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => { if (confirm(`刪除專案 ${p.name}？（既有分攤中對此專案的設定會一併移除）`)) removeProject(p.id); }}><Trash2 className="size-3.5" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{draft && projects.some((p) => p.id === draft.id) ? "編輯專案" : "新增專案"}</DialogTitle></DialogHeader>
+          {draft && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label className="text-xs">專案代號 *</Label><Input className="col-input" value={draft.code} onChange={(e) => set("code", e.target.value)} placeholder="PJ-2026A" /></div>
+              <div className="space-y-1"><Label className="text-xs">名稱 *</Label><Input className="col-input" value={draft.name} onChange={(e) => set("name", e.target.value)} /></div>
+              <div className="space-y-1"><Label className="text-xs">PM</Label><Input className="col-input" value={draft.manager} onChange={(e) => set("manager", e.target.value)} /></div>
+              <div className="space-y-1"><Label className="text-xs">客戶</Label><Input className="col-input" value={draft.client} onChange={(e) => set("client", e.target.value)} /></div>
+              <div className="space-y-1"><Label className="text-xs">預算（整案，雇主總成本）</Label><Input type="number" className="col-input" value={draft.budget} onChange={(e) => set("budget", Number(e.target.value) || 0)} /></div>
+              <div className="space-y-1"><Label className="text-xs">狀態</Label>
+                <Select value={draft.status} onValueChange={(v) => set("status", v as ProjectStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(["進行中", "結案", "暫停"] as ProjectStatus[]).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1"><Label className="text-xs">起始日</Label><Input type="date" className="col-input" value={draft.startDate} onChange={(e) => set("startDate", e.target.value)} /></div>
+              <div className="space-y-1"><Label className="text-xs">結束日</Label><Input type="date" className="col-input" value={draft.endDate} onChange={(e) => set("endDate", e.target.value)} /></div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>
+            <Button disabled={!draft?.code.trim() || !draft?.name.trim()} onClick={() => { if (draft) upsertProject(draft); setOpen(false); }}>儲存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function AttendanceSettings() {
   const { attendance, setAttendance } = usePayrollStore();
   const [geoMsg, setGeoMsg] = useState<string | null>(null);

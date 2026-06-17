@@ -9,6 +9,7 @@ import { usePayrollRows, useCompanySupplementary, type PayrollRow } from "@/stor
 import { cn, ntd, formatPeriod } from "@/lib/utils";
 import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
 import { buildPayslipMailto } from "@/lib/payslipEmail";
+import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
 import { PayslipCard } from "@/views/PayslipCard";
 import { Printer, Wand2, Lock, Mail, AlertTriangle, Package, CheckCircle2 } from "lucide-react";
 
@@ -66,10 +67,9 @@ function SummaryReport() {
   const bonusOf = (id: string) =>
     events.find((e) => e.employeeId === id && e.period === currentPeriod)?.monthlyBonus ?? 0;
 
-  const dims: { key: keyof Pick<PayrollRow, "department" | "costCenter" | "project">; title: string }[] = [
+  const dims: { key: keyof Pick<PayrollRow, "department" | "costCenter">; title: string }[] = [
     { key: "department", title: "部門別" },
     { key: "costCenter", title: "成本中心別" },
-    { key: "project", title: "專案別" },
   ];
 
   const grand = rows.reduce(
@@ -151,6 +151,7 @@ function SummaryReport() {
           </Card>
         );
       })}
+      <ProjectPnL rows={rows} bonusOf={bonusOf} />
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
           <span>
@@ -161,6 +162,84 @@ function SummaryReport() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/* 專案別人事成本（依工時/百分比分攤的 P&L） */
+function ProjectPnL({ rows, bonusOf }: { rows: PayrollRow[]; bonusOf: (id: string) => number }) {
+  const { salaries, events, projects, allocations, parameters, currentPeriod, employees } = usePayrollStore();
+  const baseByEmp = new Map(salaries.map((s) => [s.employeeId, s.baseSalary]));
+  const bonusByEmp = new Map(rows.map((r) => [r.employeeId, bonusOf(r.employeeId)]));
+  const otherByEmp = new Map(rows.map((r) => [r.employeeId, events.find((e) => e.employeeId === r.employeeId && e.period === currentPeriod)?.otherAddition ?? 0]));
+  const codeToId = new Map(projects.map((p) => [p.code, p.id]));
+  const defaultProjectByEmp = new Map(
+    employees.filter((e) => e.project && codeToId.has(e.project)).map((e) => [e.id, codeToId.get(e.project) as string]),
+  );
+  const result = computeProjectCost({
+    rows, allocations, projects, period: currentPeriod, monthlyWorkHours: parameters.monthlyWorkHours,
+    baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp,
+  });
+  const shown = result.projects.filter((p) => p.totalCost > 0 || p.budget > 0);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">專案別人事成本（依工時分攤）</CardTitle>
+        <CardDescription>
+          每位員工的全載成本（含雇主負擔）依當月各專案投入工時/百分比分攤；未投入專案的工時歸「未分攤／間接」。
+          合計等於全公司總成本（{ntd(result.companyTotal)} 元）。稼動率 {(result.utilization * 100).toFixed(0)}%。
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>專案</TableHead>
+              <TableHead className="text-right">投入工時</TableHead>
+              <TableHead className="text-right">FTE</TableHead>
+              <TableHead className="text-right">應發小計</TableHead>
+              <TableHead className="text-right">雇主負擔</TableHead>
+              <TableHead className="text-right">總成本</TableHead>
+              <TableHead className="text-right">占比</TableHead>
+              <TableHead className="text-right">期間預算</TableHead>
+              <TableHead className="text-right">差異</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shown.map((p) => {
+              const gross = p.base + p.allowance + p.ot + p.bonus + p.other;
+              const isBucket = p.projectId === UNALLOCATED_ID;
+              return (
+                <TableRow key={p.projectId} className={cn(isBucket && "text-muted-foreground")}>
+                  <TableCell>{p.name}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.hours ? p.hours.toLocaleString() : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.hours ? p.fte.toFixed(2) : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(gross)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(p.burden)}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">{ntd(p.totalCost)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{(p.pctOfCompany * 100).toFixed(1)}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.budget ? ntd(p.budget) : "—"}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums", p.budget > 0 && (p.variance < 0 ? "text-red-600" : "text-emerald-600"))}>
+                    {p.budget ? (p.variance < 0 ? `超 ${ntd(-p.variance)}` : `餘 ${ntd(p.variance)}`) : "—"}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell>合計</TableCell>
+              <TableCell className="text-right tabular-nums">{result.totalDirectHours ? result.totalDirectHours.toLocaleString() : "—"}</TableCell>
+              <TableCell />
+              <TableCell colSpan={2} />
+              <TableCell className="text-right font-bold tabular-nums">{ntd(result.companyTotal)}</TableCell>
+              <TableCell className="text-right tabular-nums">100%</TableCell>
+              <TableCell colSpan={2} />
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 

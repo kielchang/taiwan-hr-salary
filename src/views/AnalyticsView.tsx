@@ -21,15 +21,16 @@ import {
 import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, TrendChart, PALETTE } from "@/components/charts";
 import {
   analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
-  analyzeMarket, analyzeTrend, analyzeBudget, type Insight,
+  analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost, type Insight,
 } from "@/lib/insights";
+import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
 import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb, Save, TrendingUp } from "lucide-react";
 
-type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "trend" | "glossary";
+type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "project" | "trend" | "glossary";
 const TABS: [Tab, string][] = [
   ["cost", "成本結構"], ["dist", "分布與公平"], ["grade", "級距與 compa-ratio"],
-  ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["trend", "趨勢與預算"], ["glossary", "指標說明"],
+  ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["project", "專案成本"], ["trend", "趨勢與預算"], ["glossary", "指標說明"],
 ];
 const RAISE_LABEL: Record<string, string> = {
   uniformPercent: "一致調幅 %", proRataBase: "按本薪分配", byPerformance: "按績效係數", meritMatrix: "merit matrix",
@@ -104,6 +105,7 @@ export function AnalyticsView() {
             {tab === "grade" && <GradeTab rows={rows} />}
             {tab === "bonus" && <BonusTab rows={rows} />}
             {tab === "raise" && <RaiseTab rows={rows} />}
+            {tab === "project" && <ProjectCostTab rows={rows} />}
             {tab === "trend" && <TrendTab rows={rows} />}
             {tab === "glossary" && <GlossaryTab />}
           </>
@@ -836,6 +838,110 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ───────── 專案成本 ───────── */
+function ProjectCostTab({ rows }: { rows: PayrollRow[] }) {
+  const { salaries, events, projects, allocations, parameters, currentPeriod, employees } = usePayrollStore();
+  const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.monthlyBonus ?? 0;
+  const otherOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.otherAddition ?? 0;
+  const codeToId = new Map(projects.map((p) => [p.code, p.id]));
+  const result = computeProjectCost({
+    rows, allocations, projects, period: currentPeriod, monthlyWorkHours: parameters.monthlyWorkHours,
+    baseByEmp: new Map(salaries.map((s) => [s.employeeId, s.baseSalary])),
+    bonusByEmp: new Map(rows.map((r) => [r.employeeId, bonusOf(r.employeeId)])),
+    otherByEmp: new Map(rows.map((r) => [r.employeeId, otherOf(r.employeeId)])),
+    defaultProjectByEmp: new Map(employees.filter((e) => e.project && codeToId.has(e.project)).map((e) => [e.id, codeToId.get(e.project) as string])),
+  });
+  const shown = result.projects.filter((p) => p.totalCost > 0 || p.budget > 0);
+  const insights = analyzeProjectCost({ projects: result.projects, companyTotal: result.companyTotal, utilization: result.utilization });
+
+  const SEGS = [
+    { key: "base", label: "本薪", color: PALETTE[0] },
+    { key: "allowance", label: "加給/津貼", color: PALETTE[1] },
+    { key: "ot", label: "加班費", color: PALETTE[2] },
+    { key: "bonus", label: "獎金", color: PALETTE[3] },
+    { key: "other", label: "其他加項", color: PALETTE[7] },
+    { key: "burden", label: "雇主負擔", color: PALETTE[5] },
+  ] as const;
+
+  if (projects.length === 0) {
+    return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">尚未建立專案。請到「系統設定 → 專案主檔」新增專案，並在「每月薪資作業」設定工時分攤。</CardContent></Card>;
+  }
+
+  const exportCsv = () => csvDownload(
+    ["專案", "投入工時", "FTE", "本薪", "加給", "加班", "獎金", "其他", "雇主負擔", "總成本", "占比%", "期間預算", "差異"],
+    result.projects.map((p) => [p.name, p.hours, p.fte.toFixed(2), p.base, p.allowance, p.ot, p.bonus, p.other, p.burden, p.totalCost, (p.pctOfCompany * 100).toFixed(1), p.budget, p.variance]),
+    `專案成本_${currentPeriod}.csv`,
+  );
+
+  return (
+    <div className="space-y-4">
+      <InsightList insights={insights} />
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat label="人事總成本" value={`${ntd(result.companyTotal)} 元`} />
+        <Stat label="專案數" value={`${shown.filter((p) => p.projectId !== UNALLOCATED_ID).length} 個`} />
+        <Stat label="工時稼動率" value={pct(result.utilization)} hint="直接工時/總工時" />
+        <Stat label="未分攤占比" value={pct(result.companyTotal ? (result.projects.find((p) => p.projectId === UNALLOCATED_ID)?.totalCost ?? 0) / result.companyTotal : 0)} />
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-base">各專案成本組成</CardTitle>
+            <CardDescription>每位員工全載成本依工時分攤；合計＝全公司總成本（勾稽）。</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <StackedBar rows={shown.map((p) => ({ label: p.name, segments: SEGS.map((s) => ({ label: s.label, value: p[s.key], color: s.color })) }))} />
+          <Legend items={SEGS.map((s) => ({ label: s.label, color: s.color }))} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">逐專案明細（含預算 vs 實際）</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader><TableRow><TableHead>專案</TableHead><TableHead className="text-right">工時</TableHead><TableHead className="text-right">FTE</TableHead><TableHead className="text-right">總成本</TableHead><TableHead className="text-right">占比</TableHead><TableHead className="text-right">期間預算</TableHead><TableHead className="text-right">差異</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {shown.map((p) => (
+                <TableRow key={p.projectId} className={cn(p.projectId === UNALLOCATED_ID && "text-muted-foreground")}>
+                  <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.hours || "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.hours ? p.fte.toFixed(2) : "—"}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">{ntd(p.totalCost)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{(p.pctOfCompany * 100).toFixed(1)}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.budget ? ntd(p.budget) : "—"}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums", p.budget > 0 && (p.variance < 0 ? "text-red-600" : "text-emerald-600"))}>{p.budget ? (p.variance < 0 ? `超 ${ntd(-p.variance)}` : `餘 ${ntd(p.variance)}`) : "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter><TableRow><TableCell>合計</TableCell><TableCell className="text-right tabular-nums">{result.totalDirectHours || "—"}</TableCell><TableCell /><TableCell className="text-right font-bold tabular-nums">{ntd(result.companyTotal)}</TableCell><TableCell className="text-right">100%</TableCell><TableCell colSpan={2} /></TableRow></TableFooter>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">成本集中度（Pareto 80/20）</CardTitle></CardHeader>
+          <CardContent><Pareto data={shown.filter((p) => p.projectId !== UNALLOCATED_ID).map((p) => ({ label: p.name, value: p.totalCost }))} /></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">預算 vs 實際</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {shown.filter((p) => p.budget > 0).length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">尚未設定專案預算（系統設定 → 專案主檔）。</p>
+            ) : shown.filter((p) => p.budget > 0).map((p) => (
+              <Bullet key={p.projectId} label={p.name} value={p.totalCost} target={p.budget} />
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { ntd, pct } from "./utils";
 import { gini, coefficientOfVariation, percentile } from "./analytics";
 import type { PayrollSnapshot } from "./types";
+import { UNALLOCATED_ID, type ProjectAgg } from "./reports/projectCost";
 
 export type InsightLevel = "good" | "info" | "warn";
 export interface Insight {
@@ -247,5 +248,38 @@ export function analyzeBudget(input: { annualBudget: number; currentAnnualizedCo
     out.push({ level: "info", title: "預算使用接近上限", detail: "已逼近年度預算，後續調整空間有限，留意臨時性加班與獎金。", evidence: `預估占預算 ${pct(util)}，結餘 ${ntd(annualBudget - projected)}` });
   else
     out.push({ level: "good", title: "預算可控，仍有空間", detail: "預估全年成本在預算內，尚有調整餘裕。", evidence: `預估占預算 ${pct(util)}，結餘 ${ntd(annualBudget - projected)}` });
+  return out;
+}
+
+/* ───────── 專案成本 ───────── */
+export function analyzeProjectCost(input: { projects: ProjectAgg[]; companyTotal: number; utilization: number }): Insight[] {
+  const { projects, companyTotal, utilization } = input;
+  const out: Insight[] = [];
+  if (companyTotal <= 0) return out;
+  const real = projects.filter((p) => p.projectId !== UNALLOCATED_ID);
+  const bucket = projects.find((p) => p.projectId === UNALLOCATED_ID);
+
+  // 超預算
+  const over = real.filter((p) => p.budget > 0 && p.totalCost > p.budget);
+  if (over.length > 0) {
+    const worst = [...over].sort((a, b) => (b.totalCost - b.budget) - (a.totalCost - a.budget))[0];
+    out.push({ level: "warn", title: `${over.length} 個專案本期超出預算`, detail: "專案實際人事成本已超過期間預算，建議檢視投入工時或調整預算；持續超支會侵蝕專案利潤。", evidence: `最嚴重：${worst.name} 實際 ${ntd(worst.totalCost)} / 預算 ${ntd(worst.budget)}（超 ${ntd(worst.totalCost - worst.budget)}）` });
+  } else if (real.some((p) => p.budget > 0)) {
+    out.push({ level: "good", title: "各專案皆在預算內", detail: "本期專案人事成本未超出期間預算，成本可控。", evidence: "無超預算專案" });
+  }
+
+  // 集中度（前 20% 專案占比）
+  const share = top20Share(real.map((p) => p.totalCost));
+  if (real.length >= 3 && share > 0.7)
+    out.push({ level: "info", title: "成本集中於少數專案", detail: "前 20% 專案就占了多數人事成本，對少數專案依賴高；留意該專案結案或人力異動的衝擊。", evidence: `前 20% 專案占 ${pct(share)}` });
+
+  // 間接/稼動率
+  if (bucket && bucket.totalCost / companyTotal > 0.2)
+    out.push({ level: "warn", title: "未分攤（間接）人事成本偏高", detail: "有不少工時未投入專案（行政、待命、訓練或漏填分攤）。若屬漏填請補分攤；若確為間接，檢視間接人力是否過高。", evidence: `未分攤占總成本 ${pct(bucket.totalCost / companyTotal)}` });
+  if (input.utilization > 0 && utilization < 0.7)
+    out.push({ level: "info", title: `工時稼動率偏低（${pct(utilization)}）`, detail: "直接投入專案的工時比例偏低；可檢視排程與專案分派，提升可計費/可歸屬工時。", evidence: `直接工時 / 總工時 ＝ ${pct(utilization)}` });
+  else if (utilization >= 0.85)
+    out.push({ level: "good", title: `工時稼動率良好（${pct(utilization)}）`, detail: "多數工時投入專案，人力運用效率佳。", evidence: `稼動率 ${pct(utilization)}` });
+
   return out;
 }

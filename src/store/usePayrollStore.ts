@@ -20,6 +20,8 @@ import type {
   AuditEntry,
   AuditAction,
   DeclaredInsured,
+  Project,
+  Allocation,
 } from "@/lib/types";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { serializeState, type BackupEnvelope } from "@/lib/backup";
@@ -29,11 +31,13 @@ import {
   SEED_DEPENDENTS,
   SEED_EVENTS,
   SEED_PERIOD,
+  SEED_PROJECTS,
+  SEED_ALLOCATIONS,
   buildDemoData,
 } from "@/data/seed";
 
 const STORAGE_KEY = "taiwan-hr-salary:v1"; // localStorage 鍵
-export const STORE_VERSION = 1; // 資料結構版本（備份/還原與 migrate 用）
+export const STORE_VERSION = 2; // 資料結構版本（v2：新增專案主檔與工時分攤）
 
 const DEFAULT_ATTENDANCE: AttendanceConfig = {
   companyLat: null,
@@ -173,6 +177,16 @@ interface PayrollState {
   /** 投保級距申報基準（2/8 月申報調整） */
   declaredInsured: DeclaredInsured[];
   setDeclaredBaseline: (list: DeclaredInsured[]) => void;
+
+  /** 專案主檔 */
+  projects: Project[];
+  upsertProject: (p: Project) => void;
+  removeProject: (id: string) => void;
+
+  /** 每員工每月工時分攤 */
+  allocations: Allocation[];
+  upsertAllocation: (a: Allocation) => void;
+  getAllocation: (employeeId: string, period: string) => Allocation | undefined;
 }
 
 const AUDIT_CAP = 1000;
@@ -309,6 +323,37 @@ export const usePayrollStore = create<PayrollState>()(
 
       declaredInsured: [],
       setDeclaredBaseline: (list) => set({ declaredInsured: list }),
+
+      projects: SEED_PROJECTS,
+      upsertProject: (p) =>
+        set((st) => {
+          const exists = st.projects.some((x) => x.id === p.id);
+          return {
+            projects: exists ? st.projects.map((x) => (x.id === p.id ? p : x)) : [...st.projects, p],
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "project", `${exists ? "更新" : "新增"}專案 ${p.code} ${p.name}`, { targetId: p.id })),
+          };
+        }),
+      removeProject: (id) =>
+        set((st) => ({
+          projects: st.projects.filter((p) => p.id !== id),
+          // 一併清除分攤中對該專案的引用
+          allocations: st.allocations.map((a) => ({
+            ...a,
+            lines: a.lines.filter((l) => l.projectId !== id),
+            bonusProjectId: a.bonusProjectId === id ? undefined : a.bonusProjectId,
+          })),
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "project", `刪除專案 ${id}`, { targetId: id })),
+        })),
+
+      allocations: SEED_ALLOCATIONS,
+      upsertAllocation: (a) =>
+        set((st) => ({
+          allocations: st.allocations.some((x) => x.employeeId === a.employeeId && x.period === a.period)
+            ? st.allocations.map((x) => (x.employeeId === a.employeeId && x.period === a.period ? a : x))
+            : [...st.allocations, a],
+        })),
+      getAllocation: (employeeId, period) =>
+        get().allocations.find((a) => a.employeeId === employeeId && a.period === period),
 
       loadDemoData: (months = 6) =>
         set((st) => {
@@ -454,6 +499,8 @@ export const usePayrollStore = create<PayrollState>()(
           analytics: DEFAULT_ANALYTICS,
           snapshots: [],
           declaredInsured: [],
+          projects: SEED_PROJECTS,
+          allocations: SEED_ALLOCATIONS,
         }),
       clearAll: () =>
         set({
@@ -465,6 +512,8 @@ export const usePayrollStore = create<PayrollState>()(
           analytics: DEFAULT_ANALYTICS,
           snapshots: [],
           declaredInsured: [],
+          projects: [],
+          allocations: [],
         }),
 
       exportAll: () => serializeState(get() as unknown as Record<string, unknown>, STORE_VERSION),
@@ -493,6 +542,8 @@ export const usePayrollStore = create<PayrollState>()(
             setupCompleted: s.setupCompleted ?? st.setupCompleted,
             operatorName: s.operatorName ?? st.operatorName,
             declaredInsured: s.declaredInsured ?? st.declaredInsured,
+            projects: s.projects ?? st.projects,
+            allocations: s.allocations ?? st.allocations,
             auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
           };
         }),
@@ -500,8 +551,19 @@ export const usePayrollStore = create<PayrollState>()(
     {
       name: STORAGE_KEY,
       version: STORE_VERSION,
-      // 版本升級時的轉換點（目前 v1：直接沿用，欄位補預設交由 merge 處理）
-      migrate: (persisted) => persisted as PayrollState,
+      // 版本升級轉換點。v1→v2：由 employees[].project 自由字串合成專案主檔（避免漏算）。
+      migrate: (persisted) => {
+        const st = (persisted ?? {}) as Partial<PayrollState>;
+        if (!st.projects && Array.isArray(st.employees)) {
+          const codes = [...new Set(st.employees.map((e) => e.project).filter((c): c is string => !!c))];
+          st.projects = codes.map((code) => ({
+            id: code, code, name: code, manager: "", client: "", budget: 0,
+            startDate: "", endDate: "", status: "進行中" as const,
+          }));
+          st.allocations = st.allocations ?? [];
+        }
+        return st as PayrollState;
+      },
       // 與預設深度合併，使舊版 localStorage 自動補上新增欄位（如彈性工時設定）
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<PayrollState>;
@@ -521,6 +583,8 @@ export const usePayrollStore = create<PayrollState>()(
           auditLog: p.auditLog ?? current.auditLog,
           operatorName: p.operatorName ?? current.operatorName,
           declaredInsured: p.declaredInsured ?? current.declaredInsured,
+          projects: p.projects ?? current.projects,
+          allocations: p.allocations ?? current.allocations,
         };
       },
     },

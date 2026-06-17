@@ -10,6 +10,7 @@ import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { calculatePayroll } from "@/lib/calc";
 import type { MonthlyEvent } from "@/lib/types";
 import { ntd, formatPeriod } from "@/lib/utils";
+import { AllocationEditor } from "@/views/AllocationEditor";
 import { Pencil, ArrowRight, Wand2, Info } from "lucide-react";
 
 /** 將當月異動濃縮為 HR 一眼可讀的摘要 */
@@ -172,6 +173,8 @@ export function MonthlyView({
           </CardContent>
         </Card>
       )}
+
+      {employees.length > 0 && <AllocationEditor />}
 
       {/* 單人異動編輯視窗 */}
       <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>

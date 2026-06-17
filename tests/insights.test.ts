@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   top20Share, analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
-  analyzeMarket, analyzeTrend, analyzeBudget,
+  analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost,
 } from "../src/lib/insights";
+import { UNALLOCATED_ID, type ProjectAgg } from "../src/lib/reports/projectCost";
 import type { PayrollSnapshot } from "../src/lib/types";
 
 describe("top20Share", () => {
@@ -160,5 +161,31 @@ describe("analyzeBudget", () => {
   it("尚有空間 → good", () => {
     const out = analyzeBudget({ annualBudget: 2000000, currentAnnualizedCost: 1000000, plannedDelta: 100000 });
     expect(out.some((i) => i.level === "good")).toBe(true);
+  });
+});
+
+describe("analyzeProjectCost", () => {
+  const agg = (o: Partial<ProjectAgg> & { projectId: string; totalCost: number }): ProjectAgg => ({
+    name: o.projectId, hours: 0, fte: 0, base: 0, allowance: 0, ot: 0, bonus: 0, other: 0, burden: 0,
+    pctOfCompany: 0, budget: 0, variance: 0, ...o,
+  });
+  it("超預算 → warn", () => {
+    const out = analyzeProjectCost({ projects: [agg({ projectId: "P1", totalCost: 150, budget: 100, variance: -50 })], companyTotal: 150, utilization: 0.9 });
+    expect(out.some((i) => i.level === "warn" && /超出預算/.test(i.title))).toBe(true);
+  });
+  it("皆在預算內 → good", () => {
+    const out = analyzeProjectCost({ projects: [agg({ projectId: "P1", totalCost: 80, budget: 100, variance: 20 })], companyTotal: 80, utilization: 0.9 });
+    expect(out.some((i) => i.level === "good" && /預算內/.test(i.title))).toBe(true);
+  });
+  it("未分攤占比過高 → warn", () => {
+    const out = analyzeProjectCost({ projects: [agg({ projectId: "P1", totalCost: 60 }), agg({ projectId: UNALLOCATED_ID, name: "未分攤", totalCost: 40 })], companyTotal: 100, utilization: 0.9 });
+    expect(out.some((i) => i.level === "warn" && /間接/.test(i.title))).toBe(true);
+  });
+  it("稼動率偏低 → info", () => {
+    const out = analyzeProjectCost({ projects: [agg({ projectId: "P1", totalCost: 100 })], companyTotal: 100, utilization: 0.5 });
+    expect(out.some((i) => /稼動率/.test(i.title))).toBe(true);
+  });
+  it("companyTotal=0 → 空", () => {
+    expect(analyzeProjectCost({ projects: [], companyTotal: 0, utilization: 0 })).toEqual([]);
   });
 });

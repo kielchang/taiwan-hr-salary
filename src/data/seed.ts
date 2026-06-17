@@ -6,6 +6,8 @@ import type {
   Dependent,
   MonthlyEvent,
   PayrollSnapshot,
+  Project,
+  Allocation,
 } from "@/lib/types";
 import { calculatePayroll } from "@/lib/calc";
 import { buildSnapshot } from "@/lib/analytics";
@@ -126,6 +128,20 @@ export const SEED_EVENTS: MonthlyEvent[] = [
   evt("E006", {}),
   evt("E007", { personalLeaveHours: 8, sickLeaveHours: 16 }),
   evt("E008", { monthlyBonus: 100000, cumulativeBonus: 700000, withheldTax: 12000 }),
+];
+
+/* ───────────── 專案主檔與工時分攤（示範） ───────────── */
+
+export const SEED_PROJECTS: Project[] = [
+  { id: "P-A", code: "PJ-2026A", name: "2026 平台改版專案", manager: "蔡佩珊", client: "內部", budget: 6000000, startDate: "2026-01-01", endDate: "2026-12-31", status: "進行中" },
+  { id: "P-B", code: "PJ-2026B", name: "2026 客戶導入專案", manager: "張志豪", client: "ACME", budget: 3600000, startDate: "2026-01-01", endDate: "2026-09-30", status: "進行中" },
+];
+
+// 對應 SEED_PERIOD（2026-01）：示範跨專案與未分攤殘量
+export const SEED_ALLOCATIONS: Allocation[] = [
+  { employeeId: "E001", period: SEED_PERIOD, mode: "hours", lines: [{ projectId: "P-A", value: 144 }] }, // 60%，殘 40% 未分攤
+  { employeeId: "E005", period: SEED_PERIOD, mode: "hours", lines: [{ projectId: "P-A", value: 120 }, { projectId: "P-B", value: 120 }] },
+  { employeeId: "E003", period: SEED_PERIOD, mode: "pct", lines: [{ projectId: "P-B", value: 100 }] },
 ];
 
 /* ───────────── 多月示範資料（讓報表/趨勢有歷史可看） ───────────── */

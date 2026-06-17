@@ -29,6 +29,8 @@ export const BACKUP_KEYS = [
   "auditLog",
   "operatorName",
   "declaredInsured",
+  "projects",
+  "allocations",
 ] as const;
 
 /** 由完整 store 狀態（含函數）挑出資料切片，包成信封 */

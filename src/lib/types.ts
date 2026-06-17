@@ -205,6 +205,40 @@ export interface AnalyticsConfig {
   planning: PlanningConfig;
 }
 
+/* ───────────── 專案主檔與工時分攤（管理會計：依工時比例分攤人事成本） ───────────── */
+
+export type ProjectStatus = "進行中" | "結案" | "暫停";
+
+/** 專案主檔（分攤標的；含預算供 P&L 預算 vs 實際） */
+export interface Project {
+  id: string; // 內部主鍵
+  code: string; // 專案代號（對應舊 Employee.project 自由字串）
+  name: string;
+  manager: string; // PM
+  client: string;
+  budget: number; // 整案預算（以雇主總成本為基準）
+  startDate: string; // ISO yyyy-mm-dd
+  endDate: string; // ISO
+  status: ProjectStatus;
+}
+
+export type AllocationMode = "hours" | "pct";
+
+/** 單一專案分攤明細：mode=hours→時數；mode=pct→百分比(0~100) */
+export interface AllocationLine {
+  projectId: string;
+  value: number;
+}
+
+/** 每員工每月工時分攤（缺此筆→100% 計入該員工 default/已遷移專案） */
+export interface Allocation {
+  employeeId: string;
+  period: string; // yyyy-mm
+  mode: AllocationMode;
+  lines: AllocationLine[];
+  bonusProjectId?: string; // 設定→當月獎金直接歸屬此專案，跳過比例分攤
+}
+
 /* ───────────── 稽核軌跡（變更紀錄；單機版以操作者姓名為 actor） ───────────── */
 
 export type AuditAction =
@@ -214,7 +248,8 @@ export type AuditAction =
   | "confirm" // 月結確認／取消
   | "raiseApply" // 調薪方案核定寫回
   | "import" // 批次匯入
-  | "restore"; // 整檔還原
+  | "restore" // 整檔還原
+  | "project"; // 專案主檔異動
 
 export interface AuditEntry {
   id: string;

@@ -18,6 +18,8 @@ const fakeState = {
   snapshots: [{ period: "2026-01" }],
   confirmations: { "2026-01": "t" },
   setupCompleted: true,
+  projects: [{ id: "P1", code: "PJ-A", name: "甲案", manager: "", client: "", budget: 100, startDate: "", endDate: "", status: "進行中" }],
+  allocations: [{ employeeId: "E001", period: "2026-01", mode: "hours", lines: [{ projectId: "P1", value: 120 }] }],
   // 以下應被剔除
   someAction: () => 1,
   resetToSeed: () => 2,
@@ -36,11 +38,13 @@ describe("serializeState", () => {
 });
 
 describe("parseBackup", () => {
-  it("往返一致：serialize → JSON → parse", () => {
+  it("往返一致：serialize → JSON → parse（含專案/分攤）", () => {
     const env = serializeState(fakeState, VERSION);
     const res = parseBackup(JSON.stringify(env), VERSION);
     expect(res.ok).toBe(true);
     expect(res.env?.state.employees).toEqual(fakeState.employees);
+    expect(res.env?.state.projects).toEqual(fakeState.projects);
+    expect(res.env?.state.allocations).toEqual(fakeState.allocations);
   });
   it("非 JSON → 失敗", () => {
     expect(parseBackup("not json{", VERSION).ok).toBe(false);
