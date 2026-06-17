@@ -95,6 +95,7 @@ config（參數/級距） ──► store（主檔：員工·眷屬·薪資結�
 | 法規申報 | `FilingView` 法規申報（額外模組） | 年度扣繳憑單彙總（`lib/reports/withholding.ts` 跨期聚合）／勞健退繳費清單（重用 `usePayrollRows` 的 insured/premiums）／投保級距申報調整（`lib/reports/bracketAdjust.ts` 比對 `declaredInsured` 基準）／加退保作業清單（`lib/reports/enrollment.ts` 依生命週期日期）；皆 CSV 匯出，不直接介接政府平台 |
 | 專案成本 | `ReportsView`／`AnalyticsView`／`SettingsView`／`MonthlyView` | 專案主檔（`SettingsView` CRUD，含預算/起訖/%完成）＋每月工時分攤（`AllocationEditor`，時數/百分比、「由出勤帶入」`attendance.monthWorkedHours`、availableHours 基礎）；`lib/reports/projectCost.ts`（`allocateEmployee` 共用切分）以 `distributeRounded` 把每員工全載成本切到各專案＋未分攤桶（勾稽：Σ＝全公司總成本），算 FTE/稼動率/預算 vs 實際、`projectDeptMatrix`（專案×部門）、`chargeOutVariance`（標準工率＝全載÷標準工時）；`lib/reports/projectTrend.ts` 逐月重算→`projectEac`（AC/燃燒率/run-rate EAC＋選用 EVM CPI）；報表頁專案 P&L＋分析頁「專案成本」分頁（StackedBar/Pareto/Bullet/Heatmap/TrendChart＋`analyzeProjectCost` 白話意見） |
 | 資料治理 | `SettingsView`／`MasterDataView` 內 | 整檔 JSON 備份/還原（`lib/backup.ts`＋persist `version/migrate`）／員工 CSV 批次匯入含驗證預覽（`lib/import/employeeCsv.ts`）／員工生命週期（status/leaveDate）與破月比例（`calc/wage.ts prorationFactor`，opt-in、factor=1 不破壞 TC-9）／調薪試算核定寫回（store `applyRaise`）／變更稽核軌跡（store `auditLog`＋操作者姓名） |
+| 出勤匯入 | `AttendanceView`／`lib/import/attendanceCsv.ts` | 出勤/工時 CSV 批次匯入：打卡格式（上/下班）或工時格式（每日工時→合成上下班、扣午休）；驗證預覽後 `importPunches` 寫入 punches（去重），供「由出勤帶入」分攤 |
 | 出勤打卡 | `AttendanceView` 出勤打卡（額外模組） | GPS 軟性圍欄＋選用 IP 限制的上下班打卡、彈性上下班每日彙整（遲到/工時不足/缺卡）、CSV 匯出；前端定位/IP 僅供輔助稽核、非強制 |
 | 說明 | `HelpView` 使用說明／`SourcesView` 法規與費率依據 | 純操作說明＋FAQ＋薪酬分析指引；法源出處卡片（法條連結指向全國法規資料庫條文＋主管機關），即來源01–05 的使用者版 |
 

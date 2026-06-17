@@ -98,6 +98,7 @@ interface PayrollState {
   punches: PunchRecord[];
   setAttendance: (patch: Partial<AttendanceConfig>) => void;
   addPunch: (record: PunchRecord) => void;
+  importPunches: (records: PunchRecord[]) => void;
   removePunch: (id: string) => void;
   clearPunches: () => void;
 
@@ -219,6 +220,15 @@ export const usePayrollStore = create<PayrollState>()(
       setAttendance: (patch) =>
         set((st) => ({ attendance: { ...st.attendance, ...patch } })),
       addPunch: (record) => set((st) => ({ punches: [record, ...st.punches] })),
+      importPunches: (records) =>
+        set((st) => {
+          const existing = new Set(st.punches.map((p) => p.id));
+          const add = records.filter((r) => !existing.has(r.id));
+          return {
+            punches: [...add, ...st.punches],
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "import", `匯入 ${add.length} 筆打卡紀錄`)),
+          };
+        }),
       removePunch: (id) =>
         set((st) => ({ punches: st.punches.filter((p) => p.id !== id) })),
       clearPunches: () => set({ punches: [] }),

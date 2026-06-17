@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
@@ -11,8 +12,10 @@ import {
   evaluateFence, isIpAllowed, punchesToCsv, punchTypeLabel,
   evaluateAllForDate, formatMinutes, localDateKey, type DayAttendance,
 } from "@/lib/attendance";
+import { csvSerialize } from "@/lib/csv";
+import { parseAttendanceCsv, PUNCH_TEMPLATE, HOURS_TEMPLATE, type AttImportPreview } from "@/lib/import/attendanceCsv";
 import {
-  LogIn, LogOut, MapPin, Download, AlertTriangle, CheckCircle2, ShieldAlert, Settings, Trash2, CalendarCheck,
+  LogIn, LogOut, MapPin, Download, Upload, FileDown, AlertTriangle, CheckCircle2, ShieldAlert, Settings, Trash2, CalendarCheck,
 } from "lucide-react";
 
 /** 取得目前定位（瀏覽器 Geolocation；可能因權限或裝置失敗） */
@@ -54,13 +57,36 @@ interface PunchResult {
 }
 
 export function AttendanceView() {
-  const { employees, attendance, punches, addPunch, removePunch, clearPunches } = usePayrollStore();
+  const { employees, attendance, punches, addPunch, importPunches, removePunch, clearPunches } = usePayrollStore();
   const navigate = useNavigate();
   const [selected, setSelected] = useState(employees[0]?.id ?? "");
   const [busy, setBusy] = useState<PunchType | null>(null);
   const [result, setResult] = useState<PunchResult | null>(null);
   const todayKey = localDateKey(new Date().toISOString());
   const [summaryDate, setSummaryDate] = useState(todayKey);
+  const importRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<AttImportPreview | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const downloadTemplate = (kind: "punch" | "hours") => {
+    const sample = kind === "punch"
+      ? { cols: [...PUNCH_TEMPLATE], row: ["E001", "2026-01-05", "上班", "09:00"] }
+      : { cols: [...HOURS_TEMPLATE], row: ["E001", "2026-01-05", "8", "09:00"] };
+    saveCsv(csvSerialize(sample.cols, [sample.row]), `出勤匯入範本_${kind === "punch" ? "打卡" : "工時"}.csv`);
+  };
+  const onImportFile = async (file: File) => {
+    const text = await file.text();
+    setPreview(parseAttendanceCsv(text, new Set(employees.map((e) => e.id)), attendance.breakMinutes));
+    setImportOpen(true);
+  };
+  const commitImport = () => {
+    if (preview && !preview.hasError && preview.valid.length > 0) {
+      importPunches(preview.valid);
+      setImportOpen(false);
+      setPreview(null);
+      alert(`已匯入 ${preview.valid.length} 筆打卡紀錄。`);
+    }
+  };
 
   const nameById = Object.fromEntries(employees.map((e) => [e.id, e.name]));
   const today = new Date().toDateString();
@@ -257,7 +283,17 @@ export function AttendanceView() {
             </CardTitle>
             <CardDescription>{new Date().toLocaleDateString("zh-TW")}（本機）</CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <input
+              ref={importRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.target.value = ""; }}
+            />
+            <Button variant="outline" size="sm" onClick={() => downloadTemplate("punch")}><FileDown /> 打卡範本</Button>
+            <Button variant="outline" size="sm" onClick={() => downloadTemplate("hours")}><FileDown /> 工時範本</Button>
+            <Button variant="outline" size="sm" onClick={() => importRef.current?.click()}><Upload /> 匯入 CSV</Button>
             <Button
               variant="outline"
               size="sm"
@@ -331,6 +367,54 @@ export function AttendanceView() {
           )}
         </CardContent>
       </Card>
+
+      {/* 出勤/工時 CSV 匯入預覽 */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader><DialogTitle>匯入出勤／工時（預覽）</DialogTitle></DialogHeader>
+          {preview && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant="outline">{preview.format === "hours" ? "工時格式（自動合成上/下班）" : "打卡格式"}</Badge>
+                <Badge variant="success">可匯入 {preview.valid.length} 筆打卡</Badge>
+                {preview.issues.some((i) => i.level === "error") && (
+                  <Badge variant="destructive">錯誤 {preview.issues.filter((i) => i.level === "error").length} 列（需修正）</Badge>
+                )}
+                {preview.issues.some((i) => i.level === "warning") && (
+                  <Badge variant="warning">提醒 {preview.issues.filter((i) => i.level === "warning").length} 項</Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">工時格式的下班時間＝上班＋工時＋午休（{attendance.breakMinutes} 分），使月工時還原為輸入值。相同時間/類型的重複紀錄不會重覆匯入。</p>
+              <div className="max-h-[50vh] overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader><TableRow><TableHead className="w-10">列</TableHead><TableHead>內容</TableHead><TableHead>檢查</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {preview.rows.map((r) => (
+                      <TableRow key={r.row} className={r.errors.length ? "bg-destructive/5" : ""}>
+                        <TableCell className="text-xs text-muted-foreground">{r.row}</TableCell>
+                        <TableCell className="text-sm">{r.summary}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {r.errors.map((m, i) => <Badge key={`e${i}`} variant="destructive">{m}</Badge>)}
+                            {r.warnings.map((m, i) => <Badge key={`w${i}`} variant="warning">{m}</Badge>)}
+                            {r.errors.length === 0 && r.warnings.length === 0 && <span className="text-xs text-muted-foreground">OK</span>}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>取消</Button>
+            <Button onClick={commitImport} disabled={!preview || preview.hasError || preview.valid.length === 0}>
+              確認匯入 {preview?.valid.length ?? 0} 筆
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
