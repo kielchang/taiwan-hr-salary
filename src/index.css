@@ -69,3 +69,56 @@
 .col-assumption {
   @apply bg-yellow-50;
 }
+
+/* ───────────── 列印樣式（報表存檔/簽核用） ───────────── */
+@media print {
+  @page {
+    margin: 14mm 12mm 16mm;
+  }
+  body {
+    background: #fff;
+  }
+  /* 報表主體去除底色與陰影，確保灰階清晰 */
+  .print\:static {
+    position: static !important;
+  }
+  /* 表格分頁：列與表頭不被切斷、每頁重複表頭 */
+  table {
+    break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+  tr,
+  img,
+  svg {
+    break-inside: avoid;
+  }
+  /* 卡片避免跨頁斷裂 */
+  .print-block {
+    break-inside: avoid;
+  }
+  /* 列印頁尾頁碼（搭配 PrintHeader 的頁首） */
+  .print-footer {
+    position: fixed;
+    bottom: 6mm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    color: #64748b;
+  }
+}
+
+/* 頁首僅於列印時顯示 */
+.print-header {
+  display: none;
+}
+@media print {
+  .print-header {
+    display: block;
+  }
+}

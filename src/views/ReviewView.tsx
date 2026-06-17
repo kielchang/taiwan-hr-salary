@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter, NumHead, NumCell, freezeFirst } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { PrintHeader } from "@/components/PrintHeader";
+import { useNavigate } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary } from "@/store/selectors";
 import { validateAll } from "@/lib/validation";
@@ -23,6 +25,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
     snapshots, saveSnapshot, analytics,
   } = usePayrollStore();
   const [tab, setTab] = useState<Tab>("overview");
+  const navigate = useNavigate();
 
   const rows = usePayrollRows();
   const companySupp = useCompanySupplementary(rows);
@@ -69,6 +72,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
 
   return (
     <div className="space-y-4">
+      <PrintHeader title="結算查核總覽" period={currentPeriod} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">查核與確認</h2>
@@ -162,24 +166,24 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
       </div>
 
       {tab === "overview" && (
-        <Card>
+        <Card className="print-block">
           <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
+            <Table zebra>
+              <TableHeader sticky>
                 <TableRow>
-                  <TableHead>員工</TableHead>
-                  <TableHead className="text-right">月薪總額</TableHead>
-                  <TableHead className="text-right">加班費</TableHead>
-                  <TableHead className="text-right">獎金</TableHead>
-                  <TableHead className="text-right">應發</TableHead>
-                  <TableHead className="text-right">勞保</TableHead>
-                  <TableHead className="text-right">健保</TableHead>
-                  <TableHead className="text-right">勞退自提</TableHead>
-                  <TableHead className="text-right">補充保費</TableHead>
-                  <TableHead className="text-right">所得稅</TableHead>
-                  <TableHead className="text-right">請假/其他</TableHead>
-                  <TableHead className="text-right font-semibold">實發</TableHead>
-                  <TableHead className="text-right">公司成本</TableHead>
+                  <TableHead className={freezeFirst}>員工</TableHead>
+                  <NumHead>月薪總額</NumHead>
+                  <NumHead>加班費</NumHead>
+                  <NumHead>獎金</NumHead>
+                  <NumHead>應發</NumHead>
+                  <NumHead>勞保</NumHead>
+                  <NumHead>健保</NumHead>
+                  <NumHead>勞退自提</NumHead>
+                  <NumHead>補充保費</NumHead>
+                  <NumHead>所得稅</NumHead>
+                  <NumHead>請假/其他</NumHead>
+                  <NumHead className="font-semibold">實發</NumHead>
+                  <NumHead>公司成本</NumHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -188,33 +192,33 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
                   const other = r.leaveDeduction + (ev?.otherDeduction ?? 0);
                   return (
                     <TableRow key={r.employeeId}>
-                      <TableCell className="whitespace-nowrap font-medium">{r.name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.salaryTotal)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.overtimePay)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(ev?.monthlyBonus ?? 0)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.grossPay)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.premiums.laborEmployee)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.premiums.healthEmployee)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.premiums.pensionVoluntary)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.personalSupplementary)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.withheldTax)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(other)}</TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">{ntd(r.netPay)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">{ntd(r.employerTotalCost)}</TableCell>
+                      <TableCell className={cn(freezeFirst, "whitespace-nowrap font-medium")}>{r.name}</TableCell>
+                      <NumCell>{ntd(r.salaryTotal)}</NumCell>
+                      <NumCell>{ntd(r.overtimePay)}</NumCell>
+                      <NumCell>{ntd(ev?.monthlyBonus ?? 0)}</NumCell>
+                      <NumCell>{ntd(r.grossPay)}</NumCell>
+                      <NumCell>{ntd(r.premiums.laborEmployee)}</NumCell>
+                      <NumCell>{ntd(r.premiums.healthEmployee)}</NumCell>
+                      <NumCell>{ntd(r.premiums.pensionVoluntary)}</NumCell>
+                      <NumCell>{ntd(r.personalSupplementary)}</NumCell>
+                      <NumCell>{ntd(r.withheldTax)}</NumCell>
+                      <NumCell>{ntd(other)}</NumCell>
+                      <NumCell className="font-semibold">{ntd(r.netPay)}</NumCell>
+                      <NumCell className="text-muted-foreground">{ntd(r.employerTotalCost)}</NumCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell>合計</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(rows.reduce((a, r) => a + r.salaryTotal, 0))}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(rows.reduce((a, r) => a + r.overtimePay, 0))}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(periodEvents.reduce((a, e) => a + e.monthlyBonus, 0))}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(totals.gross)}</TableCell>
+                  <TableCell className={freezeFirst}>合計</TableCell>
+                  <NumCell>{ntd(rows.reduce((a, r) => a + r.salaryTotal, 0))}</NumCell>
+                  <NumCell>{ntd(rows.reduce((a, r) => a + r.overtimePay, 0))}</NumCell>
+                  <NumCell>{ntd(periodEvents.reduce((a, e) => a + e.monthlyBonus, 0))}</NumCell>
+                  <NumCell>{ntd(totals.gross)}</NumCell>
                   <TableCell colSpan={6} />
-                  <TableCell className="text-right font-bold tabular-nums">{ntd(totals.net)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(totals.employer)}</TableCell>
+                  <NumCell className="font-bold">{ntd(totals.net)}</NumCell>
+                  <NumCell>{ntd(totals.employer)}</NumCell>
                 </TableRow>
               </TableFooter>
             </Table>
@@ -248,7 +252,17 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
                       <AlertTriangle
                         className={cn("mt-0.5 size-4 shrink-0", i.severity === "error" ? "text-destructive" : "text-amber-500")}
                       />
-                      {i.message}
+                      <span className="flex-1">{i.message}</span>
+                      {i.employeeId && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 shrink-0 px-2 text-xs print:hidden"
+                          onClick={() => navigate("/master")}
+                        >
+                          前往修正 <ArrowRight className="size-3" />
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>

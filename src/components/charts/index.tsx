@@ -127,7 +127,7 @@ export interface BarDatum { label: string; value: number; id?: string }
 
 /** 垂直長條圖（直方圖、部門中位、調幅%）。hover 高亮＋提示；可 onSelect 鑽取。 */
 export function BarChart({
-  data, height = 160, color = PALETTE[0], valueFmt = ntd, onSelect, selectedIndex = null,
+  data, height = 160, color = PALETTE[0], valueFmt = ntd, onSelect, selectedIndex = null, showValues = false,
 }: {
   data: BarDatum[];
   height?: number;
@@ -135,6 +135,7 @@ export function BarChart({
   valueFmt?: (n: number) => string;
   onSelect?: (item: BarDatum, index: number) => void;
   selectedIndex?: number | null;
+  showValues?: boolean; // 於長條頂端標數值（列印/觸控不靠 hover 也能讀）
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   if (data.length === 0) return <Empty />;
@@ -159,6 +160,11 @@ export function BarChart({
                 style={{ cursor: onSelect ? "pointer" : "default" }}
                 onPointerEnter={() => setIdx(i)}
                 onPointerDown={() => { setIdx(i); onSelect?.(d, i); }} />
+              {showValues && d.value > 0 && (
+                <text x={x + bw / 2} y={y - 2} textAnchor="middle" fontSize="6.5" fill={TEXT} pointerEvents="none">
+                  {valueFmt(d.value)}
+                </text>
+              )}
               <text x={x + bw / 2} y={H - pad.b + 10} textAnchor="middle" fontSize="7" fill={TEXT}>
                 {d.label.length > 6 ? d.label.slice(0, 6) : d.label}
               </text>
@@ -351,22 +357,29 @@ export function Bullet({ value, target, label, height = 34 }: { value: number; t
 }
 
 /** 熱圖：rows × cols，cell 值（null＝無資料），色階以 [domainMin,domainMax] 內插；可點格鑽取。 */
+function heatColor(v: number, domain: [number, number]) {
+  const t = Math.max(0, Math.min(1, (v - domain[0]) / (domain[1] - domain[0])));
+  if (t < 0.5) return `hsl(${210 - t * 2 * 90}, 70%, 75%)`;
+  return `hsl(${120 - (t - 0.5) * 2 * 120}, 70%, 72%)`;
+}
+
 export function Heatmap({
-  rowLabels, colLabels, cells, domain = [0.8, 1.2], fmt = (n: number) => n.toFixed(2), onSelect,
+  rowLabels, colLabels, cells, domain, fmt = (n: number) => n.toFixed(2), onSelect, legend = true,
 }: {
   rowLabels: string[];
   colLabels: string[];
   cells: (number | null)[][];
-  domain?: [number, number];
+  domain?: [number, number]; // 未給時依資料自動取 [min,max]
   fmt?: (n: number) => string;
   onSelect?: (rowLabel: string, colLabel: string, value: number) => void;
+  legend?: boolean;
 }) {
-  const colorOf = (v: number) => {
-    const t = Math.max(0, Math.min(1, (v - domain[0]) / (domain[1] - domain[0])));
-    if (t < 0.5) return `hsl(${210 - t * 2 * 90}, 70%, 75%)`;
-    return `hsl(${120 - (t - 0.5) * 2 * 120}, 70%, 72%)`;
-  };
+  const flat = cells.flat().filter((v): v is number => v != null);
+  const auto: [number, number] = flat.length ? [Math.min(...flat), Math.max(...flat)] : [0.8, 1.2];
+  const dom: [number, number] = domain ?? (auto[0] === auto[1] ? [auto[0] - 0.1, auto[1] + 0.1] : auto);
+  const colorOf = (v: number) => heatColor(v, dom);
   return (
+    <div className="space-y-2">
     <div className="overflow-auto select-none">
       <table className="border-collapse text-xs">
         <thead>
@@ -399,6 +412,18 @@ export function Heatmap({
           ))}
         </tbody>
       </table>
+    </div>
+    {legend && (
+      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+        <span>低 {fmt(dom[0])}</span>
+        <span
+          className="h-2 w-28 rounded"
+          style={{ background: `linear-gradient(to right, ${heatColor(dom[0], dom)}, ${heatColor((dom[0] + dom[1]) / 2, dom)}, ${heatColor(dom[1], dom)})` }}
+        />
+        <span>高 {fmt(dom[1])}</span>
+        <span className="ml-1">（灰＝無資料）</span>
+      </div>
+    )}
     </div>
   );
 }

@@ -1,17 +1,21 @@
 import { useState, useRef, createElement } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter, NumHead, NumCell, SortHead } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Delta } from "@/components/ui/delta";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PrintHeader } from "@/components/PrintHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary, type PayrollRow } from "@/store/selectors";
-import { cn, ntd, formatPeriod } from "@/lib/utils";
+import { cn, ntd, pctOf, formatPeriod } from "@/lib/utils";
+import { useSort } from "@/lib/useSort";
 import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
 import { buildPayslipMailto } from "@/lib/payslipEmail";
 import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
 import { PayslipCard } from "@/views/PayslipCard";
-import { Printer, Wand2, Lock, Mail, AlertTriangle, Package, CheckCircle2 } from "lucide-react";
+import { Printer, Wand2, Lock, Mail, AlertTriangle, Package, CheckCircle2, FileText, Users } from "lucide-react";
 
 type Tab = "summary" | "tax" | "payslip";
 
@@ -22,6 +26,7 @@ export function ReportsView() {
 
   return (
     <div className="space-y-4">
+      <PrintHeader title="月結報表" period={currentPeriod} />
       <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
           <h2 className="text-base font-semibold">報表與薪資條</h2>
@@ -85,6 +90,10 @@ function SummaryReport() {
     { count: 0, gross: 0, ot: 0, bonus: 0, net: 0, burden: 0, cost: 0 },
   );
 
+  if (rows.length === 0) {
+    return <Card><CardContent><EmptyState icon={<Users className="size-7" />} title="本月尚無薪資資料" hint="請先到「每月薪資作業」建立當月員工與異動，匯總報表會自動帶出。" /></CardContent></Card>;
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end print:hidden">
@@ -101,55 +110,8 @@ function SummaryReport() {
           g.net += r.netPay; g.burden += r.employerBurden; g.cost += r.employerTotalCost;
           map.set(name, g);
         }
-        return (
-          <Card key={dim.key}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{dim.title}人事成本</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>名稱</TableHead>
-                    <TableHead className="text-right">人數</TableHead>
-                    <TableHead className="text-right">應發合計</TableHead>
-                    <TableHead className="text-right">其中加班費</TableHead>
-                    <TableHead className="text-right">其中獎金</TableHead>
-                    <TableHead className="text-right">實發金額</TableHead>
-                    <TableHead className="text-right">公司負擔保費</TableHead>
-                    <TableHead className="text-right">公司總成本</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...map.entries()].map(([name, g]) => (
-                    <TableRow key={name}>
-                      <TableCell>{name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{g.count}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(g.gross)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(g.ot)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(g.bonus)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(g.net)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(g.burden)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(g.cost)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell>合計</TableCell>
-                    <TableCell className="text-right tabular-nums">{grand.count}</TableCell>
-                    <TableCell className="text-right tabular-nums">{ntd(grand.gross)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{ntd(grand.ot)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{ntd(grand.bonus)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{ntd(grand.net)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{ntd(grand.burden)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{ntd(grand.cost)}</TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </CardContent>
-          </Card>
-        );
+        const entries = [...map.entries()].map(([name, g]) => ({ name, ...g }));
+        return <GroupTable key={dim.key} title={dim.title} entries={entries} grand={grand} />;
       })}
       <ProjectPnL rows={rows} bonusOf={bonusOf} />
       <Card>
@@ -162,6 +124,73 @@ function SummaryReport() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+type GroupAgg = { name: string; count: number; gross: number; ot: number; bonus: number; net: number; burden: number; cost: number };
+
+/** 部門/成本中心匯總表：可點欄頭排序、含占比欄與合計列、斑馬紋＋黏性表頭。 */
+function GroupTable({ title, entries, grand }: { title: string; entries: GroupAgg[]; grand: Omit<GroupAgg, "name"> }) {
+  const { sorted, sort, toggle } = useSort<GroupAgg>(
+    entries,
+    {
+      name: (r) => r.name, count: (r) => r.count, gross: (r) => r.gross, ot: (r) => r.ot,
+      bonus: (r) => r.bonus, net: (r) => r.net, burden: (r) => r.burden, cost: (r) => r.cost,
+    },
+    { key: "cost", dir: "desc" },
+  );
+  return (
+    <Card className="print-block">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{title}人事成本</CardTitle>
+        <CardDescription>點欄頭可排序（預設依公司總成本由大到小）。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table zebra>
+          <TableHeader sticky>
+            <TableRow>
+              <SortHead sortKey="name" sort={sort} onSort={toggle}>名稱</SortHead>
+              <SortHead sortKey="count" sort={sort} onSort={toggle} numeric>人數</SortHead>
+              <SortHead sortKey="gross" sort={sort} onSort={toggle} numeric>應發合計</SortHead>
+              <SortHead sortKey="ot" sort={sort} onSort={toggle} numeric>其中加班費</SortHead>
+              <SortHead sortKey="bonus" sort={sort} onSort={toggle} numeric>其中獎金</SortHead>
+              <SortHead sortKey="net" sort={sort} onSort={toggle} numeric>實發金額</SortHead>
+              <SortHead sortKey="burden" sort={sort} onSort={toggle} numeric>公司負擔保費</SortHead>
+              <SortHead sortKey="cost" sort={sort} onSort={toggle} numeric>公司總成本</SortHead>
+              <NumHead>占比</NumHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((g) => (
+              <TableRow key={g.name}>
+                <TableCell>{g.name}</TableCell>
+                <NumCell>{g.count}</NumCell>
+                <NumCell>{ntd(g.gross)}</NumCell>
+                <NumCell>{ntd(g.ot)}</NumCell>
+                <NumCell>{ntd(g.bonus)}</NumCell>
+                <NumCell>{ntd(g.net)}</NumCell>
+                <NumCell>{ntd(g.burden)}</NumCell>
+                <NumCell>{ntd(g.cost)}</NumCell>
+                <NumCell className="text-muted-foreground">{grand.cost ? pctOf(g.cost / grand.cost) : "—"}</NumCell>
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell>合計</TableCell>
+              <NumCell>{grand.count}</NumCell>
+              <NumCell>{ntd(grand.gross)}</NumCell>
+              <NumCell>{ntd(grand.ot)}</NumCell>
+              <NumCell>{ntd(grand.bonus)}</NumCell>
+              <NumCell>{ntd(grand.net)}</NumCell>
+              <NumCell>{ntd(grand.burden)}</NumCell>
+              <NumCell>{ntd(grand.cost)}</NumCell>
+              <NumCell>100%</NumCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -180,29 +209,31 @@ function ProjectPnL({ rows, bonusOf }: { rows: PayrollRow[]; bonusOf: (id: strin
     baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp,
   });
   const shown = result.projects.filter((p) => p.totalCost > 0 || p.budget > 0);
+  const totBudget = shown.reduce((a, p) => a + p.budget, 0);
+  const totVariance = shown.reduce((a, p) => a + (p.budget > 0 ? p.variance : 0), 0);
 
   return (
-    <Card>
+    <Card className="print-block">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">專案別人事成本（依工時分攤）</CardTitle>
         <CardDescription>
           每位員工的全載成本（含雇主負擔）依當月各專案投入工時/百分比分攤；未投入專案的工時歸「未分攤／間接」。
-          合計等於全公司總成本（{ntd(result.companyTotal)} 元）。稼動率 {(result.utilization * 100).toFixed(0)}%。
+          合計等於全公司總成本（{ntd(result.companyTotal)} 元）。稼動率 {pctOf(result.utilization, 0)}。
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
-          <TableHeader>
+          <TableHeader sticky>
             <TableRow>
               <TableHead>專案</TableHead>
-              <TableHead className="text-right">投入工時</TableHead>
-              <TableHead className="text-right">FTE</TableHead>
-              <TableHead className="text-right">應發小計</TableHead>
-              <TableHead className="text-right">雇主負擔</TableHead>
-              <TableHead className="text-right">總成本</TableHead>
-              <TableHead className="text-right">占比</TableHead>
-              <TableHead className="text-right">期間預算</TableHead>
-              <TableHead className="text-right">差異</TableHead>
+              <NumHead>投入工時</NumHead>
+              <NumHead>FTE</NumHead>
+              <NumHead>應發小計</NumHead>
+              <NumHead>雇主負擔</NumHead>
+              <NumHead>總成本</NumHead>
+              <NumHead>占比</NumHead>
+              <NumHead>期間預算</NumHead>
+              <NumHead>差異</NumHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -212,16 +243,14 @@ function ProjectPnL({ rows, bonusOf }: { rows: PayrollRow[]; bonusOf: (id: strin
               return (
                 <TableRow key={p.projectId} className={cn(isBucket && "text-muted-foreground")}>
                   <TableCell>{p.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.hours ? p.hours.toLocaleString() : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.hours ? p.fte.toFixed(2) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(gross)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(p.burden)}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{ntd(p.totalCost)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{(p.pctOfCompany * 100).toFixed(1)}%</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.budget ? ntd(p.budget) : "—"}</TableCell>
-                  <TableCell className={cn("text-right tabular-nums", p.budget > 0 && (p.variance < 0 ? "text-red-600" : "text-emerald-600"))}>
-                    {p.budget ? (p.variance < 0 ? `超 ${ntd(-p.variance)}` : `餘 ${ntd(p.variance)}`) : "—"}
-                  </TableCell>
+                  <NumCell>{p.hours ? ntd(p.hours) : "—"}</NumCell>
+                  <NumCell>{p.hours ? p.fte.toFixed(2) : "—"}</NumCell>
+                  <NumCell>{ntd(gross)}</NumCell>
+                  <NumCell>{ntd(p.burden)}</NumCell>
+                  <NumCell className="font-medium">{ntd(p.totalCost)}</NumCell>
+                  <NumCell>{pctOf(p.pctOfCompany)}</NumCell>
+                  <NumCell>{p.budget ? ntd(p.budget) : "—"}</NumCell>
+                  <NumCell>{p.budget ? <Delta value={p.variance} posLabel="餘 " negLabel="超 " /> : "—"}</NumCell>
                 </TableRow>
               );
             })}
@@ -229,12 +258,13 @@ function ProjectPnL({ rows, bonusOf }: { rows: PayrollRow[]; bonusOf: (id: strin
           <TableFooter>
             <TableRow>
               <TableCell>合計</TableCell>
-              <TableCell className="text-right tabular-nums">{result.totalDirectHours ? result.totalDirectHours.toLocaleString() : "—"}</TableCell>
+              <NumCell>{result.totalDirectHours ? ntd(result.totalDirectHours) : "—"}</NumCell>
               <TableCell />
               <TableCell colSpan={2} />
-              <TableCell className="text-right font-bold tabular-nums">{ntd(result.companyTotal)}</TableCell>
-              <TableCell className="text-right tabular-nums">100%</TableCell>
-              <TableCell colSpan={2} />
+              <NumCell className="font-bold">{ntd(result.companyTotal)}</NumCell>
+              <NumCell>100%</NumCell>
+              <NumCell>{totBudget ? ntd(totBudget) : "—"}</NumCell>
+              <NumCell>{totBudget ? <Delta value={totVariance} posLabel="餘 " negLabel="超 " /> : "—"}</NumCell>
             </TableRow>
           </TableFooter>
         </Table>
@@ -252,8 +282,12 @@ function TaxReport() {
   const getEvent = (id: string) =>
     events.find((e) => e.employeeId === id && e.period === currentPeriod) ?? blankEvent(id, currentPeriod);
 
+  if (rows.length === 0) {
+    return <Card><CardContent><EmptyState icon={<FileText className="size-7" />} title="本月尚無可代扣的薪資資料" hint="完成「每月薪資作業」後，這裡會列出每位員工的建議與實際代扣稅額。" /></CardContent></Card>;
+  }
+
   return (
-    <Card>
+    <Card className="print-block">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">本月代扣所得稅清單</CardTitle>
         <CardDescription>
@@ -262,16 +296,16 @@ function TaxReport() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
+        <Table zebra>
+          <TableHeader sticky>
             <TableRow>
               <TableHead>員工</TableHead>
               <TableHead>身分／方式</TableHead>
-              <TableHead className="text-right">扶養人數</TableHead>
-              <TableHead className="text-right">本月應稅薪資（估）</TableHead>
-              <TableHead className="text-right">起扣點（估）</TableHead>
-              <TableHead className="text-right">建議金額</TableHead>
-              <TableHead className="text-right">已填金額</TableHead>
+              <NumHead>扶養人數</NumHead>
+              <NumHead>本月應稅薪資（估）</NumHead>
+              <NumHead>起扣點（估）</NumHead>
+              <NumHead>建議金額</NumHead>
+              <NumHead>已填金額</NumHead>
               <TableHead className="w-24 print:hidden"></TableHead>
             </TableRow>
           </TableHeader>

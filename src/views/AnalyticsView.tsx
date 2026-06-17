@@ -13,13 +13,14 @@ import { usePayrollRows, usePayrollRowsFor, buildPayrollRows, type PayrollRow } 
 import { annualMonths, annualTotals, simulateAnnual } from "@/lib/reports/annual";
 import { saveBlob } from "@/lib/payslipPdf";
 import { csvSerialize } from "@/lib/csv";
-import { cn, ntd, pct, formatPeriod } from "@/lib/utils";
+import { cn, ntd, pct, pctOf, ratioPct, formatPeriod } from "@/lib/utils";
 import {
   percentileSet, coefficientOfVariation, gini, lorenzPoints, histogram,
   buildBasis, simulateBonusPool, simulateRaise, buildSnapshot, compareRaiseMethods,
   type BonusSimResult, type RaiseSimResult,
 } from "@/lib/analytics";
 import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, TrendChart, PALETTE } from "@/components/charts";
+import { Delta } from "@/components/ui/delta";
 import {
   analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
   analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost, type Insight,
@@ -28,7 +29,21 @@ import { computeProjectCost, projectDeptMatrix, chargeOutVariance, UNALLOCATED_I
 import { projectCostByPeriod, projectEac } from "@/lib/reports/projectTrend";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
 import { HelpHint } from "@/components/HelpHint";
-import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb, Save, TrendingUp } from "lucide-react";
+import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb, Save, TrendingUp, FlaskConical } from "lucide-react";
+
+/** 規劃試算沙盒提示：明示「不寫回薪資」（除非另行核定），避免誤把規劃數字當實際。 */
+function SandboxNotice({ applyHint = false }: { applyHint?: boolean }) {
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-900 print:hidden">
+      <FlaskConical className="mt-0.5 size-4 shrink-0" />
+      <p>
+        <span className="font-medium">規劃試算沙盒</span>
+        ：以下為情境模擬，<span className="font-medium">不會寫回實際薪資</span>。
+        {applyHint ? "如需採用，請於下方「核定並套用」明確寫回並留稽核軌跡。" : "可任意調整參數比較，不影響月結。"}
+      </p>
+    </div>
+  );
+}
 
 type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "trend" | "glossary";
 const TAB_LABEL: Record<Tab, string> = {
@@ -351,7 +366,7 @@ function DistTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
             <CardTitle className="text-base">月薪資總額分布（直方圖）</CardTitle>
             <CardDescription>點任一桶，看落在該薪資區間的員工。</CardDescription>
           </CardHeader>
-          <CardContent><BarChart data={hist.map((b) => ({ label: ntd(b.start), value: b.count }))} valueFmt={(n) => `${n} 人`} color={PALETTE[0]} selectedIndex={selBin} onSelect={(_, i) => { setSelBin((cur) => (cur === i ? null : i)); setSelDept(null); setSelEmp(null); }} /></CardContent>
+          <CardContent><BarChart data={hist.map((b) => ({ label: `${ntd(b.start)}–${ntd(b.end)}`, value: b.count }))} valueFmt={(n) => `${n} 人`} showValues color={PALETTE[0]} selectedIndex={selBin} onSelect={(_, i) => { setSelBin((cur) => (cur === i ? null : i)); setSelDept(null); setSelEmp(null); }} /></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
@@ -514,9 +529,9 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
                       </SelectContent>
                     </Select>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{b.compaRatio == null ? "—" : b.compaRatio.toFixed(2)}</TableCell>
-                  <TableCell className={cn("text-right tabular-nums", b.marketCompaRatio != null && b.marketCompaRatio < 0.9 && "text-amber-600 font-medium")}>{b.marketCompaRatio == null ? "—" : b.marketCompaRatio.toFixed(2)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{b.rangePenetration == null ? "—" : pct(b.rangePenetration)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{b.compaRatio == null ? "—" : ratioPct(b.compaRatio)}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums", b.marketCompaRatio != null && b.marketCompaRatio < 0.9 && "text-amber-600 font-medium")}>{b.marketCompaRatio == null ? "—" : ratioPct(b.marketCompaRatio)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{b.rangePenetration == null ? "—" : pctOf(b.rangePenetration, 0)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -530,7 +545,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
             <CardTitle className="text-base">部門 × 級距 compa-ratio 熱圖</CardTitle>
             <CardDescription>綠＝接近中位(1.0)，藍＝偏低、紅＝偏高。</CardDescription>
           </CardHeader>
-          <CardContent><Heatmap rowLabels={depts} colLabels={grades.map((g) => g.name)} cells={cells} /></CardContent>
+          <CardContent><Heatmap rowLabels={depts} colLabels={grades.map((g) => g.name)} cells={cells} fmt={(n) => ratioPct(n)} /></CardContent>
         </Card>
       )}
     </div>
@@ -559,6 +574,7 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
 
   return (
     <div className="space-y-4">
+      <SandboxNotice />
       <InsightList insights={insights} />
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">情境設定</CardTitle></CardHeader>
@@ -708,6 +724,7 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
 
   return (
     <div className="space-y-4">
+      <SandboxNotice applyHint />
       <InsightList insights={insights} />
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">調薪情境設定</CardTitle></CardHeader>
@@ -964,9 +981,9 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
                   <TableCell className="text-right tabular-nums">{p.hours || "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.hours ? p.fte.toFixed(2) : "—"}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{ntd(p.totalCost)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{(p.pctOfCompany * 100).toFixed(1)}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{pctOf(p.pctOfCompany)}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.budget ? ntd(p.budget) : "—"}</TableCell>
-                  <TableCell className={cn("text-right tabular-nums", p.budget > 0 && (p.variance < 0 ? "text-red-600" : "text-emerald-600"))}>{p.budget ? (p.variance < 0 ? `超 ${ntd(-p.variance)}` : `餘 ${ntd(p.variance)}`) : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.budget ? <Delta value={p.variance} posLabel="餘 " negLabel="超 " /> : "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -1012,17 +1029,23 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
               <p className="py-6 text-center text-xs text-muted-foreground">尚無可比較的專案工時。</p>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>專案</TableHead><TableHead className="text-right">應計(標準)</TableHead><TableHead className="text-right">實際</TableHead><TableHead className="text-right">差異</TableHead></TableRow></TableHeader>
+                <TableHeader sticky><TableRow><TableHead>專案</TableHead><TableHead className="text-right">應計(標準)</TableHead><TableHead className="text-right">實際</TableHead><TableHead className="text-right">差異</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {charge.map((c) => (
                     <TableRow key={c.projectId}>
                       <TableCell className="font-medium">{c.name}</TableCell>
                       <TableCell className="text-right tabular-nums">{ntd(c.standard)}</TableCell>
                       <TableCell className="text-right tabular-nums">{ntd(c.actual)}</TableCell>
-                      <TableCell className={cn("text-right tabular-nums", c.variance < 0 ? "text-red-600" : c.variance > 0 ? "text-emerald-600" : "")}>{ntd(c.variance)}</TableCell>
+                      <TableCell className="text-right tabular-nums"><Delta value={c.variance} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
+                <TableFooter><TableRow>
+                  <TableCell>合計</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(charge.reduce((a, c) => a + c.standard, 0))}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(charge.reduce((a, c) => a + c.actual, 0))}</TableCell>
+                  <TableCell className="text-right tabular-nums"><Delta value={charge.reduce((a, c) => a + c.variance, 0)} /></TableCell>
+                </TableRow></TableFooter>
               </Table>
             )}
           </CardContent>
@@ -1070,11 +1093,19 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
                   <TableCell className="text-right tabular-nums">{ntd(e.burnRate)}</TableCell>
                   <TableCell className="text-right tabular-nums">{e.budget ? ntd(e.runRateEac) : "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{e.eacEvm != null ? ntd(e.eacEvm) : "—"}</TableCell>
-                  <TableCell className={cn("text-right tabular-nums", e.budget > 0 && (e.varianceRunRate < 0 ? "text-red-600" : "text-emerald-600"))}>{e.budget ? (e.varianceRunRate < 0 ? `超 ${ntd(-e.varianceRunRate)}` : `餘 ${ntd(e.varianceRunRate)}`) : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{e.budget ? <Delta value={e.varianceRunRate} posLabel="餘 " negLabel="超 " /> : "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{e.budget ? pct(e.pctConsumed) : "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
+            <TableFooter><TableRow>
+              <TableCell>合計</TableCell>
+              <TableCell className="text-right font-bold tabular-nums">{ntd(eac.reduce((a, e) => a + e.ac, 0))}</TableCell>
+              <TableCell />
+              <TableCell className="text-right tabular-nums">{ntd(eac.reduce((a, e) => a + (e.budget ? e.runRateEac : 0), 0))}</TableCell>
+              <TableCell colSpan={2} />
+              <TableCell />
+            </TableRow></TableFooter>
           </Table>
           <p className="text-xs text-muted-foreground">EAC(燃燒率)＝月均×專案總月數；EAC(EVM)＝預算÷CPI（需填「%完成」）。完工差異＝預算−EAC(燃燒率)。</p>
         </CardContent>
@@ -1211,7 +1242,7 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
                 </div>
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">Gini（公平性）</p>
-                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: Number(s.gini.toFixed(3)) }))} color={PALETTE[3]} valueFmt={(n) => n.toFixed(2)} zeroBased={false} selectedIndex={selIdx} onSelect={(it) => togglePeriod(it.label)} />
+                  <TrendChart data={sorted.map((s) => ({ label: s.period, value: Number(s.gini.toFixed(3)) }))} color={PALETTE[3]} valueFmt={(n) => n.toFixed(3)} zeroBased={false} selectedIndex={selIdx} onSelect={(it) => togglePeriod(it.label)} />
                 </div>
               </div>
               <Table>
@@ -1251,7 +1282,7 @@ function GlossaryTab() {
     {
       term: "compa-ratio（薪酬比較比）",
       purpose: "回答「這個人薪水相對於同職級的『標準價』是高還是低」，用來檢查薪資定位是否合理、有沒有人被低估或過度給付。",
-      reading: "以 1.0 為基準（剛好在級距中位）。落在 0.9～1.1 算健康；低於 0.9 代表偏低、留才風險高，可優先調薪；高於 1.1 代表已偏高、再調空間有限，宜改用獎金激勵。",
+      reading: "以 100% 為基準（剛好在級距中位）。落在 90%～110% 算健康；低於 90% 代表偏低、留才風險高，可優先調薪；高於 110% 代表已偏高、再調空間有限，宜改用獎金激勵。",
     },
     {
       term: "range penetration（區間滲透率）",
@@ -1301,7 +1332,7 @@ function GlossaryTab() {
     {
       term: "市場 compa-ratio（對外競爭力）",
       purpose: "和一般 compa-ratio 一樣是「實薪 ÷ 中位」，但分母換成『市場中位』，回答「我們相對同業是高是低」，是招募與留才決策最直接的依據。",
-      reading: "以 1.0 為市場中位。低於 0.9 代表明顯落後同業、挖角風險高；0.9～1.1 與市場相當；高於 1.1 領先市場、留才有利但成本較高。需先在級距填入『市場中位』才會顯示。",
+      reading: "以 100% 為市場中位。低於 90% 代表明顯落後同業、挖角風險高；90%～110% 與市場相當；高於 110% 領先市場、留才有利但成本較高。需先在級距填入『市場中位』才會顯示。",
     },
     {
       term: "薪酬趨勢（歷期快照）",
