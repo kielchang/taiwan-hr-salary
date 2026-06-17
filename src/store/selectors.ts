@@ -1,7 +1,20 @@
 // 衍生計算：以純函數計算模組（§5）將 store 狀態轉為當月薪資結算結果與彙總。
 import { calculatePayroll, type PayrollResult } from "@/lib/calc";
 import { companySupplementary } from "@/lib/calc";
+import type { Employee } from "@/lib/types";
 import { usePayrollStore, blankEvent } from "./usePayrollStore";
+
+/** 該員工於某期間是否在職（用於當期計薪過濾；undefined 狀態＝在職） */
+export function isActiveInPeriod(emp: Employee, period: string): boolean {
+  const [y, m] = period.split("-").map(Number);
+  if (!y || !m) return true;
+  const monthEnd = new Date(y, m, 0);
+  const monthStart = new Date(y, m - 1, 1);
+  if (emp.status === "留停") return false;
+  if (emp.hireDate && new Date(emp.hireDate) > monthEnd) return false; // 尚未到職
+  if (emp.status === "離職" && emp.leaveDate && new Date(emp.leaveDate) < monthStart) return false; // 期前已離職
+  return true;
+}
 
 export interface PayrollRow extends PayrollResult {
   name: string;
@@ -15,7 +28,7 @@ export function usePayrollRows(): PayrollRow[] {
   const { employees, salaries, dependents, events, parameters, brackets, currentPeriod } =
     usePayrollStore();
 
-  return employees.map((emp) => {
+  return employees.filter((emp) => isActiveInPeriod(emp, currentPeriod)).map((emp) => {
     const salary =
       salaries.find((s) => s.employeeId === emp.id) ?? {
         employeeId: emp.id,
@@ -31,7 +44,7 @@ export function usePayrollRows(): PayrollRow[] {
     const event =
       events.find((e) => e.employeeId === emp.id && e.period === currentPeriod) ??
       blankEvent(emp.id, currentPeriod);
-    const result = calculatePayroll(emp, salary, dependents, event, parameters, brackets);
+    const result = calculatePayroll(emp, salary, dependents, event, parameters, brackets, { period: currentPeriod });
     return {
       ...result,
       name: emp.name,

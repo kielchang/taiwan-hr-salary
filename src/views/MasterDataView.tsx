@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { usePayrollStore } from "@/store/usePayrollStore";
 import type { Employee, SalaryStructure, Dependent } from "@/lib/types";
 import { monthlySalaryTotal, lookupInsuredAmounts, seniorityMonths, formatSeniority, annualLeaveDays } from "@/lib/calc";
+import { saveBlob } from "@/lib/payslipPdf";
+import { csvSerialize } from "@/lib/csv";
+import { parseEmployeeCsv, IMPORT_COLUMNS, type ImportPreview } from "@/lib/import/employeeCsv";
 import { cn, ntd } from "@/lib/utils";
-import { Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { Pencil, Plus, Trash2, UserPlus, Upload, FileDown } from "lucide-react";
+
+const STATUS_OPTIONS: Employee["status"][] = ["在職", "離職", "留停"];
 
 const SALARY_ITEMS: { key: keyof Omit<SalaryStructure, "employeeId">; label: string; help?: string }[] = [
   { key: "baseSalary", label: "本薪" },
@@ -39,6 +44,8 @@ const blankEmployee = (): Employee => ({
   voluntaryPensionRate: 0,
   nationalId: "",
   email: "",
+  status: "在職",
+  leaveDate: null,
 });
 
 const blankSalary = (id: string): SalaryStructure => ({
@@ -58,8 +65,30 @@ type DialogTab = "basic" | "salary" | "family";
 export function MasterDataView() {
   const {
     employees, salaries, dependents, parameters, brackets,
-    upsertEmployee, upsertSalary, setEmployeeDependents, removeEmployee,
+    upsertEmployee, upsertSalary, setEmployeeDependents, removeEmployee, importEmployees,
   } = usePayrollStore();
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  const downloadTemplate = () => {
+    const sample = ["E999", "範例員工", "資訊部", "工程師", "2026-01-01", "A123456789", "name@example.com", "居住者", "固定5%", "0", "40000", "0", "0", "0", "3000", "0", "0", "0"];
+    saveBlob(new Blob([csvSerialize([...IMPORT_COLUMNS], [sample])], { type: "text/csv;charset=utf-8" }), "員工匯入模板.csv");
+  };
+  const onImportFile = async (file: File) => {
+    const text = await file.text();
+    setPreview(parseEmployeeCsv(text, parameters.minWageMonthly));
+    setImportOpen(true);
+  };
+  const commitImport = () => {
+    if (preview && !preview.hasError) {
+      importEmployees(preview.valid);
+      setImportOpen(false);
+      setPreview(null);
+      alert(`已匯入 ${preview.valid.length} 名員工。`);
+    }
+  };
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<DialogTab>("basic");
@@ -131,9 +160,28 @@ export function MasterDataView() {
             年資、特休與投保級距由系統自動計算。
           </p>
         </div>
-        <Button size="sm" onClick={openNew}>
-          <UserPlus /> 新增員工
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={downloadTemplate}>
+            <FileDown /> 匯入模板
+          </Button>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept="application/json,.csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onImportFile(f);
+              e.target.value = "";
+            }}
+          />
+          <Button variant="outline" size="sm" onClick={() => importFileRef.current?.click()}>
+            <Upload /> 批次匯入
+          </Button>
+          <Button size="sm" onClick={openNew}>
+            <UserPlus /> 新增員工
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -183,6 +231,9 @@ export function MasterDataView() {
                       <TableCell className="text-center text-sm tabular-nums">{hd}／{td}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
+                          {emp.status && emp.status !== "在職" && (
+                            <Badge variant="secondary">{emp.status}{emp.leaveDate ? `・${emp.leaveDate}` : ""}</Badge>
+                          )}
                           {lowWage && <Badge variant="destructive">低於最低工資</Badge>}
                           {noForm && <Badge variant="warning">免稅額申報表未收</Badge>}
                         </div>
@@ -256,9 +307,22 @@ export function MasterDataView() {
               <Field label="職稱">
                 <Input className="col-input" value={draftEmp.title} onChange={(e) => setEmp("title", e.target.value)} />
               </Field>
-              <Field label="到職日" help="用於計算年資與特休天數">
+              <Field label="到職日" help="用於計算年資與特休天數；到職當月固定薪資按比例（破月）">
                 <Input type="date" className="col-input" value={draftEmp.hireDate} onChange={(e) => setEmp("hireDate", e.target.value)} />
               </Field>
+              <Field label="任職狀態" help="離職/留停者不列入當期計薪；離職當月按比例（破月）">
+                <Select value={draftEmp.status ?? "在職"} onValueChange={(v) => setEmp("status", v as Employee["status"])}>
+                  <SelectTrigger className="col-input"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s!}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              {draftEmp.status && draftEmp.status !== "在職" && (
+                <Field label="離職／留停生效日" help="用於破月計算與加退保清單">
+                  <Input type="date" className="col-input" value={draftEmp.leaveDate ?? ""} onChange={(e) => setEmp("leaveDate", e.target.value || null)} />
+                </Field>
+              )}
               <Field label="勞退自願提繳率（%）" help="員工自願從薪資提繳 0～6% 到退休金專戶，此金額免稅">
                 <Input
                   type="number" step="1" min="0" max="6" className="col-input"
@@ -436,6 +500,67 @@ export function MasterDataView() {
             <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>
             <Button onClick={save} disabled={!draftEmp.id.trim() || !draftEmp.name.trim()}>
               儲存員工檔案
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批次匯入預覽 */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>批次匯入員工（預覽）</DialogTitle>
+          </DialogHeader>
+          {preview && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant="success">可匯入 {preview.valid.length} 筆</Badge>
+                {preview.issues.some((i) => i.level === "error") && (
+                  <Badge variant="destructive">錯誤 {preview.issues.filter((i) => i.level === "error").length} 項（需修正後重匯）</Badge>
+                )}
+                {preview.issues.some((i) => i.level === "warning") && (
+                  <Badge variant="warning">提醒 {preview.issues.filter((i) => i.level === "warning").length} 項</Badge>
+                )}
+                <span className="text-xs text-muted-foreground">同編號將覆蓋既有員工。</span>
+              </div>
+              <div className="max-h-[50vh] overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">列</TableHead><TableHead>編號／姓名</TableHead>
+                      <TableHead className="text-right">月薪總額</TableHead><TableHead>檢查</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {preview.rows.map((r) => {
+                      const total = monthlySalaryTotal(r.salary);
+                      return (
+                        <TableRow key={r.row} className={cn(r.errors.length && "bg-destructive/5")}>
+                          <TableCell className="text-xs text-muted-foreground">{r.row}</TableCell>
+                          <TableCell className="text-sm">
+                            <span className="font-medium">{r.employee.name || "（缺姓名）"}</span>
+                            <span className="ml-1.5 text-xs text-muted-foreground">{r.employee.id || "（缺編號）"}</span>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">{ntd(total)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {r.errors.map((m, i) => <Badge key={`e${i}`} variant="destructive">{m}</Badge>)}
+                              {r.warnings.map((m, i) => <Badge key={`w${i}`} variant="warning">{m}</Badge>)}
+                              {r.errors.length === 0 && r.warnings.length === 0 && <span className="text-xs text-muted-foreground">OK</span>}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>取消</Button>
+            <Button onClick={commitImport} disabled={!preview || preview.hasError || preview.valid.length === 0}>
+              確認匯入 {preview?.valid.length ?? 0} 筆
             </Button>
           </DialogFooter>
         </DialogContent>

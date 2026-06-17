@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows, type PayrollRow } from "@/store/selectors";
 import { saveBlob } from "@/lib/payslipPdf";
+import { csvSerialize } from "@/lib/csv";
 import { cn, ntd, pct, formatPeriod } from "@/lib/utils";
 import {
   percentileSet, coefficientOfVariation, gini, lorenzPoints, histogram,
@@ -29,11 +31,12 @@ const TABS: [Tab, string][] = [
   ["cost", "成本結構"], ["dist", "分布與公平"], ["grade", "級距與 compa-ratio"],
   ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["trend", "趨勢與預算"], ["glossary", "指標說明"],
 ];
+const RAISE_LABEL: Record<string, string> = {
+  uniformPercent: "一致調幅 %", proRataBase: "按本薪分配", byPerformance: "按績效係數", meritMatrix: "merit matrix",
+};
 
 function csvDownload(headers: string[], rows: (string | number)[][], fileName: string) {
-  const cell = (v: string | number) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const text = "﻿" + [headers, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
-  saveBlob(new Blob([text], { type: "text/csv;charset=utf-8" }), fileName);
+  saveBlob(new Blob([csvSerialize(headers, rows)], { type: "text/csv;charset=utf-8" }), fileName);
 }
 
 export function AnalyticsView() {
@@ -621,10 +624,17 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
 
 /* ───────── 年度／季度調薪試算 ───────── */
 function RaiseTab({ rows }: { rows: PayrollRow[] }) {
-  const { analytics, parameters, brackets, setRaiseScenario } = usePayrollStore();
+  const { analytics, parameters, brackets, setRaiseScenario, applyRaise } = usePayrollStore();
   const rs = analytics.raiseScenario;
   const result: RaiseSimResult = simulateRaise(rows, analytics, parameters, brackets);
   const quarterly = rs.cadence === "quarterly";
+  const [applyOpen, setApplyOpen] = useState(false);
+  const changedRows = result.rows.filter((r) => r.monthlyIncrease !== 0);
+  const doApply = () => {
+    applyRaise(changedRows.map((r) => ({ employeeId: r.employeeId, newSalary: r.newSalary })), `${RAISE_LABEL[rs.method]}・平均 ${result.avgRaisePct.toFixed(1)}%`);
+    setApplyOpen(false);
+    alert(`已將 ${changedRows.length} 人的調薪寫回薪資結構。差額套用在本薪，可至「基本資料」或「每月薪資作業」確認。`);
+  };
   const [selRating, setSelRating] = useState<string | null>(null);
 
   // 調幅% by 績效
@@ -709,7 +719,12 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
       <Card>
         <CardHeader className="flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">逐人調薪試算</CardTitle>
-          <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>
+            <Button size="sm" disabled={changedRows.length === 0} onClick={() => setApplyOpen(true)}>
+              <CheckCircle2 /> 核定套用此方案
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -788,6 +803,39 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
           <p className="mt-2 text-xs text-muted-foreground">綠色＝四法中調後最公平（Gini 最低）。一致調幅與按本薪不看績效；按績效/merit matrix 會向高績效（與級距偏低者）傾斜。切換上方「分配方法」即可套用。</p>
         </CardContent>
       </Card>
+
+      <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>核定並套用調薪方案</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+              <Info className="mt-0.5 size-4 shrink-0" />
+              此操作會把 {changedRows.length} 人的調後月薪<strong>寫回薪資結構（差額套在本薪）</strong>，並留下稽核紀錄；之後當月結算會自動以新薪資計算。試算僅本次套用，請確認無誤。
+            </div>
+            <div className="max-h-[50vh] overflow-auto rounded-md border">
+              <Table>
+                <TableHeader><TableRow><TableHead>員工</TableHead><TableHead className="text-right">現職月薪</TableHead><TableHead className="text-right">調後月薪</TableHead><TableHead className="text-right">調幅</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {changedRows.map((r) => (
+                    <TableRow key={r.employeeId}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(r.currentSalary)}</TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">{ntd(r.newSalary)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.raisePct.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApplyOpen(false)}>取消</Button>
+            <Button onClick={doApply}><CheckCircle2 /> 確認核定寫回</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

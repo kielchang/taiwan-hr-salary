@@ -8,10 +8,11 @@ import type {
   Dependent,
   MonthlyEvent,
 } from "@/lib/types";
+import { round } from "@/lib/rounding";
 import { lookupInsuredAmounts, type InsuredAmounts } from "./brackets";
 import { dependentStats, type DependentStats } from "./dependents";
 import { seniorityMonths, annualLeaveDays } from "./seniority";
-import { monthlySalaryTotal, overtimePay, leaveDeduction } from "./wage";
+import { monthlySalaryTotal, overtimePay, leaveDeduction, prorationFactor } from "./wage";
 import { insurancePremiums, type InsurancePremiums } from "./insurance";
 import { personalSupplementary } from "./supplementary";
 import {
@@ -24,7 +25,9 @@ import {
 export interface PayrollResult {
   employeeId: string;
   // 基底
-  salaryTotal: number; // 月薪資總額
+  salaryTotal: number; // 月薪資總額（全月契約值；投保/最低工資/分析皆用此）
+  prorationFactor: number; // 破月比例（全月＝1）
+  paidSalaryTotal: number; // 當月實付固定薪資（＝salaryTotal×比例）
   seniorityMonths: number; // 年資月數
   annualLeaveDays: number; // 本年特休日數
   insured: InsuredAmounts; // 四險投保金額
@@ -57,15 +60,22 @@ export function calculatePayroll(
   event: MonthlyEvent,
   p: Parameters,
   brackets: InsuranceBrackets,
+  opts?: { period?: string }, // 提供 period 才啟用破月（全月者比例＝1，結果與不傳完全相同）
 ): PayrollResult {
   const salaryTotal = monthlySalaryTotal(salary);
   const insured = lookupInsuredAmounts(brackets, salaryTotal);
   const stats = dependentStats(dependents, employee.id, p);
   const months = seniorityMonths(employee.hireDate, p.seniorityBaseDate);
 
-  const ot = overtimePay(salaryTotal, event, p);
-  // §5.5 應發合計
-  const grossPay = salaryTotal + ot + event.otherAddition + event.monthlyBonus;
+  // 破月：僅當提供 period 且非全月在職時 factor<1；factor===1 短路保持與原本逐位元相同
+  const factor = opts?.period
+    ? prorationFactor(opts.period, employee.hireDate, employee.leaveDate ?? null, employee.status)
+    : 1;
+  const paidSalaryTotal = factor === 1 ? salaryTotal : round(salaryTotal * factor);
+
+  const ot = overtimePay(salaryTotal, event, p); // 加班費依全月時薪率
+  // §5.5 應發合計（固定薪資按破月比例）
+  const grossPay = paidSalaryTotal + ot + event.otherAddition + event.monthlyBonus;
 
   const leave = leaveDeduction(salaryTotal, event, p);
   const premiums = insurancePremiums(
@@ -123,6 +133,8 @@ export function calculatePayroll(
   return {
     employeeId: employee.id,
     salaryTotal,
+    prorationFactor: factor,
+    paidSalaryTotal,
     seniorityMonths: months,
     annualLeaveDays: annualLeaveDays(months),
     insured,

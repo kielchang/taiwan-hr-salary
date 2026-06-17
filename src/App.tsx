@@ -20,12 +20,14 @@ import { HelpView } from "@/views/HelpView";
 import { SourcesView } from "@/views/SourcesView";
 import { AttendanceView } from "@/views/AttendanceView";
 import { AnalyticsView } from "@/views/AnalyticsView";
-import { CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3 } from "lucide-react";
+import { FilingView } from "@/views/FilingView";
+import { CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3, FileCheck2 } from "lucide-react";
 
 /** 上排主選單：各自獨立主題，對應路由路徑 */
 const NAV: { to: string; match: string; label: string; icon: React.ElementType }[] = [
   { to: "/payroll/monthly", match: "/payroll", label: "每月薪資作業", icon: CalendarClock },
   { to: "/analytics", match: "/analytics", label: "薪酬分析", icon: BarChart3 },
+  { to: "/filing", match: "/filing", label: "法規申報", icon: FileCheck2 },
   { to: "/attendance", match: "/attendance", label: "出勤打卡", icon: Clock },
   { to: "/master", match: "/master", label: "基本資料", icon: Users },
   { to: "/settings", match: "/settings", label: "系統設定", icon: Settings },
@@ -43,6 +45,7 @@ export default function App() {
         <Route index element={<Navigate to="/payroll/monthly" replace />} />
         <Route path="/payroll/:step" element={<PayrollRoute />} />
         <Route path="/analytics" element={<AnalyticsView />} />
+        <Route path="/filing" element={<FilingView />} />
         <Route path="/attendance" element={<AttendanceView />} />
         <Route path="/master" element={<MasterDataView />} />
         <Route path="/settings" element={<SettingsView />} />

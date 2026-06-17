@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BracketTableCards } from "@/components/BracketTableCards";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +13,14 @@ import type { Parameters } from "@/config/parameters";
 import { parseIpList } from "@/lib/attendance";
 import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
-import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload } from "lucide-react";
+import { csvSerialize } from "@/lib/csv";
+import type { AuditAction } from "@/lib/types";
+import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History } from "lucide-react";
+
+const AUDIT_LABEL: Record<AuditAction, string> = {
+  salary: "薪資異動", employee: "員工異動", event: "結算異動", confirm: "月結確認",
+  raiseApply: "調薪核定", import: "批次匯入", restore: "整檔還原",
+};
 
 interface Field {
   key: keyof Parameters;
@@ -82,8 +90,18 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
 ];
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll } = usePayrollStore();
+  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog } = usePayrollStore();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const exportAudit = () => {
+    saveBlob(
+      new Blob([csvSerialize(
+        ["時間", "操作者", "類別", "對象", "期間", "說明"],
+        auditLog.map((a) => [new Date(a.at).toLocaleString(), a.actor, AUDIT_LABEL[a.action], a.targetId ?? "", a.period ?? "", a.summary]),
+      )], { type: "text/csv;charset=utf-8" }),
+      "操作紀錄.csv",
+    );
+  };
 
   const onExport = () => {
     const env = exportAll();
@@ -239,6 +257,44 @@ export function SettingsView() {
             <Upload /> 從備份檔還原
           </Button>
           <span className="text-xs text-muted-foreground">建議每月結算後匯出存檔。</span>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><History className="size-4 text-primary" /> 操作者與變更紀錄</CardTitle>
+          <CardDescription>
+            填入操作者姓名後，薪資/員工/代扣稅/月結/調薪核定/匯入/還原等敏感變更都會留下稽核軌跡（誰、何時、改什麼）。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">操作者姓名（稽核用）</Label>
+              <Input className="col-input h-8 w-48" value={operatorName} placeholder="例：王小明" onChange={(e) => setOperatorName(e.target.value)} />
+            </div>
+            <Button variant="outline" size="sm" onClick={exportAudit} disabled={auditLog.length === 0}><Download /> 匯出紀錄 CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => { if (confirm("清空操作紀錄？")) clearAuditLog(); }} disabled={auditLog.length === 0}><Trash2 /> 清空紀錄</Button>
+          </div>
+          {auditLog.length === 0 ? (
+            <p className="text-xs text-muted-foreground">尚無紀錄。</p>
+          ) : (
+            <div className="max-h-72 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader><TableRow><TableHead className="w-36">時間</TableHead><TableHead>操作者</TableHead><TableHead>類別</TableHead><TableHead>說明</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {auditLog.slice(0, 100).map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="text-xs tabular-nums text-muted-foreground">{new Date(a.at).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm">{a.actor}</TableCell>
+                      <TableCell><Badge variant="outline">{AUDIT_LABEL[a.action]}</Badge></TableCell>
+                      <TableCell className="text-sm">{a.summary}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

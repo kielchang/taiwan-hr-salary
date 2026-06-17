@@ -17,6 +17,9 @@ import type {
   RaiseScenario,
   PlanningConfig,
   PayrollSnapshot,
+  AuditEntry,
+  AuditAction,
+  DeclaredInsured,
 } from "@/lib/types";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { serializeState, type BackupEnvelope } from "@/lib/backup";
@@ -152,7 +155,39 @@ interface PayrollState {
   /** 整檔備份/還原 */
   exportAll: () => BackupEnvelope;
   importAll: (env: BackupEnvelope) => void;
+
+  /** 操作者（稽核軌跡 actor；單機版以姓名識別） */
+  operatorName: string;
+  setOperatorName: (name: string) => void;
+
+  /** 稽核軌跡 */
+  auditLog: AuditEntry[];
+  clearAuditLog: () => void;
+
+  /** 批次匯入員工＋薪資 */
+  importEmployees: (rows: { employee: Employee; salary: SalaryStructure }[]) => void;
+
+  /** 調薪方案核定寫回薪資（four-eyes 確認後） */
+  applyRaise: (rows: { employeeId: string; newSalary: number }[], note?: string) => void;
+
+  /** 投保級距申報基準（2/8 月申報調整） */
+  declaredInsured: DeclaredInsured[];
+  setDeclaredBaseline: (list: DeclaredInsured[]) => void;
 }
+
+const AUDIT_CAP = 1000;
+const newId = () =>
+  (typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+const sumSalary = (s: SalaryStructure) =>
+  s.baseSalary + s.managerAllowance + s.dutyAllowance + s.professionalAllowance +
+  s.mealAllowance + s.transportAllowance + s.attendanceBonus + s.otherFixedAllowance;
+
+function makeAudit(actor: string, action: AuditAction, summary: string, extra: Partial<AuditEntry> = {}): AuditEntry {
+  return { id: newId(), at: new Date().toISOString(), actor: actor?.trim() || "（未具名）", action, summary, ...extra };
+}
+const pushAudit = (log: AuditEntry[], entry: AuditEntry) => [entry, ...log].slice(0, AUDIT_CAP);
 
 export const usePayrollStore = create<PayrollState>()(
   persist(
@@ -231,6 +266,50 @@ export const usePayrollStore = create<PayrollState>()(
       removeSnapshot: (period) =>
         set((st) => ({ snapshots: st.snapshots.filter((s) => s.period !== period) })),
       clearSnapshots: () => set({ snapshots: [] }),
+
+      operatorName: "",
+      setOperatorName: (name) => set({ operatorName: name }),
+
+      auditLog: [],
+      clearAuditLog: () => set({ auditLog: [] }),
+
+      importEmployees: (rows) =>
+        set((st) => {
+          let employees = [...st.employees];
+          let salaries = [...st.salaries];
+          rows.forEach(({ employee, salary }) => {
+            employees = employees.some((e) => e.id === employee.id)
+              ? employees.map((e) => (e.id === employee.id ? employee : e))
+              : [...employees, employee];
+            salaries = salaries.some((s) => s.employeeId === employee.id)
+              ? salaries.map((s) => (s.employeeId === employee.id ? salary : s))
+              : [...salaries, salary];
+          });
+          return {
+            employees,
+            salaries,
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "import", `批次匯入 ${rows.length} 名員工`)),
+          };
+        }),
+
+      applyRaise: (rows, note) =>
+        set((st) => {
+          const salaries = st.salaries.map((s) => {
+            const r = rows.find((x) => x.employeeId === s.employeeId);
+            if (!r) return s;
+            const allowances = sumSalary(s) - s.baseSalary; // 加給維持不變，差額套在本薪
+            return { ...s, baseSalary: Math.max(0, r.newSalary - allowances) };
+          });
+          return {
+            salaries,
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "raiseApply",
+              `核定調薪方案：${rows.length} 人寫回薪資${note ? `（${note}）` : ""}`)),
+          };
+        }),
+
+      declaredInsured: [],
+      setDeclaredBaseline: (list) => set({ declaredInsured: list }),
+
       loadDemoData: (months = 6) =>
         set((st) => {
           const { events, snapshots } = buildDemoData(
@@ -250,11 +329,15 @@ export const usePayrollStore = create<PayrollState>()(
       confirmPeriod: (period) =>
         set((st) => ({
           confirmations: { ...st.confirmations, [period]: new Date().toISOString() },
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "confirm", `確認 ${period} 月結`, { period })),
         })),
       unconfirmPeriod: (period) =>
         set((st) => {
           const { [period]: _removed, ...rest } = st.confirmations;
-          return { confirmations: rest };
+          return {
+            confirmations: rest,
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "confirm", `取消 ${period} 月結確認`, { period })),
+          };
         }),
 
       setParameters: (patch) =>
@@ -265,14 +348,21 @@ export const usePayrollStore = create<PayrollState>()(
 
       upsertEmployee: (emp) =>
         set((st) => {
-          const exists = st.employees.some((e) => e.id === emp.id);
+          const prev = st.employees.find((e) => e.id === emp.id);
+          const exists = !!prev;
           const employees = exists
             ? st.employees.map((e) => (e.id === emp.id ? emp : e))
             : [...st.employees, emp];
           const salaries = st.salaries.some((s) => s.employeeId === emp.id)
             ? st.salaries
             : [...st.salaries, blankSalary(emp.id)];
-          return { employees, salaries };
+          const statusChanged = prev && (prev.status ?? "在職") !== (emp.status ?? "在職");
+          const summary = !exists
+            ? `新增員工 ${emp.name}（${emp.id}）`
+            : statusChanged
+              ? `${emp.name} 狀態 ${prev?.status ?? "在職"} → ${emp.status ?? "在職"}${emp.leaveDate ? `（${emp.leaveDate}）` : ""}`
+              : `更新員工 ${emp.name}（${emp.id}）`;
+          return { employees, salaries, auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "employee", summary, { targetId: emp.id })) };
         }),
       removeEmployee: (id) =>
         set((st) => ({
@@ -284,11 +374,24 @@ export const usePayrollStore = create<PayrollState>()(
         })),
 
       upsertSalary: (s) =>
-        set((st) => ({
-          salaries: st.salaries.some((x) => x.employeeId === s.employeeId)
-            ? st.salaries.map((x) => (x.employeeId === s.employeeId ? s : x))
-            : [...st.salaries, s],
-        })),
+        set((st) => {
+          const prev = st.salaries.find((x) => x.employeeId === s.employeeId);
+          const exists = !!prev;
+          const before = prev ? sumSalary(prev) : 0;
+          const after = sumSalary(s);
+          const log =
+            exists && before !== after
+              ? pushAudit(st.auditLog, makeAudit(st.operatorName, "salary",
+                  `${st.employees.find((e) => e.id === s.employeeId)?.name ?? s.employeeId} 月薪資總額 ${before} → ${after}`,
+                  { targetId: s.employeeId }))
+              : st.auditLog;
+          return {
+            salaries: exists
+              ? st.salaries.map((x) => (x.employeeId === s.employeeId ? s : x))
+              : [...st.salaries, s],
+            auditLog: log,
+          };
+        }),
       getSalary: (employeeId) =>
         get().salaries.find((s) => s.employeeId === employeeId) ??
         blankSalary(employeeId),
@@ -313,8 +416,17 @@ export const usePayrollStore = create<PayrollState>()(
         set((st) => {
           // 結算資料異動 → 該月確認狀態自動解除（需重新查核）
           const { [e.period]: _removed, ...confirmations } = st.confirmations;
+          const prev = st.events.find((x) => x.employeeId === e.employeeId && x.period === e.period);
+          // 僅就敏感欄位（代扣稅）留稽核，避免一般時數異動灌爆紀錄
+          const taxChanged = (prev?.withheldTax ?? null) !== (e.withheldTax ?? null);
+          const log = taxChanged
+            ? pushAudit(st.auditLog, makeAudit(st.operatorName, "event",
+                `${st.employees.find((x) => x.id === e.employeeId)?.name ?? e.employeeId} ${e.period} 代扣稅 ${prev?.withheldTax ?? "未填"} → ${e.withheldTax ?? "未填"}`,
+                { targetId: e.employeeId, period: e.period }))
+            : st.auditLog;
           return {
             confirmations,
+            auditLog: log,
             events: st.events.some(
               (x) => x.employeeId === e.employeeId && x.period === e.period,
             )
@@ -341,6 +453,7 @@ export const usePayrollStore = create<PayrollState>()(
           punches: [],
           analytics: DEFAULT_ANALYTICS,
           snapshots: [],
+          declaredInsured: [],
         }),
       clearAll: () =>
         set({
@@ -351,6 +464,7 @@ export const usePayrollStore = create<PayrollState>()(
           punches: [],
           analytics: DEFAULT_ANALYTICS,
           snapshots: [],
+          declaredInsured: [],
         }),
 
       exportAll: () => serializeState(get() as unknown as Record<string, unknown>, STORE_VERSION),
@@ -377,6 +491,9 @@ export const usePayrollStore = create<PayrollState>()(
             snapshots: s.snapshots ?? st.snapshots,
             confirmations: s.confirmations ?? st.confirmations,
             setupCompleted: s.setupCompleted ?? st.setupCompleted,
+            operatorName: s.operatorName ?? st.operatorName,
+            declaredInsured: s.declaredInsured ?? st.declaredInsured,
+            auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
           };
         }),
     }),
@@ -401,6 +518,9 @@ export const usePayrollStore = create<PayrollState>()(
             planning: { ...current.analytics.planning, ...(p.analytics?.planning ?? {}) },
           },
           snapshots: p.snapshots ?? current.snapshots,
+          auditLog: p.auditLog ?? current.auditLog,
+          operatorName: p.operatorName ?? current.operatorName,
+          declaredInsured: p.declaredInsured ?? current.declaredInsured,
         };
       },
     },

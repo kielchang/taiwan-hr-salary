@@ -7,6 +7,9 @@ export type TaxResidency = "居住者" | "非居住者";
 /** 扣繳方式（員工主檔；README §5.9 分流） */
 export type WithholdingMethod = "依扣繳稅額表" | "固定5%";
 
+/** 員工任職狀態（生命週期；undefined 視為「在職」以相容舊資料） */
+export type EmployeeStatus = "在職" | "離職" | "留停";
+
 /**
  * 員工主檔（README §3.2）
  * 注意：月薪資總額、投保級距、年資、特休、眷屬統計皆為「衍生值」，
@@ -27,6 +30,8 @@ export interface Employee {
   voluntaryPensionRate: number; // 勞退自提率 0~0.06
   nationalId: string; // 身分證字號／居留證號（薪資條加密 PDF 之開啟密碼）
   email: string; // 員工 Email（薪資條 email 通知收件人）
+  status?: EmployeeStatus; // 任職狀態（undefined＝在職）
+  leaveDate?: string | null; // 離職／留停生效日 ISO（用於破月與加退保清單）
   note?: string;
 }
 
@@ -198,4 +203,36 @@ export interface AnalyticsConfig {
   scenario: BonusScenario;
   raiseScenario: RaiseScenario;
   planning: PlanningConfig;
+}
+
+/* ───────────── 稽核軌跡（變更紀錄；單機版以操作者姓名為 actor） ───────────── */
+
+export type AuditAction =
+  | "salary" // 薪資結構異動
+  | "employee" // 員工主檔異動
+  | "event" // 結算事件（敏感欄位如代扣稅）異動
+  | "confirm" // 月結確認／取消
+  | "raiseApply" // 調薪方案核定寫回
+  | "import" // 批次匯入
+  | "restore"; // 整檔還原
+
+export interface AuditEntry {
+  id: string;
+  at: string; // ISO
+  actor: string; // 操作者（單機版：系統設定的操作者姓名）
+  action: AuditAction;
+  targetId?: string; // 員工編號等
+  period?: string;
+  summary: string; // 一句話描述（含前後值）
+}
+
+/* ───────────── 投保級距申報基準（2/8 月申報調整用） ───────────── */
+
+/** 目前向主管機關「已申報」的投保金額基準；與當前薪資算出的級距比對找出待調整者 */
+export interface DeclaredInsured {
+  employeeId: string;
+  labor: number;
+  health: number;
+  pension: number;
+  declaredAt: string; // ISO 設為基準的時間
 }
