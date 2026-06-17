@@ -19,6 +19,7 @@ import type {
   PayrollSnapshot,
 } from "@/lib/types";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
+import { serializeState, type BackupEnvelope } from "@/lib/backup";
 import {
   SEED_EMPLOYEES,
   SEED_SALARIES,
@@ -29,6 +30,7 @@ import {
 } from "@/data/seed";
 
 const STORAGE_KEY = "taiwan-hr-salary:v1"; // localStorage 鍵
+export const STORE_VERSION = 1; // 資料結構版本（備份/還原與 migrate 用）
 
 const DEFAULT_ATTENDANCE: AttendanceConfig = {
   companyLat: null,
@@ -146,6 +148,10 @@ interface PayrollState {
 
   resetToSeed: () => void;
   clearAll: () => void;
+
+  /** 整檔備份/還原 */
+  exportAll: () => BackupEnvelope;
+  importAll: (env: BackupEnvelope) => void;
 }
 
 export const usePayrollStore = create<PayrollState>()(
@@ -346,9 +352,39 @@ export const usePayrollStore = create<PayrollState>()(
           analytics: DEFAULT_ANALYTICS,
           snapshots: [],
         }),
+
+      exportAll: () => serializeState(get() as unknown as Record<string, unknown>, STORE_VERSION),
+      importAll: (env) =>
+        set((st) => {
+          const s = (env?.state ?? {}) as Partial<PayrollState>;
+          return {
+            parameters: { ...st.parameters, ...(s.parameters ?? {}) },
+            brackets: s.brackets ?? st.brackets,
+            employees: s.employees ?? st.employees,
+            salaries: s.salaries ?? st.salaries,
+            dependents: s.dependents ?? st.dependents,
+            events: s.events ?? st.events,
+            currentPeriod: s.currentPeriod ?? st.currentPeriod,
+            attendance: { ...st.attendance, ...(s.attendance ?? {}) },
+            punches: s.punches ?? st.punches,
+            analytics: {
+              ...st.analytics,
+              ...(s.analytics ?? {}),
+              scenario: { ...st.analytics.scenario, ...(s.analytics?.scenario ?? {}) },
+              raiseScenario: { ...st.analytics.raiseScenario, ...(s.analytics?.raiseScenario ?? {}) },
+              planning: { ...st.analytics.planning, ...(s.analytics?.planning ?? {}) },
+            },
+            snapshots: s.snapshots ?? st.snapshots,
+            confirmations: s.confirmations ?? st.confirmations,
+            setupCompleted: s.setupCompleted ?? st.setupCompleted,
+          };
+        }),
     }),
     {
       name: STORAGE_KEY,
+      version: STORE_VERSION,
+      // 版本升級時的轉換點（目前 v1：直接沿用，欄位補預設交由 merge 處理）
+      migrate: (persisted) => persisted as PayrollState,
       // 與預設深度合併，使舊版 localStorage 自動補上新增欄位（如彈性工時設定）
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<PayrollState>;

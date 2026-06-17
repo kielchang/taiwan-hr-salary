@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BracketTableCards } from "@/components/BracketTableCards";
 import { Input } from "@/components/ui/input";
@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { usePayrollStore } from "@/store/usePayrollStore";
+import { usePayrollStore, STORE_VERSION } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
 import { parseIpList } from "@/lib/attendance";
-import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange } from "lucide-react";
+import { saveBlob } from "@/lib/payslipPdf";
+import { parseBackup, summarizeBackup } from "@/lib/backup";
+import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload } from "lucide-react";
 
 interface Field {
   key: keyof Parameters;
@@ -80,7 +82,33 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
 ];
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots } = usePayrollStore();
+  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll } = usePayrollStore();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onExport = () => {
+    const env = exportAll();
+    const date = new Date().toISOString().slice(0, 10);
+    saveBlob(new Blob([JSON.stringify(env, null, 2)], { type: "application/json" }), `HR薪資備份_${date}.json`);
+  };
+
+  const onImportFile = async (file: File) => {
+    const text = await file.text();
+    const res = parseBackup(text, STORE_VERSION);
+    if (!res.ok || !res.env) {
+      alert(`還原失敗：${res.error}`);
+      return;
+    }
+    const s = summarizeBackup(res.env);
+    const ok = confirm(
+      `將以備份檔覆蓋目前所有資料，無法復原。\n\n` +
+        `備份匯出時間：${new Date(s.exportedAt).toLocaleString()}\n` +
+        `員工 ${s.employees} 人、結算紀錄 ${s.events} 筆（${s.periods} 個月份）、趨勢快照 ${s.snapshots} 期\n\n確定還原？`,
+    );
+    if (ok) {
+      importAll(res.env);
+      alert("已還原備份資料。");
+    }
+  };
   const navigate = useNavigate();
   const [showBrackets, setShowBrackets] = useState(false);
 
@@ -183,6 +211,36 @@ export function SettingsView() {
       </Card>
 
       <AttendanceSettings />
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">資料備份與還原</CardTitle>
+          <CardDescription>
+            資料只存在這台電腦的瀏覽器，清除瀏覽器資料即遺失。建議定期「匯出備份檔」另存（薪資資料依法應保存五年）；
+            換電腦或誤刪時可用備份檔「還原」。備份檔含全部員工、薪資、結算與設定。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onExport}>
+            <Download /> 匯出備份檔（JSON）
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onImportFile(f);
+              e.target.value = ""; // 允許重選同檔
+            }}
+          />
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            <Upload /> 從備份檔還原
+          </Button>
+          <span className="text-xs text-muted-foreground">建議每月結算後匯出存檔。</span>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
