@@ -186,6 +186,32 @@ export function evaluateAllForDate(
   return [...byEmp.entries()].map(([eid, list]) => evaluateDay(cfg, eid, date, list));
 }
 
+/**
+ * 彙總某月（period yyyy-mm）每位員工的實際總工時（小時，四捨五入）。
+ * 由打卡逐日 evaluateDay 的 workedMinutes 累加（缺卡日 workedMinutes=null 不計）。
+ * 供「由出勤帶入」作為工時分攤基礎與稼動率分母。
+ */
+export function monthWorkedHours(
+  cfg: AttendanceConfig,
+  period: string,
+  punches: PunchRecord[],
+): Map<string, number> {
+  const [y, m] = period.split("-").map(Number);
+  const mins = new Map<string, number>();
+  if (!y || !m) return mins;
+  const days = new Date(y, m, 0).getDate();
+  const p = (n: number) => String(n).padStart(2, "0");
+  for (let d = 1; d <= days; d++) {
+    const dateKey = `${y}-${p(m)}-${p(d)}`;
+    for (const s of evaluateAllForDate(cfg, dateKey, punches)) {
+      if (s.workedMinutes != null) mins.set(s.employeeId, (mins.get(s.employeeId) ?? 0) + s.workedMinutes);
+    }
+  }
+  const hours = new Map<string, number>();
+  for (const [id, mm] of mins) hours.set(id, Math.round(mm / 60));
+  return hours;
+}
+
 /** 分鐘 → "Hh Mm" */
 export function formatMinutes(min: number): string {
   const h = Math.floor(min / 60);

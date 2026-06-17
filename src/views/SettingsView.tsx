@@ -409,6 +409,7 @@ function ProjectMasterCard() {
               </div>
               <div className="space-y-1"><Label className="text-xs">起始日</Label><Input type="date" className="col-input" value={draft.startDate} onChange={(e) => set("startDate", e.target.value)} /></div>
               <div className="space-y-1"><Label className="text-xs">結束日</Label><Input type="date" className="col-input" value={draft.endDate} onChange={(e) => set("endDate", e.target.value)} /></div>
+              <div className="space-y-1"><Label className="text-xs">完成度 %（EVM 用，選填）</Label><Input type="number" min="0" max="100" className="col-input" value={draft.percentComplete != null ? Math.round(draft.percentComplete * 100) : ""} placeholder="未填＝僅燃燒率推估" onChange={(e) => set("percentComplete", e.target.value === "" ? undefined : Math.min(100, Math.max(0, Number(e.target.value) || 0)) / 100)} /></div>
             </div>
           )}
           <DialogFooter>

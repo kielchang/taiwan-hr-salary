@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeProjectCost, monthlyBudgetShare, UNALLOCATED_ID } from "../src/lib/reports/projectCost";
+import { computeProjectCost, monthlyBudgetShare, projectDeptMatrix, chargeOutVariance, UNALLOCATED_ID } from "../src/lib/reports/projectCost";
 import type { PayrollRow } from "../src/store/selectors";
 import type { Project, Allocation } from "../src/lib/types";
 
@@ -69,6 +69,21 @@ describe("computeProjectCost 勾稽不變量", () => {
     expect(sum(r, "totalCost")).toBe(COMPANY); // 仍勾稽
   });
 
+  it("availableHours（由出勤帶入）：作為稼動率分母與殘量上限，仍勾稽", () => {
+    // E1 可用工時 160，全投 P1 → 無殘量、utilization=1（只計 E1 hours 模式）
+    const full = run([{ employeeId: "E1", period: P, mode: "hours", lines: [{ projectId: "P1", value: 160 }], availableHours: 160 }], [["E2", "P2"]]);
+    expect(full.projects.find((p) => p.projectId === UNALLOCATED_ID)).toBeUndefined();
+    expect(full.totalHours).toBe(160);
+    expect(full.utilization).toBeCloseTo(1, 6);
+    expect(sum(full, "totalCost")).toBe(COMPANY);
+    // 部分分配：可用 160、投 100 → 殘量 60 入未分攤
+    const part = run([{ employeeId: "E1", period: P, mode: "hours", lines: [{ projectId: "P1", value: 100 }], availableHours: 160 }], [["E2", "P2"]]);
+    expect(part.totalDirectHours).toBe(100);
+    expect(part.totalHours).toBe(160);
+    expect(part.utilization).toBeCloseTo(100 / 160, 6);
+    expect(sum(part, "totalCost")).toBe(COMPANY);
+  });
+
   it("獎金直接指定：整筆歸該專案、其餘元件仍依比例、總額不變", () => {
     const r = run([{ employeeId: "E2", period: P, mode: "pct", lines: [{ projectId: "P1", value: 50 }, { projectId: "P2", value: 50 }], bonusProjectId: "P1" }]);
     expect(r.projects.find((p) => p.projectId === "P1")!.bonus).toBe(10000);
@@ -89,5 +104,51 @@ describe("monthlyBudgetShare", () => {
     expect(monthlyBudgetShare(projects[0], "2026-03")).toBe(100000); // 1,200,000 / 12
     expect(monthlyBudgetShare(projects[0], "2025-12")).toBe(0);
     expect(monthlyBudgetShare(projects[1], "2026-03")).toBe(0); // 無預算/起訖
+  });
+});
+
+function inp(allocations: Allocation[], defaults: [string, string][] = []) {
+  return {
+    rows, allocations, projects, period: P, monthlyWorkHours: 240,
+    baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp: new Map(defaults),
+  };
+}
+
+describe("projectDeptMatrix", () => {
+  it("每列(專案)和＝該專案總成本；總和＝公司總成本", () => {
+    const allocations: Allocation[] = [
+      { employeeId: "E1", period: P, mode: "hours", lines: [{ projectId: "P1", value: 120 }, { projectId: "P2", value: 120 }] },
+      { employeeId: "E2", period: P, mode: "pct", lines: [{ projectId: "P1", value: 50 }, { projectId: "P2", value: 50 }] },
+    ];
+    const m = projectDeptMatrix(inp(allocations));
+    const cc = computeProjectCost(inp(allocations));
+    // 每列和對應專案 totalCost
+    m.rowLabels.forEach((label, ri) => {
+      const rowSum = m.cells[ri].reduce<number>((a, v) => a + (v ?? 0), 0);
+      const proj = cc.projects.find((p) => p.name === label);
+      if (proj) expect(rowSum).toBe(proj.totalCost);
+    });
+    const grand = m.cells.flat().reduce<number>((a, v) => a + (v ?? 0), 0);
+    expect(grand).toBe(COMPANY);
+    expect(m.colLabels.sort()).toEqual(["研發", "業務"].sort());
+  });
+});
+
+describe("chargeOutVariance", () => {
+  it("工時＝標準工時 → 差異 0", () => {
+    const allocations: Allocation[] = [
+      { employeeId: "E1", period: P, mode: "hours", lines: [{ projectId: "P1", value: 120 }, { projectId: "P2", value: 120 }] }, // 滿 240
+      { employeeId: "E2", period: P, mode: "pct", lines: [{ projectId: "P1", value: 50 }, { projectId: "P2", value: 50 }] }, // 等量 240
+    ];
+    const v = chargeOutVariance(inp(allocations));
+    v.forEach((r) => expect(r.variance).toBe(0));
+  });
+  it("工時少於標準 → 差異為負（吸收不足）", () => {
+    const allocations: Allocation[] = [
+      { employeeId: "E1", period: P, mode: "hours", lines: [{ projectId: "P1", value: 120 }], availableHours: 120 },
+    ];
+    const v = chargeOutVariance(inp(allocations, [["E2", "P2"]]));
+    const p1 = v.find((r) => r.projectId === "P1")!;
+    expect(p1.variance).toBeLessThan(0); // 標準(rate×120) < 實際(全額)
   });
 });

@@ -60,6 +60,89 @@ export function monthlyBudgetShare(project: Project, period: string): number {
   return Math.round(project.budget / months);
 }
 
+/** 單一員工對各專案的貢獻（供彙總、矩陣、charge-out 共用同一切分邏輯） */
+export interface EmpContribution {
+  projectId: string;
+  department: string;
+  base: number; allowance: number; ot: number; bonus: number; other: number; burden: number;
+  totalCost: number;
+  hours: number; // 直接工時（hours 模式；未分攤桶記殘量）
+  standardValue: number; // 標準工率 × 等量工時（charge-out）
+}
+
+interface AllocCtx {
+  monthlyWorkHours: number;
+  baseByEmp: Map<string, number>;
+  bonusByEmp: Map<string, number>;
+  otherByEmp: Map<string, number>;
+  defaultProjectByEmp: Map<string, string>;
+}
+
+/** 把一位員工的全載成本依分攤切到各專案（含未分攤桶）；回傳逐專案貢獻與工時資訊。 */
+function allocateEmployee(r: PayrollRow, alloc: Allocation | undefined, ctx: AllocCtx): {
+  contributions: EmpContribution[]; directHours: number; availHours: number; hoursMode: boolean;
+} {
+  const { monthlyWorkHours, baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp } = ctx;
+  const factor = r.prorationFactor ?? 1;
+  const base = Math.round((baseByEmp.get(r.employeeId) ?? 0) * factor);
+  const allowance = r.paidSalaryTotal - base;
+  const ot = r.overtimePay;
+  const bonus = bonusByEmp.get(r.employeeId) ?? 0;
+  const other = otherByEmp.get(r.employeeId) ?? 0;
+  const burden = r.employerBurden;
+  const rate = monthlyWorkHours > 0 ? r.employerTotalCost / monthlyWorkHours : 0;
+
+  let ids: string[];
+  let weights: number[];
+  let lineHours: number[] = [];
+  let eqHours: number[]; // charge-out 等量工時
+  let hoursMode = false;
+  let availHours = 0;
+  if (alloc && alloc.lines.length > 0) {
+    ids = alloc.lines.map((l) => l.projectId);
+    weights = alloc.lines.map((l) => Math.max(0, l.value));
+    if (alloc.mode === "hours") {
+      hoursMode = true;
+      availHours = alloc.availableHours ?? monthlyWorkHours;
+      lineHours = [...weights];
+      const residual = availHours - weights.reduce((a, b) => a + b, 0);
+      if (residual > 0) { ids.push(UNALLOCATED_ID); weights.push(residual); lineHours.push(residual); }
+      eqHours = [...lineHours];
+    } else {
+      const residual = 100 - weights.reduce((a, b) => a + b, 0);
+      if (residual > 0) { ids.push(UNALLOCATED_ID); weights.push(residual); }
+      lineHours = ids.map(() => 0);
+      eqHours = weights.map((w) => (w / 100) * monthlyWorkHours);
+    }
+  } else {
+    const pid = defaultProjectByEmp.get(r.employeeId) || UNALLOCATED_ID;
+    ids = [pid]; weights = [1]; lineHours = [0]; eqHours = [monthlyWorkHours];
+  }
+
+  const split = (pool: number) => distributeRounded(pool, weights);
+  const sBase = split(base), sAllow = split(allowance), sOt = split(ot), sOther = split(other), sBurden = split(burden);
+  let sBonus: number[];
+  if (alloc?.bonusProjectId) {
+    if (!ids.includes(alloc.bonusProjectId) && bonus > 0) {
+      ids = [...ids, alloc.bonusProjectId]; weights = [...weights, 0]; lineHours = [...lineHours, 0]; eqHours = [...eqHours, 0];
+      sBase.push(0); sAllow.push(0); sOt.push(0); sOther.push(0); sBurden.push(0);
+    }
+    sBonus = ids.map((pid) => (pid === alloc.bonusProjectId ? bonus : 0));
+  } else {
+    sBonus = split(bonus);
+  }
+
+  const contributions: EmpContribution[] = ids.map((pid, i) => ({
+    projectId: pid, department: r.department || "（未填）",
+    base: sBase[i], allowance: sAllow[i], ot: sOt[i], bonus: sBonus[i], other: sOther[i], burden: sBurden[i],
+    totalCost: sBase[i] + sAllow[i] + sOt[i] + sOther[i] + sBurden[i] + sBonus[i],
+    hours: lineHours[i] ?? 0,
+    standardValue: Math.round(rate * (eqHours[i] ?? 0)),
+  }));
+  const directHours = contributions.reduce((a, c) => a + (c.projectId === UNALLOCATED_ID ? 0 : c.hours), 0);
+  return { contributions, directHours, availHours, hoursMode };
+}
+
 export function computeProjectCost(input: ProjectCostInput): ProjectCostResult {
   const { rows, allocations, projects, period, monthlyWorkHours, baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp } = input;
   const nameOf = new Map(projects.map((p) => [p.id, p.name || p.code]));
@@ -71,67 +154,20 @@ export function computeProjectCost(input: ProjectCostInput): ProjectCostResult {
   const acc = new Map<string, ReturnType<typeof blank>>();
   const bump = (pid: string) => { const a = acc.get(pid) ?? blank(); acc.set(pid, a); return a; };
 
+  const ctx: AllocCtx = { monthlyWorkHours, baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp };
   let companyTotal = 0;
   let totalDirectHours = 0;
   let totalHours = 0;
 
   for (const r of rows) {
-    const factor = r.prorationFactor ?? 1;
-    const base = Math.round((baseByEmp.get(r.employeeId) ?? 0) * factor);
-    const allowance = r.paidSalaryTotal - base; // 吸收捨入；base+allowance＝實付固定薪資
-    const ot = r.overtimePay;
-    const bonus = bonusByEmp.get(r.employeeId) ?? 0;
-    const other = otherByEmp.get(r.employeeId) ?? 0;
-    const burden = r.employerBurden;
     companyTotal += r.employerTotalCost;
-
-    // 解析權重與對應 projectId（含未分攤殘量）
-    const alloc = allocOf.get(r.employeeId);
-    let ids: string[];
-    let weights: number[];
-    let lineHours: number[] = []; // 與 ids 對齊（hours 模式；未分攤桶也記殘時數）
-    if (alloc && alloc.lines.length > 0) {
-      ids = alloc.lines.map((l) => l.projectId);
-      weights = alloc.lines.map((l) => Math.max(0, l.value));
-      if (alloc.mode === "hours") {
-        lineHours = [...weights];
-        const residual = monthlyWorkHours - weights.reduce((a, b) => a + b, 0);
-        if (residual > 0) { ids.push(UNALLOCATED_ID); weights.push(residual); lineHours.push(residual); }
-        totalDirectHours += weights.reduce((a, b, i) => a + (ids[i] === UNALLOCATED_ID ? 0 : b), 0);
-        totalHours += monthlyWorkHours;
-      } else {
-        const residual = 100 - weights.reduce((a, b) => a + b, 0);
-        if (residual > 0) { ids.push(UNALLOCATED_ID); weights.push(residual); }
-        lineHours = ids.map(() => 0);
-      }
-    } else {
-      const pid = defaultProjectByEmp.get(r.employeeId) || UNALLOCATED_ID;
-      ids = [pid];
-      weights = [1];
-      lineHours = [0];
+    const { contributions, directHours, availHours, hoursMode } = allocateEmployee(r, allocOf.get(r.employeeId), ctx);
+    if (hoursMode) { totalDirectHours += directHours; totalHours += availHours; }
+    for (const c of contributions) {
+      const a = bump(c.projectId);
+      a.base += c.base; a.allowance += c.allowance; a.ot += c.ot; a.other += c.other;
+      a.burden += c.burden; a.bonus += c.bonus; a.hours += c.hours; a.totalCost += c.totalCost;
     }
-
-    const split = (pool: number) => distributeRounded(pool, weights);
-    const sBase = split(base), sAllow = split(allowance), sOt = split(ot), sOther = split(other), sBurden = split(burden);
-    // 獎金：預設依比例；設 bonusProjectId 則整筆直接歸屬
-    let sBonus: number[];
-    if (alloc?.bonusProjectId) {
-      sBonus = ids.map((pid) => (pid === alloc.bonusProjectId ? bonus : 0));
-      if (!ids.includes(alloc.bonusProjectId) && bonus > 0) {
-        ids = [...ids, alloc.bonusProjectId]; weights = [...weights, 0]; lineHours = [...lineHours, 0];
-        sBase.push(0); sAllow.push(0); sOt.push(0); sOther.push(0); sBurden.push(0);
-        sBonus = ids.map((pid) => (pid === alloc.bonusProjectId ? bonus : 0));
-      }
-    } else {
-      sBonus = split(bonus);
-    }
-
-    ids.forEach((pid, i) => {
-      const a = bump(pid);
-      a.base += sBase[i]; a.allowance += sAllow[i]; a.ot += sOt[i]; a.other += sOther[i];
-      a.burden += sBurden[i]; a.bonus += sBonus[i]; a.hours += lineHours[i] ?? 0;
-      a.totalCost += sBase[i] + sAllow[i] + sOt[i] + sOther[i] + sBurden[i] + sBonus[i];
-    });
   }
 
   // 輸出：所有主檔專案（即使 0 成本，供預算 vs 實際）＋有資料的未知專案＋未分攤桶（末）
@@ -159,4 +195,66 @@ export function computeProjectCost(input: ProjectCostInput): ProjectCostResult {
     totalHours,
     utilization: totalHours > 0 ? totalDirectHours / totalHours : 0,
   };
+}
+
+/* ───────── 專案×部門矩陣 ───────── */
+export interface ProjectDeptMatrix {
+  rowLabels: string[]; // 專案（含未分攤）
+  colLabels: string[]; // 部門
+  cells: (number | null)[][]; // 成本（null＝0）
+}
+
+/** 專案×部門人事成本矩陣（重用 allocateEmployee；每列和＝該專案總成本） */
+export function projectDeptMatrix(input: ProjectCostInput): ProjectDeptMatrix {
+  const { rows, allocations, projects, period, monthlyWorkHours, baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp } = input;
+  const ctx: AllocCtx = { monthlyWorkHours, baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp };
+  const allocOf = new Map(allocations.filter((a) => a.period === period).map((a) => [a.employeeId, a]));
+  const nameOf = new Map(projects.map((p) => [p.id, p.name || p.code]));
+  const depts = [...new Set(rows.map((r) => r.department || "（未填）"))];
+  const grid = new Map<string, Map<string, number>>(); // projectId → dept → cost
+  for (const r of rows) {
+    const { contributions } = allocateEmployee(r, allocOf.get(r.employeeId), ctx);
+    for (const c of contributions) {
+      const row = grid.get(c.projectId) ?? new Map<string, number>();
+      row.set(c.department, (row.get(c.department) ?? 0) + c.totalCost);
+      grid.set(c.projectId, row);
+    }
+  }
+  const pids = [...grid.keys()].sort((a, b) => (a === UNALLOCATED_ID ? 1 : b === UNALLOCATED_ID ? -1 : 0));
+  return {
+    rowLabels: pids.map((pid) => (pid === UNALLOCATED_ID ? "未分攤／間接" : nameOf.get(pid) ?? pid)),
+    colLabels: depts,
+    cells: pids.map((pid) => depts.map((d) => grid.get(pid)?.get(d) ?? null)),
+  };
+}
+
+/* ───────── 標準工率(charge-out)差異 ───────── */
+export interface ChargeOutRow {
+  projectId: string;
+  name: string;
+  actual: number; // 實際分攤成本
+  standard: number; // 標準工率 × 投入工時
+  variance: number; // standard − actual（工時＝標準時近 0）
+}
+
+/** 以自動工率（全載成本÷標準工時）算各專案應計 vs 實際差異 */
+export function chargeOutVariance(input: ProjectCostInput): ChargeOutRow[] {
+  const { rows, allocations, projects, period, monthlyWorkHours, baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp } = input;
+  const ctx: AllocCtx = { monthlyWorkHours, baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp };
+  const allocOf = new Map(allocations.filter((a) => a.period === period).map((a) => [a.employeeId, a]));
+  const nameOf = new Map(projects.map((p) => [p.id, p.name || p.code]));
+  const acc = new Map<string, { actual: number; standard: number }>();
+  for (const r of rows) {
+    const { contributions } = allocateEmployee(r, allocOf.get(r.employeeId), ctx);
+    for (const c of contributions) {
+      const a = acc.get(c.projectId) ?? { actual: 0, standard: 0 };
+      a.actual += c.totalCost; a.standard += c.standardValue;
+      acc.set(c.projectId, a);
+    }
+  }
+  return [...acc.entries()].map(([pid, a]) => ({
+    projectId: pid,
+    name: pid === UNALLOCATED_ID ? "未分攤／間接" : nameOf.get(pid) ?? pid,
+    actual: a.actual, standard: a.standard, variance: a.standard - a.actual,
+  }));
 }

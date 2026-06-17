@@ -8,19 +8,37 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePayrollStore } from "@/store/usePayrollStore";
+import { monthWorkedHours } from "@/lib/attendance";
 import type { Allocation, AllocationMode } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2, Pencil, FolderKanban } from "lucide-react";
+import { Plus, Trash2, Pencil, FolderKanban, Clock } from "lucide-react";
 
 const NONE = "__none__";
 
 /** 每月工時分攤輸入（在每月薪資作業中使用）：逐員工設定各專案時數/百分比 */
 export function AllocationEditor() {
-  const { employees, projects, currentPeriod, parameters, getAllocation, upsertAllocation } = usePayrollStore();
+  const { employees, projects, currentPeriod, parameters, attendance, punches, getAllocation, upsertAllocation } = usePayrollStore();
   const navigate = useNavigate();
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Allocation | null>(null);
   const nameOf = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid;
+  const codeToId = new Map(projects.map((p) => [p.code, p.id]));
+  const defaultIdOf = (empId: string) => {
+    const code = employees.find((e) => e.id === empId)?.project;
+    return code ? codeToId.get(code) : undefined;
+  };
+
+  const fromAttendance = () => {
+    if (!editing || !draft) return;
+    const H = monthWorkedHours(attendance, currentPeriod, punches).get(editing) ?? 0;
+    if (!H) { alert("該員工本月無打卡工時可帶入。"); return; }
+    const defId = defaultIdOf(editing);
+    if (draft.lines.length === 0 && defId) {
+      setDraft({ ...draft, mode: "hours", lines: [{ projectId: defId, value: H }], availableHours: H });
+    } else {
+      setDraft({ ...draft, mode: "hours", availableHours: H });
+    }
+  };
 
   const open = (employeeId: string) => {
     const cur = getAllocation(employeeId, currentPeriod);
@@ -29,7 +47,7 @@ export function AllocationEditor() {
   };
   const save = () => { if (draft) upsertAllocation(draft); setEditing(null); setDraft(null); };
 
-  const cap = draft?.mode === "pct" ? 100 : parameters.monthlyWorkHours;
+  const cap = draft?.mode === "pct" ? 100 : (draft?.availableHours ?? parameters.monthlyWorkHours);
   const used = draft ? draft.lines.reduce((a, l) => a + (Number(l.value) || 0), 0) : 0;
   const residual = cap - used;
 
@@ -82,14 +100,24 @@ export function AllocationEditor() {
           <DialogHeader><DialogTitle>{employees.find((e) => e.id === editing)?.name} 的工時分攤</DialogTitle></DialogHeader>
           {draft && (
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Label className="text-xs">輸入方式</Label>
                 <Select value={draft.mode} onValueChange={(v) => setDraft({ ...draft, mode: v as AllocationMode })}>
                   <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="hours">時數</SelectItem><SelectItem value="pct">百分比</SelectItem></SelectContent>
                 </Select>
                 <span className="text-xs text-muted-foreground">上限 {cap}{draft.mode === "pct" ? "%" : " 小時"}</span>
+                <Button variant="outline" size="sm" className="ml-auto" onClick={fromAttendance}><Clock /> 由出勤帶入</Button>
               </div>
+              {draft.mode === "hours" && (
+                <div className="flex items-center gap-3">
+                  <Label className="text-xs whitespace-nowrap">當月可用工時（基礎/分母）</Label>
+                  <Input type="number" className="h-8 w-28 col-input text-right"
+                    value={draft.availableHours ?? ""} placeholder={String(parameters.monthlyWorkHours)}
+                    onChange={(e) => setDraft({ ...draft, availableHours: e.target.value === "" ? undefined : Number(e.target.value) || 0 })} />
+                  <span className="text-xs text-muted-foreground">空白＝用標準 {parameters.monthlyWorkHours} 小時；可由出勤帶入實際工時</span>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {draft.lines.map((l, i) => (

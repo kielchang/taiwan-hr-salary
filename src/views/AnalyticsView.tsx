@@ -23,7 +23,8 @@ import {
   analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
   analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost, type Insight,
 } from "@/lib/insights";
-import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
+import { computeProjectCost, projectDeptMatrix, chargeOutVariance, UNALLOCATED_ID } from "@/lib/reports/projectCost";
+import { projectCostByPeriod, projectEac } from "@/lib/reports/projectTrend";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
 import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb, Save, TrendingUp } from "lucide-react";
 
@@ -844,17 +845,21 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
 
 /* ───────── 專案成本 ───────── */
 function ProjectCostTab({ rows }: { rows: PayrollRow[] }) {
-  const { salaries, events, projects, allocations, parameters, currentPeriod, employees } = usePayrollStore();
+  const { salaries, events, dependents, brackets, projects, allocations, parameters, currentPeriod, employees } = usePayrollStore();
   const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.monthlyBonus ?? 0;
   const otherOf = (id: string) => events.find((e) => e.employeeId === id && e.period === currentPeriod)?.otherAddition ?? 0;
   const codeToId = new Map(projects.map((p) => [p.code, p.id]));
-  const result = computeProjectCost({
+  const input = {
     rows, allocations, projects, period: currentPeriod, monthlyWorkHours: parameters.monthlyWorkHours,
     baseByEmp: new Map(salaries.map((s) => [s.employeeId, s.baseSalary])),
     bonusByEmp: new Map(rows.map((r) => [r.employeeId, bonusOf(r.employeeId)])),
     otherByEmp: new Map(rows.map((r) => [r.employeeId, otherOf(r.employeeId)])),
     defaultProjectByEmp: new Map(employees.filter((e) => e.project && codeToId.has(e.project)).map((e) => [e.id, codeToId.get(e.project) as string])),
-  });
+  };
+  const result = computeProjectCost(input);
+  const matrix = projectDeptMatrix(input);
+  const maxCell = Math.max(1, ...matrix.cells.flat().map((v) => v ?? 0));
+  const charge = chargeOutVariance(input).filter((c) => c.projectId !== UNALLOCATED_ID && (c.actual > 0 || c.standard > 0));
   const shown = result.projects.filter((p) => p.totalCost > 0 || p.budget > 0);
   const insights = analyzeProjectCost({ projects: result.projects, companyTotal: result.companyTotal, utilization: result.utilization });
 
@@ -942,8 +947,96 @@ function ProjectCostTab({ rows }: { rows: PayrollRow[] }) {
           </CardContent>
         </Card>
       </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">專案 × 部門成本矩陣</CardTitle>
+            <CardDescription>各專案人事成本由哪些部門投入；每列加總＝該專案總成本。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Heatmap rowLabels={matrix.rowLabels} colLabels={matrix.colLabels} cells={matrix.cells} domain={[0, maxCell]} fmt={(n) => ntd(n)} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">標準工率差異（charge-out）</CardTitle>
+            <CardDescription>標準工率＝全載成本÷標準工時；應計＝工率×投入工時。差異為負＝投入工時少於標準（吸收不足）。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {charge.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">尚無可比較的專案工時。</p>
+            ) : (
+              <Table>
+                <TableHeader><TableRow><TableHead>專案</TableHead><TableHead className="text-right">應計(標準)</TableHead><TableHead className="text-right">實際</TableHead><TableHead className="text-right">差異</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {charge.map((c) => (
+                    <TableRow key={c.projectId}>
+                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(c.standard)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{ntd(c.actual)}</TableCell>
+                      <TableCell className={cn("text-right tabular-nums", c.variance < 0 ? "text-red-600" : c.variance > 0 ? "text-emerald-600" : "")}>{ntd(c.variance)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <ProjectEacSection />
     </div>
   );
+
+  function ProjectEacSection() {
+    const periods = [...new Set([...events.map((e) => e.period), currentPeriod])].filter((p) => p <= currentPeriod).sort((a, b) => a.localeCompare(b));
+    const byPeriod = projectCostByPeriod({ employees, salaries, dependents, events, allocations, projects, parameters, brackets }, periods);
+    const eac = projectEac(byPeriod, projects, currentPeriod).filter((e) => e.ac > 0);
+    if (periods.length < 2 || eac.length === 0) {
+      return (
+        <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+          EAC／燃燒率需要至少兩個月的專案成本資料。請於不同月份建立分攤（或載入多月示範資料）。
+        </CardContent></Card>
+      );
+    }
+    const top = [...eac].sort((a, b) => b.ac - a.ac).slice(0, 4);
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">EAC／燃燒率（跨月累計）</CardTitle>
+          <CardDescription>逐月累計各專案實際成本，算燃燒率與完工預估（EAC）；填「%完成」則另以 EVM（CPI）推估。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {top.map((e) => (
+              <div key={e.projectId}>
+                <p className="mb-1 truncate text-xs font-medium text-muted-foreground" title={e.name}>{e.name}</p>
+                <TrendChart data={e.monthly.map((m) => ({ label: m.period, value: m.cost }))} color={PALETTE[4]} />
+              </div>
+            ))}
+          </div>
+          <Table>
+            <TableHeader><TableRow><TableHead>專案</TableHead><TableHead className="text-right">累計實際</TableHead><TableHead className="text-right">燃燒率/月</TableHead><TableHead className="text-right">EAC(燃燒率)</TableHead><TableHead className="text-right">EAC(EVM)</TableHead><TableHead className="text-right">完工差異</TableHead><TableHead className="text-right">%消耗</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {eac.map((e) => (
+                <TableRow key={e.projectId}>
+                  <TableCell className="font-medium">{e.name}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(e.ac)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{ntd(e.burnRate)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{e.budget ? ntd(e.runRateEac) : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{e.eacEvm != null ? ntd(e.eacEvm) : "—"}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums", e.budget > 0 && (e.varianceRunRate < 0 ? "text-red-600" : "text-emerald-600"))}>{e.budget ? (e.varianceRunRate < 0 ? `超 ${ntd(-e.varianceRunRate)}` : `餘 ${ntd(e.varianceRunRate)}`) : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{e.budget ? pct(e.pctConsumed) : "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className="text-xs text-muted-foreground">EAC(燃燒率)＝月均×專案總月數；EAC(EVM)＝預算÷CPI（需填「%完成」）。完工差異＝預算−EAC(燃燒率)。</p>
+        </CardContent>
+      </Card>
+    );
+  }
 }
 
 /* ───────── 趨勢與預算 ───────── */

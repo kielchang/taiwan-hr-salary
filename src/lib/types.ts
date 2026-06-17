@@ -220,6 +220,7 @@ export interface Project {
   startDate: string; // ISO yyyy-mm-dd
   endDate: string; // ISO
   status: ProjectStatus;
+  percentComplete?: number; // 0~1 完成度（EVM 用；缺→僅以燃燒率外推 EAC）
 }
 
 export type AllocationMode = "hours" | "pct";
@@ -237,6 +238,7 @@ export interface Allocation {
   mode: AllocationMode;
   lines: AllocationLine[];
   bonusProjectId?: string; // 設定→當月獎金直接歸屬此專案，跳過比例分攤
+  availableHours?: number; // 當月實際可用工時（由出勤帶入）；缺→沿用 monthlyWorkHours
 }
 
 /* ───────────── 稽核軌跡（變更紀錄；單機版以操作者姓名為 actor） ───────────── */

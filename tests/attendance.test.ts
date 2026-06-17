@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { haversineMeters, evaluateFence, isIpAllowed, parseIpList, punchesToCsv } from "@/lib/attendance";
+import { haversineMeters, evaluateFence, isIpAllowed, parseIpList, punchesToCsv, monthWorkedHours } from "@/lib/attendance";
 import type { AttendanceConfig, PunchRecord } from "@/lib/types";
 
 const cfg = (over: Partial<AttendanceConfig> = {}): AttendanceConfig => ({
@@ -107,5 +107,31 @@ describe("evaluateDay（彈性上下班）", () => {
   it("建議下班＝上班＋應工時＋午休（09:00＋8h＋1h＝18:00）", () => {
     const d = evaluateDay(cfg(), "E1", DATE, [punch("in", 9, 0)]);
     expect(new Date(d.expectedOutISO!).getHours()).toBe(18);
+  });
+});
+
+describe("monthWorkedHours", () => {
+  const punch = (employeeId: string, type: "in" | "out", timestamp: string): PunchRecord => ({
+    id: `${employeeId}-${type}-${timestamp}`, employeeId, type, timestamp,
+    lat: null, lng: null, accuracy: null, distanceM: null, withinFence: true, ip: null, ipAllowed: null,
+  });
+  it("累加當月各日工時（扣午休），缺卡日不計", () => {
+    const c = cfg({ breakMinutes: 60 });
+    const punches: PunchRecord[] = [
+      // 1/05：09:00–18:00 → 9h − 1h 午休 = 8h
+      punch("E1", "in", "2026-01-05T09:00:00"), punch("E1", "out", "2026-01-05T18:00:00"),
+      // 1/06：09:00–17:00 → 8h − 1h = 7h
+      punch("E1", "in", "2026-01-06T09:00:00"), punch("E1", "out", "2026-01-06T17:00:00"),
+      // 1/07：只有上班卡（缺下班）→ 不計
+      punch("E1", "in", "2026-01-07T09:00:00"),
+      // 另一員工另月 → 不計入 2026-01
+      punch("E2", "in", "2026-02-03T09:00:00"), punch("E2", "out", "2026-02-03T18:00:00"),
+    ];
+    const h = monthWorkedHours(c, "2026-01", punches);
+    expect(h.get("E1")).toBe(15); // 8 + 7
+    expect(h.get("E2")).toBeUndefined();
+  });
+  it("無打卡 → 空 Map", () => {
+    expect(monthWorkedHours(cfg(), "2026-01", []).size).toBe(0);
   });
 });
