@@ -52,12 +52,26 @@ describe("client mount + 路由（白屏防護）", () => {
     expect(div.textContent).toContain("投保級距表（四險）");
   });
 
+  it("深連結 /projects → 專案頁（成本與分析）", async () => {
+    seedDone();
+    const div = await mountAt("/projects");
+    expect(div.textContent).toContain("專案");
+    expect(div.textContent).toContain("成本與分析");
+  });
+
+  it("深連結 /reports → 報表與申報中心", async () => {
+    seedDone();
+    const div = await mountAt("/reports");
+    expect(div.textContent).toContain("報表與申報");
+    expect(div.textContent).toContain("月結報表");
+  });
+
   it("深連結 /analytics → 薪酬分析頁", async () => {
     seedDone();
     const div = await mountAt("/analytics");
     expect(div.textContent).toContain("薪酬分析");
     expect(div.textContent).toContain("成本結構");
-    expect(div.textContent).toContain("年度／季度調薪試算");
+    expect(div.textContent).toContain("調薪試算");
   });
 
   it("深連結 /attendance → 出勤打卡頁", async () => {

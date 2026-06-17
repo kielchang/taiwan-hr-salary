@@ -13,6 +13,7 @@ import {
   evaluateAllForDate, formatMinutes, localDateKey, type DayAttendance,
 } from "@/lib/attendance";
 import { csvSerialize } from "@/lib/csv";
+import { HelpHint } from "@/components/HelpHint";
 import { parseAttendanceCsv, PUNCH_TEMPLATE, HOURS_TEMPLATE, type AttImportPreview } from "@/lib/import/attendanceCsv";
 import {
   LogIn, LogOut, MapPin, Download, Upload, FileDown, AlertTriangle, CheckCircle2, ShieldAlert, Settings, Trash2, CalendarCheck,
@@ -155,7 +156,7 @@ export function AttendanceView() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold">出勤打卡</h1>
+        <h1 className="flex items-center gap-2 text-lg font-bold">出勤打卡 <HelpHint id="attendance" /></h1>
         <p className="text-sm text-muted-foreground">
           以裝置 GPS 定位判斷是否在公司範圍內{attendance.ipCheckEnabled ? "，並檢查公網 IP" : ""}。
           打卡紀錄存在「這台裝置的瀏覽器」，可匯出 CSV 由人事彙整。

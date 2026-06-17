@@ -11,7 +11,7 @@ import { lookupBracket, monthlySalaryTotal, supplementaryBaseDifferential, bonus
 import { buildSnapshot } from "@/lib/analytics";
 import { simulateAnnual } from "@/lib/reports/annual";
 import { Bullet } from "@/components/charts";
-import { cn, ntd } from "@/lib/utils";
+import { cn, ntd, pct } from "@/lib/utils";
 import { CheckCircle2, AlertTriangle, ArrowRight, Undo2, Users, Banknote, Wallet, Building, TrendingUp } from "lucide-react";
 
 type Tab = "overview" | "checks" | "bonus";
@@ -51,6 +51,17 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
   const year = currentPeriod.slice(0, 4);
   const sim = simulateAnnual(year, currentPeriod, totals.employer, snapshots);
   const annualBudget = analytics.planning.annualPayrollBudget;
+  // 環比（上月）/同比（去年同月）：取月結快照之雇主總成本對比
+  const [yy, mm] = currentPeriod.split("-").map(Number);
+  const prevD = new Date(yy, mm - 2, 1);
+  const prevPeriod = `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, "0")}`;
+  const lastYearPeriod = `${yy - 1}-${String(mm).padStart(2, "0")}`;
+  const snapBy = new Map(snapshots.map((s) => [s.period, s]));
+  const prevSnap = snapBy.get(prevPeriod);
+  const lySnap = snapBy.get(lastYearPeriod);
+  const mom = prevSnap && prevSnap.totalCost > 0 ? (totals.employer - prevSnap.totalCost) / prevSnap.totalCost : null;
+  const yoy = lySnap && lySnap.totalCost > 0 ? (totals.employer - lySnap.totalCost) / lySnap.totalCost : null;
+  const deltaText = (d: number | null, base: string) => d == null ? `無${base}快照可比` : `${d >= 0 ? "+" : ""}${pct(d)}`;
   const doConfirm = () => {
     saveSnapshot(buildSnapshot(rows, currentPeriod, bonusTotal)); // 留存當月實際，供年報累計
     confirmPeriod(currentPeriod);
@@ -120,6 +131,10 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
             <MiniStat label={`當年已實際累計（${sim.monthsBefore} 個月）`} value={`${ntd(sim.ytdBefore)} 元`} />
             <MiniStat label="剩餘月數（含本月）" value={`${sim.remainingMonths} 個月`} />
             <MiniStat label="模擬全年總成本" value={`${ntd(sim.projectedAnnual)} 元`} hint="已實際＋剩餘月×本月" />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MiniStat label={`環比（vs 上月 ${prevPeriod}）`} value={deltaText(mom, "上月")} hint={prevSnap ? `上月 ${ntd(prevSnap.totalCost)} 元` : "上月未保存快照"} />
+            <MiniStat label={`同比（vs 去年同月 ${lastYearPeriod}）`} value={deltaText(yoy, "去年同月")} hint={lySnap ? `去年同月 ${ntd(lySnap.totalCost)} 元` : "去年同月未保存快照"} />
           </div>
           {annualBudget > 0 && <Bullet label="模擬全年 vs 年度預算" value={sim.projectedAnnual} target={annualBudget} />}
         </CardContent>
@@ -206,7 +221,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
             {onNext && (
               <div className="mt-4 flex justify-end">
                 <Button variant="outline" onClick={onNext}>
-                  前往報表與薪資條 <ArrowRight />
+                  前往報表與申報 <ArrowRight />
                 </Button>
               </div>
             )}

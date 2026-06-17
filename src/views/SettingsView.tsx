@@ -17,6 +17,8 @@ import { parseIpList } from "@/lib/attendance";
 import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
 import { csvSerialize } from "@/lib/csv";
+import { cn } from "@/lib/utils";
+import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban } from "lucide-react";
 
@@ -92,6 +94,9 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
   },
 ];
 
+type SecTab = "legal" | "company" | "data";
+const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", "公司與出勤"], ["data", "資料與安全"]];
+
 export function SettingsView() {
   const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog } = usePayrollStore();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -132,6 +137,7 @@ export function SettingsView() {
   };
   const navigate = useNavigate();
   const [showBrackets, setShowBrackets] = useState(false);
+  const [secTab, setSecTab] = useState<SecTab>("legal");
 
   const renderField = (f: Field, tone: "company" | "legal") => {
     const raw = parameters[f.key];
@@ -165,7 +171,7 @@ export function SettingsView() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold">系統設定</h1>
+          <h1 className="flex items-center gap-2 text-lg font-bold">系統設定 <HelpHint id="settings" /></h1>
           <p className="text-sm text-muted-foreground">
             黃色欄位是「貴公司自己的設定」；白色欄位是政府公告的法定值，已內建 115 年度資料，
             通常每年 1 月依新公告更新一次即可。
@@ -176,6 +182,16 @@ export function SettingsView() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap gap-1">
+        {SEC_TABS.map(([k, label]) => (
+          <button key={k} onClick={() => setSecTab(k)}
+            className={cn("rounded-md px-3 py-1.5 text-sm", secTab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {secTab === "company" && (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">公司專屬設定</CardTitle>
@@ -187,7 +203,9 @@ export function SettingsView() {
           </div>
         </CardContent>
       </Card>
+      )}
 
+      {secTab === "legal" && (<>
       <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
         <Info className="mr-1 inline size-3.5" />
         <span className="font-medium">年度更新提醒：</span>
@@ -230,11 +248,11 @@ export function SettingsView() {
           </CardContent>
         )}
       </Card>
+      </>)}
 
-      <AttendanceSettings />
+      {secTab === "company" && <AttendanceSettings />}
 
-      <ProjectMasterCard />
-
+      {secTab === "data" && (<>
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">資料備份與還原</CardTitle>
@@ -341,13 +359,14 @@ export function SettingsView() {
           </Button>
         </CardContent>
       </Card>
+      </>)}
     </div>
   );
 }
 
 /** 打卡設定（公司座標、半徑、超範圍處理、IP 檢查）— 黃底＝公司自訂 */
 /** 專案主檔 CRUD（供工時分攤與專案成本報表） */
-function ProjectMasterCard() {
+export function ProjectMasterCard() {
   const { projects, upsertProject, removeProject } = usePayrollStore();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Project | null>(null);

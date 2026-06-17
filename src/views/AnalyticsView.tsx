@@ -27,12 +27,21 @@ import {
 import { computeProjectCost, projectDeptMatrix, chargeOutVariance, UNALLOCATED_ID } from "@/lib/reports/projectCost";
 import { projectCostByPeriod, projectEac } from "@/lib/reports/projectTrend";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
+import { HelpHint } from "@/components/HelpHint";
 import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb, Save, TrendingUp } from "lucide-react";
 
-type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "project" | "trend" | "glossary";
-const TABS: [Tab, string][] = [
-  ["cost", "成本結構"], ["dist", "分布與公平"], ["grade", "級距與 compa-ratio"],
-  ["bonus", "獎金／分紅試算"], ["raise", "年度／季度調薪試算"], ["project", "專案成本"], ["trend", "年報（趨勢·預算）"], ["glossary", "指標說明"],
+type Tab = "cost" | "dist" | "grade" | "bonus" | "raise" | "trend" | "glossary";
+const TAB_LABEL: Record<Tab, string> = {
+  cost: "成本結構", dist: "分布與公平", grade: "級距與 compa-ratio",
+  bonus: "獎金／分紅試算", raise: "調薪試算", trend: "趨勢·預算", glossary: "指標說明",
+};
+const TABS: [Tab, string][] = (Object.keys(TAB_LABEL) as Tab[]).map((k) => [k, TAB_LABEL[k]]);
+// 兩層分組：月報（依檢視月份的實際回顧）／規劃試算（沙盒）／年報／說明
+const GROUPS: { title: string; tag?: "例行" | "試算"; tabs: Tab[] }[] = [
+  { title: "月報", tag: "例行", tabs: ["cost", "dist", "grade"] },
+  { title: "規劃試算", tag: "試算", tabs: ["bonus", "raise"] },
+  { title: "年報", tag: "例行", tabs: ["trend"] },
+  { title: "說明", tabs: ["glossary"] },
 ];
 const RAISE_LABEL: Record<string, string> = {
   uniformPercent: "一致調幅 %", proRataBase: "按本薪分配", byPerformance: "按績效係數", meritMatrix: "merit matrix",
@@ -43,7 +52,7 @@ function csvDownload(headers: string[], rows: (string | number)[][], fileName: s
 }
 
 // 月報（描述性、依選定月份）vs 規劃/年報（依當期或跨期）
-const MONTH_TABS: Tab[] = ["cost", "dist", "grade", "project"];
+const MONTH_TABS: Tab[] = ["cost", "dist", "grade"];
 
 export function AnalyticsView() {
   const [tab, setTab] = useState<Tab>("cost");
@@ -76,7 +85,7 @@ export function AnalyticsView() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
-          <h1 className="flex items-center gap-2 text-lg font-bold"><BarChart3 className="size-5 text-primary" /> 薪酬分析</h1>
+          <h1 className="flex items-center gap-2 text-lg font-bold"><BarChart3 className="size-5 text-primary" /> 薪酬分析 <HelpHint id="analytics" /></h1>
           <p className="text-sm text-muted-foreground">
             月報依「檢視月份」呈現該月數據；獎金/調薪為規劃沙盒、<strong>不寫回薪資</strong>；年報為跨月累計與全年推估。
           </p>
@@ -91,12 +100,21 @@ export function AnalyticsView() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 print:hidden">
-        {TABS.map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={cn("rounded-md px-3 py-1.5 text-sm", tab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
-            {label}
-          </button>
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2 print:hidden">
+        {GROUPS.map((g) => (
+          <div key={g.title}>
+            <p className="mb-0.5 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {g.title}{g.tag && <span className={cn("ml-1 rounded px-1 py-0.5 text-[9px]", g.tag === "例行" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700")}>{g.tag}</span>}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {g.tabs.map((k) => (
+                <button key={k} onClick={() => setTab(k)}
+                  className={cn("rounded-md px-3 py-1.5 text-sm", tab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
+                  {TAB_LABEL[k]}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
@@ -132,7 +150,6 @@ export function AnalyticsView() {
             {tab === "grade" && <GradeTab rows={viewRows} />}
             {tab === "bonus" && <BonusTab rows={currentRows} />}
             {tab === "raise" && <RaiseTab rows={currentRows} />}
-            {tab === "project" && <ProjectCostTab rows={viewRows} period={viewPeriod} />}
             {tab === "trend" && <TrendTab rows={currentRows} />}
             {tab === "glossary" && <GlossaryTab />}
           </>
@@ -870,7 +887,7 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
 }
 
 /* ───────── 專案成本 ───────── */
-function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
+export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
   const { salaries, events, dependents, brackets, projects, allocations, parameters, employees } = usePayrollStore();
   const currentPeriod = period;
   const bonusOf = (id: string) => events.find((e) => e.employeeId === id && e.period === period)?.monthlyBonus ?? 0;
