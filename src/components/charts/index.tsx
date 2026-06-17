@@ -64,7 +64,7 @@ export function StackedBar({
   };
   const seg = hover ? rows[hover.ri]?.segments[hover.si] : null;
   return (
-    <div className="relative" onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
+    <div className="relative select-none" onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
       <div className="space-y-1.5">
         {rows.map((r, ri) => {
           const total = r.segments.reduce((a, s) => a + s.value, 0);
@@ -144,7 +144,7 @@ export function BarChart({
   const bw = (W - pad.l - pad.r) / data.length;
   const activeI = idx ?? selectedIndex;
   return (
-    <div className="relative" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
+    <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
         {data.map((d, i) => {
           const h = ((H - pad.t - pad.b) * d.value) / max;
@@ -194,7 +194,7 @@ export function LineChart({
   const sy = (y: number) => H - pad - y * (H - 2 * pad);
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
   return (
-    <div className="relative" onPointerMove={onMove} onPointerLeave={() => setIdx(null)}>
+    <div className="relative select-none" onPointerMove={onMove} onPointerLeave={() => setIdx(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
         <rect x={pad} y={pad} width={W - 2 * pad} height={H - 2 * pad} fill="none" stroke={GRID} strokeWidth={0.5} />
         {diagonal && <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(1)} stroke={AXIS} strokeDasharray="3 2" strokeWidth={0.8} />}
@@ -239,7 +239,7 @@ export function Pareto({
   });
   const linePath = cumPts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   return (
-    <div className="relative" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
+    <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
         {sorted.map((d, i) => {
           const h = ((H - pad.t - pad.b) * d.value) / max;
@@ -295,7 +295,7 @@ export function Scatter({
   const sx = (x: number) => pad.l + (xMax === xMin ? 0.5 : (x - xMin) / (xMax - xMin)) * (W - pad.l - pad.r);
   const sy = (y: number) => H - pad.b - (yMax === yMin ? 0.5 : (y - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
   return (
-    <div className="relative" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
+    <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
         <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
         <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
@@ -333,7 +333,7 @@ export function Bullet({ value, target, label, height = 34 }: { value: number; t
   const tX = (target / max) * W;
   const over = target > 0 && value > target;
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 select-none">
       {label && <p className="text-xs text-muted-foreground">{label}</p>}
       <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="h-7 w-full" role="img">
         <rect x={0} y={height * 0.25} width={W} height={height * 0.5} fill={GRID} rx={2} />
@@ -367,7 +367,7 @@ export function Heatmap({
     return `hsl(${120 - (t - 0.5) * 2 * 120}, 70%, 72%)`;
   };
   return (
-    <div className="overflow-auto">
+    <div className="overflow-auto select-none">
       <table className="border-collapse text-xs">
         <thead>
           <tr>
@@ -431,7 +431,7 @@ export function TrendChart({
   const band = (W - pad.l - pad.r) / Math.max(1, n);
   const activeI = idx ?? selectedIndex;
   return (
-    <div className="relative" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
+    <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
         <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
         <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
