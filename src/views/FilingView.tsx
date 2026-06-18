@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter, NumHead, NumCell } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -8,14 +8,12 @@ import { PrintHeader } from "@/components/PrintHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows } from "@/store/selectors";
-import { saveBlob } from "@/lib/payslipPdf";
-import { csvSerialize } from "@/lib/csv";
 import { cn, ntd, formatPeriod } from "@/lib/utils";
 import { yearlyWithholding, availableYears } from "@/lib/reports/withholding";
 import { bracketWorklist } from "@/lib/reports/bracketAdjust";
 import { enrollmentWorklist } from "@/lib/reports/enrollment";
 import type { DeclaredInsured } from "@/lib/types";
-import { Scale, Download, UserPlus, UserMinus, ArrowRight } from "lucide-react";
+import { Scale, UserPlus, UserMinus, ArrowRight } from "lucide-react";
 
 type Tab = "withholding" | "insurance" | "bracket" | "enrollment";
 const TABS: [Tab, string][] = [
@@ -24,10 +22,6 @@ const TABS: [Tab, string][] = [
   ["bracket", "投保級距申報調整"],
   ["enrollment", "加退保作業清單"],
 ];
-
-function dl(headers: string[], rows: (string | number)[][], name: string) {
-  saveBlob(new Blob([csvSerialize(headers, rows)], { type: "text/csv;charset=utf-8" }), name);
-}
 
 export function FilingView() {
   const [tab, setTab] = useState<Tab>("withholding");
@@ -64,14 +58,18 @@ function WithholdingTab() {
   const years = availableYears(events);
   const [year, setYear] = useState(years[0] ?? currentPeriod.slice(0, 4));
   const rows = yearlyWithholding(employees, salaries, dependents, events, parameters, brackets, year);
-  const tot = rows.reduce((a, r) => ({ gross: a.gross + r.gross, taxable: a.taxable + r.taxable, bonus: a.bonus + r.bonus, withheld: a.withheld + r.withheld, supp: a.supp + r.supplementary }), { gross: 0, taxable: 0, bonus: 0, withheld: 0, supp: 0 });
-
-  const exportCsv = () => dl(
-    ["員工編號", "姓名", "結算月數", "全年應發", "全年應稅(估)", "全年獎金", "全年代扣稅", "全年補充保費"],
-    rows.map((r) => [r.employeeId, r.name, r.months, r.gross, r.taxable, r.bonus, r.withheld, r.supplementary]),
-    `年度扣繳彙總_${year}.csv`,
-  );
-
+  type R = (typeof rows)[number];
+  const money = (key: string, header: string, get: (r: R) => number): Column<R> =>
+    ({ key, header, numeric: true, sortValue: get, cell: (r) => ntd(get(r)), total: (rs) => ntd(rs.reduce((a, r) => a + get(r), 0)) });
+  const columns: Column<R>[] = [
+    { key: "emp", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => `${r.name} ${r.employeeId}`, cell: (r) => (<>{r.name}<span className="ml-1.5 text-xs text-muted-foreground">{r.employeeId}</span></>) },
+    { key: "months", header: "月數", numeric: true, sortValue: (r) => r.months, cell: (r) => r.months },
+    money("gross", "全年應發", (r) => r.gross),
+    money("taxable", "全年應稅(估)", (r) => r.taxable),
+    money("bonus", "全年獎金", (r) => r.bonus),
+    money("withheld", "全年代扣稅", (r) => r.withheld),
+    money("supp", "補充保費", (r) => r.supplementary),
+  ];
   return (
     <Card className="print-block">
       <CardHeader className="flex-row items-center justify-between pb-2">
@@ -79,46 +77,26 @@ function WithholdingTab() {
           <CardTitle className="text-base">年度各類所得扣繳暨免扣繳憑單（彙總）</CardTitle>
           <CardDescription>聚合該年度所有結算月份；金額為系統估算，正式申報請依官方平台核對。</CardDescription>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
-          <Select value={year} onValueChange={setYear}>
-            <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
-            <SelectContent>{(years.length ? years : [year]).map((y) => <SelectItem key={y} value={y}>{y} 年</SelectItem>)}</SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>
-        </div>
       </CardHeader>
       <CardContent>
-        {rows.length === 0 ? (
-          <EmptyState title="該年度尚無結算資料" hint="選擇其他年度，或先在「每月薪資作業」完成至少一個月的結算。" compact />
-        ) : (
-          <Table zebra>
-            <TableHeader sticky><TableRow><TableHead>員工</TableHead><NumHead>月數</NumHead><NumHead>全年應發</NumHead><NumHead>全年應稅(估)</NumHead><NumHead>全年獎金</NumHead><NumHead>全年代扣稅</NumHead><NumHead>補充保費</NumHead></TableRow></TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.employeeId}>
-                  <TableCell className="font-medium">{r.name}<span className="ml-1.5 text-xs text-muted-foreground">{r.employeeId}</span></TableCell>
-                  <NumCell>{r.months}</NumCell>
-                  <NumCell>{ntd(r.gross)}</NumCell>
-                  <NumCell>{ntd(r.taxable)}</NumCell>
-                  <NumCell>{ntd(r.bonus)}</NumCell>
-                  <NumCell>{ntd(r.withheld)}</NumCell>
-                  <NumCell>{ntd(r.supplementary)}</NumCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell>合計</TableCell>
-                <TableCell />
-                <NumCell>{ntd(tot.gross)}</NumCell>
-                <NumCell>{ntd(tot.taxable)}</NumCell>
-                <NumCell>{ntd(tot.bonus)}</NumCell>
-                <NumCell>{ntd(tot.withheld)}</NumCell>
-                <NumCell>{ntd(tot.supp)}</NumCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        )}
+        <DataTable
+          rows={rows}
+          columns={columns}
+          getRowKey={(r) => r.employeeId}
+          searchPlaceholder="搜尋員工…"
+          toolbar={
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+              <SelectContent>{(years.length ? years : [year]).map((y) => <SelectItem key={y} value={y}>{y} 年</SelectItem>)}</SelectContent>
+            </Select>
+          }
+          csv={{
+            headers: ["員工編號", "姓名", "結算月數", "全年應發", "全年應稅(估)", "全年獎金", "全年代扣稅", "全年補充保費"],
+            row: (r) => [r.employeeId, r.name, r.months, r.gross, r.taxable, r.bonus, r.withheld, r.supplementary],
+            fileName: `年度扣繳彙總_${year}.csv`,
+          }}
+          empty={{ title: "該年度尚無結算資料", hint: "選擇其他年度，或先在「每月薪資作業」完成至少一個月的結算。" }}
+        />
       </CardContent>
     </Card>
   );
@@ -128,64 +106,40 @@ function WithholdingTab() {
 function InsuranceTab() {
   const rows = usePayrollRows();
   const currentPeriod = usePayrollStore((s) => s.currentPeriod);
-  const exportCsv = () => dl(
-    ["員工編號", "姓名", "勞保投保", "健保投保", "勞退提繳", "勞保自付", "健保自付", "勞退自提", "勞保雇主", "職保雇主", "健保雇主", "勞退雇主"],
-    rows.map((r) => [r.employeeId, r.name, r.insured.labor, r.insured.health, r.insured.pension, r.premiums.laborEmployee, r.premiums.healthEmployee, r.premiums.pensionVoluntary, r.premiums.laborEmployer, r.premiums.occupationalEmployer, r.premiums.healthEmployer, r.premiums.pensionEmployer]),
-    `勞健退繳費清單_${currentPeriod}.csv`,
-  );
-  const tot = rows.reduce(
-    (a, r) => ({
-      le: a.le + r.premiums.laborEmployee, he: a.he + r.premiums.healthEmployee,
-      lr: a.lr + r.premiums.laborEmployer, oe: a.oe + r.premiums.occupationalEmployer,
-      hr: a.hr + r.premiums.healthEmployer, pr: a.pr + r.premiums.pensionEmployer,
-    }),
-    { le: 0, he: 0, lr: 0, oe: 0, hr: 0, pr: 0 },
-  );
+  type R = (typeof rows)[number];
+  const ins = (key: string, header: string, get: (r: R) => number, total = false): Column<R> =>
+    ({ key, header, numeric: true, sortValue: get, cell: (r) => ntd(get(r)), ...(total ? { total: (rs) => ntd(rs.reduce((a, r) => a + get(r), 0)) } : {}) });
+  const columns: Column<R>[] = [
+    { key: "emp", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => r.name, cell: (r) => r.name },
+    ins("il", "勞保投保", (r) => r.insured.labor),
+    ins("ih", "健保投保", (r) => r.insured.health),
+    ins("ip", "勞退提繳", (r) => r.insured.pension),
+    ins("le", "勞保自付", (r) => r.premiums.laborEmployee, true),
+    ins("he", "健保自付", (r) => r.premiums.healthEmployee, true),
+    ins("lr", "勞保雇主", (r) => r.premiums.laborEmployer, true),
+    ins("oe", "職保雇主", (r) => r.premiums.occupationalEmployer, true),
+    ins("hr", "健保雇主", (r) => r.premiums.healthEmployer, true),
+    ins("pr", "勞退雇主", (r) => r.premiums.pensionEmployer, true),
+  ];
   return (
     <Card className="print-block">
-      <CardHeader className="flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle className="text-base">勞健退繳費／提繳清單（{formatPeriod(currentPeriod)}）</CardTitle>
-          <CardDescription>當期各員工投保金額與勞保、職保、健保、勞退之員工自付與雇主負擔，供對帳繳款單。</CardDescription>
-        </div>
-        <Button variant="outline" size="sm" onClick={exportCsv} className="print:hidden"><Download /> 匯出 CSV</Button>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">勞健退繳費／提繳清單（{formatPeriod(currentPeriod)}）</CardTitle>
+        <CardDescription>當期各員工投保金額與勞保、職保、健保、勞退之員工自付與雇主負擔，供對帳繳款單。</CardDescription>
       </CardHeader>
       <CardContent>
-        {rows.length === 0 ? (
-          <EmptyState title="當期無在職員工資料" hint="先在「每月薪資作業」建立當月在職名單。" compact />
-        ) : (
-          <Table zebra>
-            <TableHeader sticky><TableRow><TableHead>員工</TableHead><NumHead>勞保投保</NumHead><NumHead>健保投保</NumHead><NumHead>勞退提繳</NumHead><NumHead>勞保自付</NumHead><NumHead>健保自付</NumHead><NumHead>勞保雇主</NumHead><NumHead>職保雇主</NumHead><NumHead>健保雇主</NumHead><NumHead>勞退雇主</NumHead></TableRow></TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.employeeId}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <NumCell>{ntd(r.insured.labor)}</NumCell>
-                  <NumCell>{ntd(r.insured.health)}</NumCell>
-                  <NumCell>{ntd(r.insured.pension)}</NumCell>
-                  <NumCell>{ntd(r.premiums.laborEmployee)}</NumCell>
-                  <NumCell>{ntd(r.premiums.healthEmployee)}</NumCell>
-                  <NumCell>{ntd(r.premiums.laborEmployer)}</NumCell>
-                  <NumCell>{ntd(r.premiums.occupationalEmployer)}</NumCell>
-                  <NumCell>{ntd(r.premiums.healthEmployer)}</NumCell>
-                  <NumCell>{ntd(r.premiums.pensionEmployer)}</NumCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell>合計</TableCell>
-                <TableCell colSpan={3} />
-                <NumCell>{ntd(tot.le)}</NumCell>
-                <NumCell>{ntd(tot.he)}</NumCell>
-                <NumCell>{ntd(tot.lr)}</NumCell>
-                <NumCell>{ntd(tot.oe)}</NumCell>
-                <NumCell>{ntd(tot.hr)}</NumCell>
-                <NumCell>{ntd(tot.pr)}</NumCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        )}
+        <DataTable
+          rows={rows}
+          columns={columns}
+          getRowKey={(r) => r.employeeId}
+          searchPlaceholder="搜尋員工…"
+          csv={{
+            headers: ["員工編號", "姓名", "勞保投保", "健保投保", "勞退提繳", "勞保自付", "健保自付", "勞退自提", "勞保雇主", "職保雇主", "健保雇主", "勞退雇主"],
+            row: (r) => [r.employeeId, r.name, r.insured.labor, r.insured.health, r.insured.pension, r.premiums.laborEmployee, r.premiums.healthEmployee, r.premiums.pensionVoluntary, r.premiums.laborEmployer, r.premiums.occupationalEmployer, r.premiums.healthEmployer, r.premiums.pensionEmployer],
+            fileName: `勞健退繳費清單_${currentPeriod}.csv`,
+          }}
+          empty={{ title: "當期無在職員工資料", hint: "先在「每月薪資作業」建立當月在職名單。" }}
+        />
       </CardContent>
     </Card>
   );
@@ -205,12 +159,6 @@ function BracketTab() {
       setDeclaredBaseline(list);
     }
   };
-  const exportCsv = () => dl(
-    ["員工編號", "姓名", "目前勞保", "申報勞保", "目前健保", "申報健保", "目前勞退", "申報勞退", "需調整"],
-    work.map((w) => [w.employeeId, w.name, w.current.labor, w.declared?.labor ?? "", w.current.health, w.declared?.health ?? "", w.current.pension, w.declared?.pension ?? "", w.changed ? "是" : ""]),
-    `投保級距申報調整.csv`,
-  );
-
   const cmp = (current: number, declared?: number) => (
     <span className="inline-flex items-center justify-end gap-1">
       <span>{ntd(current)}</span>
@@ -222,6 +170,14 @@ function BracketTab() {
       )}
     </span>
   );
+  type W = (typeof work)[number];
+  const columns: Column<W>[] = [
+    { key: "emp", header: "員工", freeze: true, sortValue: (w) => w.name, filterText: (w) => w.name, cell: (w) => w.name },
+    { key: "labor", header: "勞保（現 → 報）", numeric: true, sortValue: (w) => w.current.labor, cell: (w) => cmp(w.current.labor, w.declared?.labor) },
+    { key: "health", header: "健保（現 → 報）", numeric: true, sortValue: (w) => w.current.health, cell: (w) => cmp(w.current.health, w.declared?.health) },
+    { key: "pension", header: "勞退（現 → 報）", numeric: true, sortValue: (w) => w.current.pension, cell: (w) => cmp(w.current.pension, w.declared?.pension) },
+    { key: "status", header: "狀態", sortValue: (w) => (w.changed ? 1 : 0), filterText: (w) => (w.changed ? "需調整" : "一致"), cell: (w) => (!hasBaseline ? <span className="text-xs text-muted-foreground">—</span> : w.changed ? <Badge variant="warning">需調整</Badge> : <Badge variant="success">一致</Badge>) },
+  ];
 
   return (
     <Card className="print-block">
@@ -233,30 +189,22 @@ function BracketTab() {
             {hasBaseline ? `（已設基準，待調整 ${changed.length} 人）` : "（尚未設基準，請先設定）"}
           </CardDescription>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
-          <Button variant="outline" size="sm" onClick={setBaseline}>以目前為申報基準</Button>
-          <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>
-        </div>
       </CardHeader>
       <CardContent>
-        {rows.length === 0 ? (
-          <EmptyState title="當期無在職員工資料" hint="先在「每月薪資作業」建立當月在職名單。" compact />
-        ) : (
-          <Table zebra>
-            <TableHeader sticky><TableRow><TableHead>員工</TableHead><NumHead>勞保（現 → 報）</NumHead><NumHead>健保（現 → 報）</NumHead><NumHead>勞退（現 → 報）</NumHead><TableHead>狀態</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {work.map((w) => (
-                <TableRow key={w.employeeId} className={cn(w.changed && hasBaseline && "bg-amber-50")}>
-                  <TableCell className="font-medium">{w.name}</TableCell>
-                  <NumCell>{cmp(w.current.labor, w.declared?.labor)}</NumCell>
-                  <NumCell>{cmp(w.current.health, w.declared?.health)}</NumCell>
-                  <NumCell>{cmp(w.current.pension, w.declared?.pension)}</NumCell>
-                  <TableCell>{!hasBaseline ? <span className="text-xs text-muted-foreground">—</span> : w.changed ? <Badge variant="warning">需調整</Badge> : <Badge variant="success">一致</Badge>}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          rows={work}
+          columns={columns}
+          getRowKey={(w) => w.employeeId}
+          searchPlaceholder="搜尋員工…"
+          rowClassName={(w) => cn(w.changed && hasBaseline && "bg-amber-50")}
+          toolbar={<Button variant="outline" size="sm" onClick={setBaseline}>以目前為申報基準</Button>}
+          csv={{
+            headers: ["員工編號", "姓名", "目前勞保", "申報勞保", "目前健保", "申報健保", "目前勞退", "申報勞退", "需調整"],
+            row: (w) => [w.employeeId, w.name, w.current.labor, w.declared?.labor ?? "", w.current.health, w.declared?.health ?? "", w.current.pension, w.declared?.pension ?? "", w.changed ? "是" : ""],
+            fileName: `投保級距申報調整.csv`,
+          }}
+          empty={{ title: "當期無在職員工資料", hint: "先在「每月薪資作業」建立當月在職名單。" }}
+        />
       </CardContent>
     </Card>
   );

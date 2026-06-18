@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -150,6 +151,64 @@ export function MasterDataView() {
       },
     ]);
 
+  type EmpRow = {
+    emp: Employee; total: number; months: number; leaveDays: number;
+    hd: number; td: number; lowWage: boolean; noForm: boolean;
+  };
+  const empRows: EmpRow[] = employees.map((emp) => {
+    const s = salaries.find((x) => x.employeeId === emp.id) ?? blankSalary(emp.id);
+    const total = monthlySalaryTotal(s);
+    const months = seniorityMonths(emp.hireDate, parameters.seniorityBaseDate);
+    return {
+      emp, total, months, leaveDays: annualLeaveDays(months),
+      hd: dependents.filter((d) => d.employeeId === emp.id && d.enrolledInHealthInsurance).length,
+      td: dependents.filter((d) => d.employeeId === emp.id && d.taxDependent).length,
+      lowWage: total < parameters.minWageMonthly,
+      noForm: emp.taxResidency === "居住者" && !emp.exemptionFormReceivedDate,
+    };
+  });
+  const empColumns: Column<EmpRow>[] = [
+    {
+      key: "name", header: "員工", freeze: true,
+      sortValue: (r) => r.emp.name, filterText: (r) => `${r.emp.name} ${r.emp.id}`,
+      cell: (r) => (<><span className="font-medium">{r.emp.name}</span><span className="ml-1.5 text-xs text-muted-foreground">{r.emp.id}</span></>),
+    },
+    {
+      key: "dept", header: "部門／職稱", sortValue: (r) => r.emp.department,
+      filterText: (r) => `${r.emp.department} ${r.emp.title}`,
+      cell: (r) => (<span className="text-sm">{r.emp.department}{r.emp.title && <span className="text-muted-foreground">・{r.emp.title}</span>}</span>),
+    },
+    { key: "hire", header: "到職日", sortValue: (r) => r.emp.hireDate, cell: (r) => <span className="text-sm">{r.emp.hireDate}</span> },
+    { key: "sen", header: "年資", numeric: true, sortValue: (r) => r.months, cell: (r) => <span className="text-sm">{formatSeniority(r.months)}</span> },
+    { key: "leave", header: "特休", numeric: true, sortValue: (r) => r.leaveDays, cell: (r) => <span className="text-sm">{r.leaveDays} 天</span> },
+    {
+      key: "total", header: "月薪總額", numeric: true, sortValue: (r) => r.total,
+      cell: (r) => <span className="font-medium">{ntd(r.total)}</span>,
+      total: (rs) => ntd(rs.reduce((a, r) => a + r.total, 0)),
+    },
+    { key: "deps", header: "眷屬（健保/扶養）", numeric: true, sortValue: (r) => r.hd, cell: (r) => <span className="text-sm">{r.hd}／{r.td}</span> },
+    {
+      key: "flags", header: "提醒",
+      filterText: (r) => [r.emp.status !== "在職" ? r.emp.status : "", r.lowWage ? "低於最低工資" : "", r.noForm ? "免稅額申報表未收" : ""].join(" "),
+      cell: (r) => (
+        <div className="flex flex-wrap gap-1">
+          {r.emp.status && r.emp.status !== "在職" && <Badge variant="secondary">{r.emp.status}{r.emp.leaveDate ? `・${r.emp.leaveDate}` : ""}</Badge>}
+          {r.lowWage && <Badge variant="destructive">低於最低工資</Badge>}
+          {r.noForm && <Badge variant="warning">免稅額申報表未收</Badge>}
+        </div>
+      ),
+    },
+    {
+      key: "ops", header: "", headerClassName: "w-20",
+      cell: (r) => (
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" className="size-7" onClick={(e) => { e.stopPropagation(); openEdit(r.emp); }}><Pencil className="size-3.5" /></Button>
+          <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={(e) => { e.stopPropagation(); if (confirm(`刪除 ${r.emp.name} 的所有資料（含薪資、眷屬與結算紀錄）？`)) removeEmployee(r.emp.id); }}><Trash2 className="size-3.5" /></Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -186,82 +245,15 @@ export function MasterDataView() {
 
       <Card>
         <CardContent className="pt-6">
-          {employees.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              尚未建立員工。按右上角「新增員工」開始，或到「系統設定」載入範例公司資料。
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>員工</TableHead>
-                  <TableHead>部門／職稱</TableHead>
-                  <TableHead>到職日</TableHead>
-                  <TableHead className="text-right">年資</TableHead>
-                  <TableHead className="text-right">特休</TableHead>
-                  <TableHead className="text-right">月薪總額</TableHead>
-                  <TableHead className="text-center">眷屬（健保/扶養）</TableHead>
-                  <TableHead>提醒</TableHead>
-                  <TableHead className="w-20"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employees.map((emp) => {
-                  const s = salaries.find((x) => x.employeeId === emp.id) ?? blankSalary(emp.id);
-                  const total = monthlySalaryTotal(s);
-                  const months = seniorityMonths(emp.hireDate, parameters.seniorityBaseDate);
-                  const hd = dependents.filter((d) => d.employeeId === emp.id && d.enrolledInHealthInsurance).length;
-                  const td = dependents.filter((d) => d.employeeId === emp.id && d.taxDependent).length;
-                  const lowWage = total < parameters.minWageMonthly;
-                  const noForm = emp.taxResidency === "居住者" && !emp.exemptionFormReceivedDate;
-                  return (
-                    <TableRow key={emp.id}>
-                      <TableCell>
-                        <span className="font-medium">{emp.name}</span>
-                        <span className="ml-1.5 text-xs text-muted-foreground">{emp.id}</span>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {emp.department}
-                        {emp.title && <span className="text-muted-foreground">・{emp.title}</span>}
-                      </TableCell>
-                      <TableCell className="text-sm">{emp.hireDate}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{formatSeniority(months)}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{annualLeaveDays(months)} 天</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{ntd(total)}</TableCell>
-                      <TableCell className="text-center text-sm tabular-nums">{hd}／{td}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {emp.status && emp.status !== "在職" && (
-                            <Badge variant="secondary">{emp.status}{emp.leaveDate ? `・${emp.leaveDate}` : ""}</Badge>
-                          )}
-                          {lowWage && <Badge variant="destructive">低於最低工資</Badge>}
-                          {noForm && <Badge variant="warning">免稅額申報表未收</Badge>}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="size-7" onClick={() => openEdit(emp)}>
-                            <Pencil className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 text-destructive"
-                            onClick={() => {
-                              if (confirm(`刪除 ${emp.name} 的所有資料（含薪資、眷屬與結算紀錄）？`))
-                                removeEmployee(emp.id);
-                            }}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            rows={empRows}
+            columns={empColumns}
+            getRowKey={(r) => r.emp.id}
+            initialSort={{ key: "name", dir: "asc" }}
+            searchPlaceholder="搜尋姓名／編號／部門…"
+            onRowClick={(r) => openEdit(r.emp)}
+            empty={{ title: "尚未建立員工", hint: "按右上角「新增員工」開始，或到「系統設定 → 資料與安全」載入示範公司資料。", action: <Button size="sm" onClick={openNew}><UserPlus /> 新增員工</Button> }}
+          />
         </CardContent>
       </Card>
 

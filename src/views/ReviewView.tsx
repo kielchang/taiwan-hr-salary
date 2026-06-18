@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter, NumHead, NumCell, freezeFirst } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -69,6 +70,32 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
     saveSnapshot(buildSnapshot(rows, currentPeriod, bonusTotal)); // 留存當月實際，供年報累計
     confirmPeriod(currentPeriod);
   };
+
+  type OvRow = { r: (typeof rows)[number]; bonus: number; other: number };
+  const ovRows: OvRow[] = rows.map((r) => {
+    const ev = periodEvents.find((e) => e.employeeId === r.employeeId);
+    return { r, bonus: ev?.monthlyBonus ?? 0, other: r.leaveDeduction + (ev?.otherDeduction ?? 0) };
+  });
+  const sumOf = (f: (o: OvRow) => number) => (rs: OvRow[]) => ntd(rs.reduce((a, o) => a + f(o), 0));
+  const num = (key: string, header: string, get: (o: OvRow) => number, opts: { total?: boolean; className?: string } = {}): Column<OvRow> => ({
+    key, header, numeric: true, sortValue: (o) => get(o), cell: (o) => <span className={opts.className}>{ntd(get(o))}</span>,
+    ...(opts.total ? { total: sumOf(get) } : {}),
+  });
+  const ovColumns: Column<OvRow>[] = [
+    { key: "name", header: "員工", freeze: true, sortValue: (o) => o.r.name, filterText: (o) => `${o.r.name} ${o.r.department}`, cell: (o) => o.r.name },
+    num("salary", "月薪總額", (o) => o.r.salaryTotal, { total: true }),
+    num("ot", "加班費", (o) => o.r.overtimePay, { total: true }),
+    num("bonus", "獎金", (o) => o.bonus, { total: true }),
+    num("gross", "應發", (o) => o.r.grossPay, { total: true }),
+    num("labor", "勞保", (o) => o.r.premiums.laborEmployee),
+    num("health", "健保", (o) => o.r.premiums.healthEmployee),
+    num("pension", "勞退自提", (o) => o.r.premiums.pensionVoluntary),
+    num("supp", "補充保費", (o) => o.r.personalSupplementary),
+    num("tax", "所得稅", (o) => o.r.withheldTax),
+    num("other", "請假/其他", (o) => o.other),
+    num("net", "實發", (o) => o.r.netPay, { total: true, className: "font-semibold" }),
+    num("employer", "公司成本", (o) => o.r.employerTotalCost, { total: true, className: "text-muted-foreground" }),
+  ];
 
   return (
     <div className="space-y-4">
@@ -168,60 +195,18 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
       {tab === "overview" && (
         <Card className="print-block">
           <CardContent className="pt-6">
-            <Table zebra>
-              <TableHeader sticky>
-                <TableRow>
-                  <TableHead className={freezeFirst}>員工</TableHead>
-                  <NumHead>月薪總額</NumHead>
-                  <NumHead>加班費</NumHead>
-                  <NumHead>獎金</NumHead>
-                  <NumHead>應發</NumHead>
-                  <NumHead>勞保</NumHead>
-                  <NumHead>健保</NumHead>
-                  <NumHead>勞退自提</NumHead>
-                  <NumHead>補充保費</NumHead>
-                  <NumHead>所得稅</NumHead>
-                  <NumHead>請假/其他</NumHead>
-                  <NumHead className="font-semibold">實發</NumHead>
-                  <NumHead>公司成本</NumHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r) => {
-                  const ev = periodEvents.find((e) => e.employeeId === r.employeeId);
-                  const other = r.leaveDeduction + (ev?.otherDeduction ?? 0);
-                  return (
-                    <TableRow key={r.employeeId}>
-                      <TableCell className={cn(freezeFirst, "whitespace-nowrap font-medium")}>{r.name}</TableCell>
-                      <NumCell>{ntd(r.salaryTotal)}</NumCell>
-                      <NumCell>{ntd(r.overtimePay)}</NumCell>
-                      <NumCell>{ntd(ev?.monthlyBonus ?? 0)}</NumCell>
-                      <NumCell>{ntd(r.grossPay)}</NumCell>
-                      <NumCell>{ntd(r.premiums.laborEmployee)}</NumCell>
-                      <NumCell>{ntd(r.premiums.healthEmployee)}</NumCell>
-                      <NumCell>{ntd(r.premiums.pensionVoluntary)}</NumCell>
-                      <NumCell>{ntd(r.personalSupplementary)}</NumCell>
-                      <NumCell>{ntd(r.withheldTax)}</NumCell>
-                      <NumCell>{ntd(other)}</NumCell>
-                      <NumCell className="font-semibold">{ntd(r.netPay)}</NumCell>
-                      <NumCell className="text-muted-foreground">{ntd(r.employerTotalCost)}</NumCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell className={freezeFirst}>合計</TableCell>
-                  <NumCell>{ntd(rows.reduce((a, r) => a + r.salaryTotal, 0))}</NumCell>
-                  <NumCell>{ntd(rows.reduce((a, r) => a + r.overtimePay, 0))}</NumCell>
-                  <NumCell>{ntd(periodEvents.reduce((a, e) => a + e.monthlyBonus, 0))}</NumCell>
-                  <NumCell>{ntd(totals.gross)}</NumCell>
-                  <TableCell colSpan={6} />
-                  <NumCell className="font-bold">{ntd(totals.net)}</NumCell>
-                  <NumCell>{ntd(totals.employer)}</NumCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
+            <DataTable
+              rows={ovRows}
+              columns={ovColumns}
+              getRowKey={(o) => o.r.employeeId}
+              searchPlaceholder="搜尋員工／部門…"
+              csv={{
+                headers: ["員工", "月薪總額", "加班費", "獎金", "應發", "勞保", "健保", "勞退自提", "補充保費", "所得稅", "請假/其他", "實發", "公司成本"],
+                row: (o) => [o.r.name, o.r.salaryTotal, o.r.overtimePay, o.bonus, o.r.grossPay, o.r.premiums.laborEmployee, o.r.premiums.healthEmployee, o.r.premiums.pensionVoluntary, o.r.personalSupplementary, o.r.withheldTax, o.other, o.r.netPay, o.r.employerTotalCost],
+                fileName: `結算總覽_${currentPeriod}.csv`,
+              }}
+              empty={{ title: "本期尚無結算資料" }}
+            />
             {onNext && (
               <div className="mt-4 flex justify-end">
                 <Button variant="outline" onClick={onNext}>
