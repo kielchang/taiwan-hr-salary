@@ -22,6 +22,7 @@ import {
 import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, TrendChart, PALETTE } from "@/components/charts";
 import { Delta } from "@/components/ui/delta";
 import { DataTable } from "@/components/ui/data-table";
+import { ChartCard } from "@/components/ui/chart-card";
 import {
   analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
   analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost, type Insight,
@@ -241,49 +242,33 @@ function CostTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
         <Stat label="人數" value={`${rows.length} 人`} />
       </div>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">人事成本組成（全公司）</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <StackedBar rows={[{ label: "全公司", segments: SEGS.map((s) => ({ label: s.label, value: totals[s.key], color: s.color })) }]} />
-          <Legend items={SEGS.map((s) => ({ label: s.label, color: s.color }))} />
-          <p className="text-xs text-muted-foreground">
-            獎金/變動占比過高或加班費偏大，常是結構檢討重點；雇主負擔約為投保金額×費率×負擔比例。
-          </p>
-        </CardContent>
-      </Card>
+      <ChartCard title="人事成本組成（全公司）" legend={SEGS.map((s) => ({ label: s.label, color: s.color }))}>
+        <StackedBar rows={[{ label: "全公司", segments: SEGS.map((s) => ({ label: s.label, value: totals[s.key], color: s.color })) }]} />
+        <p className="text-xs text-muted-foreground">
+          獎金/變動占比過高或加班費偏大，常是結構檢討重點；雇主負擔約為投保金額×費率×負擔比例。
+        </p>
+      </ChartCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">部門別成本組成</CardTitle>
-          <CardDescription>點任一部門列，下方展開該部門逐人成本明細。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <StackedBar
-            rows={[...deptMap.entries()].map(([d, t]) => ({ label: d, segments: SEGS.map((s) => ({ label: s.label, value: t[s.key], color: s.color })) }))}
-            onSelectRow={(d) => { setSelDept((cur) => (cur === d ? null : d)); setSelEmp(null); }}
-            selectedRow={selDept}
-          />
-          <Legend items={SEGS.map((s) => ({ label: s.label, color: s.color }))} />
-        </CardContent>
-      </Card>
+      <ChartCard title="部門別成本組成" description="點任一部門列，下方展開該部門逐人成本明細。" legend={SEGS.map((s) => ({ label: s.label, color: s.color }))}>
+        <StackedBar
+          rows={[...deptMap.entries()].map(([d, t]) => ({ label: d, segments: SEGS.map((s) => ({ label: s.label, value: t[s.key], color: s.color })) }))}
+          onSelectRow={(d) => { setSelDept((cur) => (cur === d ? null : d)); setSelEmp(null); }}
+          selectedRow={selDept}
+        />
+      </ChartCard>
 
       {selDept && (
         <DetailPanel title={`部門明細：${selDept}`} onClose={() => setSelDept(null)}>
-          <Table>
-            <TableHeader><TableRow><TableHead>員工</TableHead>{SEGS.map((s) => <TableHead key={s.key} className="text-right">{s.label}</TableHead>)}<TableHead className="text-right">總成本</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {rows.filter((r) => (r.department || "（未填）") === selDept).map((r) => {
-                const c = comp(r);
-                return (
-                  <TableRow key={r.employeeId}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    {SEGS.map((s) => <TableCell key={s.key} className="text-right tabular-nums">{ntd(c[s.key])}</TableCell>)}
-                    <TableCell className="text-right font-medium tabular-nums">{ntd(r.employerTotalCost)}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            rows={rows.filter((r) => (r.department || "（未填）") === selDept)}
+            getRowKey={(r) => r.employeeId}
+            searchPlaceholder="搜尋員工…"
+            columns={[
+              { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => r.name, cell: (r) => r.name },
+              ...SEGS.map((s) => ({ key: s.key, header: s.label, numeric: true, sortValue: (r: PayrollRow) => comp(r)[s.key], cell: (r: PayrollRow) => ntd(comp(r)[s.key]), total: (rs: PayrollRow[]) => ntd(rs.reduce((a, r) => a + comp(r)[s.key], 0)) })),
+              { key: "total", header: "總成本", numeric: true, sortValue: (r) => r.employerTotalCost, cell: (r) => <span className="font-medium">{ntd(r.employerTotalCost)}</span>, total: (rs) => <span className="font-bold">{ntd(rs.reduce((a, r) => a + r.employerTotalCost, 0))}</span> },
+            ]}
+          />
         </DetailPanel>
       )}
 
@@ -420,23 +405,22 @@ function DistTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
 
 /** 共用：員工薪資小表（鑽取明細用） */
 function EmployeeMiniTable({ rows }: { rows: PayrollRow[] }) {
-  if (rows.length === 0) return <p className="py-4 text-center text-sm text-muted-foreground">此範圍沒有員工。</p>;
   return (
-    <Table>
-      <TableHeader><TableRow><TableHead>員工</TableHead><TableHead>部門</TableHead><TableHead className="text-right">年資(月)</TableHead><TableHead className="text-right">月薪資總額</TableHead><TableHead className="text-right">實發</TableHead><TableHead className="text-right">雇主總成本</TableHead></TableRow></TableHeader>
-      <TableBody>
-        {rows.map((r) => (
-          <TableRow key={r.employeeId}>
-            <TableCell className="font-medium">{r.name}</TableCell>
-            <TableCell className="text-sm">{r.department}</TableCell>
-            <TableCell className="text-right tabular-nums">{r.seniorityMonths}</TableCell>
-            <TableCell className="text-right tabular-nums">{ntd(r.salaryTotal)}</TableCell>
-            <TableCell className="text-right tabular-nums">{ntd(r.netPay)}</TableCell>
-            <TableCell className="text-right tabular-nums">{ntd(r.employerTotalCost)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <DataTable
+      rows={rows}
+      getRowKey={(r) => r.employeeId}
+      searchable={rows.length > 8}
+      searchPlaceholder="搜尋員工／部門…"
+      empty={{ title: "此範圍沒有員工" }}
+      columns={[
+        { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => `${r.name} ${r.department}`, cell: (r) => r.name },
+        { key: "dept", header: "部門", sortValue: (r) => r.department, cell: (r) => <span className="text-sm">{r.department}</span> },
+        { key: "sen", header: "年資(月)", numeric: true, sortValue: (r) => r.seniorityMonths, cell: (r) => r.seniorityMonths },
+        { key: "salary", header: "月薪資總額", numeric: true, sortValue: (r) => r.salaryTotal, cell: (r) => ntd(r.salaryTotal) },
+        { key: "net", header: "實發", numeric: true, sortValue: (r) => r.netPay, cell: (r) => ntd(r.netPay) },
+        { key: "cost", header: "雇主總成本", numeric: true, sortValue: (r) => r.employerTotalCost, cell: (r) => ntd(r.employerTotalCost) },
+      ]}
+    />
   );
 }
 
@@ -815,21 +799,19 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
 
       {selRating && (
         <DetailPanel title={`評等 ${selRating} 的逐人調薪`} onClose={() => setSelRating(null)}>
-          <Table>
-            <TableHeader><TableRow><TableHead>員工</TableHead><TableHead className="text-right">現職月薪</TableHead><TableHead className="text-right">調幅%</TableHead><TableHead className="text-right">調後月薪</TableHead><TableHead className="text-right">月增額</TableHead><TableHead className="text-right">年化成本增額</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {result.rows.filter((r) => r.ratingKey === selRating).map((r) => (
-                <TableRow key={r.employeeId}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.currentSalary)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.raisePct.toFixed(1)}%</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.newSalary)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.monthlyIncrease)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.annualizedCostDelta)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            rows={result.rows.filter((r) => r.ratingKey === selRating)}
+            getRowKey={(r) => r.employeeId}
+            searchable={false}
+            columns={[
+              { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, cell: (r) => r.name },
+              { key: "cur", header: "現職月薪", numeric: true, sortValue: (r) => r.currentSalary, cell: (r) => ntd(r.currentSalary) },
+              { key: "pct", header: "調幅%", numeric: true, sortValue: (r) => r.raisePct, cell: (r) => `${r.raisePct.toFixed(1)}%` },
+              { key: "new", header: "調後月薪", numeric: true, sortValue: (r) => r.newSalary, cell: (r) => ntd(r.newSalary) },
+              { key: "inc", header: "月增額", numeric: true, sortValue: (r) => r.monthlyIncrease, cell: (r) => ntd(r.monthlyIncrease) },
+              { key: "ann", header: "年化成本增額", numeric: true, sortValue: (r) => r.annualizedCostDelta, cell: (r) => ntd(r.annualizedCostDelta) },
+            ]}
+          />
         </DetailPanel>
       )}
 
@@ -867,21 +849,19 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
               <Info className="mt-0.5 size-4 shrink-0" />
               此操作會把 {changedRows.length} 人的調後月薪<strong>寫回薪資結構（差額套在本薪）</strong>，並留下稽核紀錄；之後當月結算會自動以新薪資計算。試算僅本次套用，請確認無誤。
             </div>
-            <div className="max-h-[50vh] overflow-auto rounded-md border">
-              <Table>
-                <TableHeader><TableRow><TableHead>員工</TableHead><TableHead className="text-right">現職月薪</TableHead><TableHead className="text-right">調後月薪</TableHead><TableHead className="text-right">調幅</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {changedRows.map((r) => (
-                    <TableRow key={r.employeeId}>
-                      <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.currentSalary)}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{ntd(r.newSalary)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.raisePct.toFixed(1)}%</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              rows={changedRows}
+              getRowKey={(r) => r.employeeId}
+              maxHeight="max-h-[50vh]"
+              searchable={changedRows.length > 8}
+              searchPlaceholder="搜尋員工…"
+              columns={[
+                { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => r.name, cell: (r) => r.name },
+                { key: "cur", header: "現職月薪", numeric: true, sortValue: (r) => r.currentSalary, cell: (r) => ntd(r.currentSalary) },
+                { key: "new", header: "調後月薪", numeric: true, sortValue: (r) => r.newSalary, cell: (r) => <span className="font-medium">{ntd(r.newSalary)}</span> },
+                { key: "pct", header: "調幅", numeric: true, sortValue: (r) => r.raisePct, cell: (r) => `${r.raisePct.toFixed(1)}%` },
+              ]}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApplyOpen(false)}>取消</Button>
