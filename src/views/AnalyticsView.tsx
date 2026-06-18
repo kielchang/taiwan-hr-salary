@@ -21,6 +21,7 @@ import {
 } from "@/lib/analytics";
 import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, TrendChart, PALETTE } from "@/components/charts";
 import { Delta } from "@/components/ui/delta";
+import { DataTable } from "@/components/ui/data-table";
 import {
   analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
   analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost, type Insight,
@@ -512,30 +513,28 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">員工級距指派與 compa-ratio</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>員工</TableHead><TableHead>部門</TableHead><TableHead className="text-right">月薪</TableHead><TableHead>級距</TableHead><TableHead className="text-right">compa-ratio</TableHead><TableHead className="text-right">市場 compa</TableHead><TableHead className="text-right">區間滲透率</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {basis.map((b) => (
-                <TableRow key={b.employeeId}>
-                  <TableCell className="font-medium">{b.name}</TableCell>
-                  <TableCell className="text-sm">{b.department}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(b.base)}</TableCell>
-                  <TableCell>
-                    <Select value={b.grade?.id ?? NONE} onValueChange={(v) => setEmployeeGrade(b.employeeId, v === NONE ? null : v)}>
-                      <SelectTrigger className="h-8 w-32 col-input"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE}>未指派</SelectItem>
-                        {grades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{b.compaRatio == null ? "—" : ratioPct(b.compaRatio)}</TableCell>
-                  <TableCell className={cn("text-right tabular-nums", b.marketCompaRatio != null && b.marketCompaRatio < 0.9 && "text-amber-600 font-medium")}>{b.marketCompaRatio == null ? "—" : ratioPct(b.marketCompaRatio)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{b.rangePenetration == null ? "—" : pctOf(b.rangePenetration, 0)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            rows={basis}
+            getRowKey={(b) => b.employeeId}
+            searchPlaceholder="搜尋員工／部門…"
+            columns={[
+              { key: "name", header: "員工", freeze: true, sortValue: (b) => b.name, filterText: (b) => `${b.name} ${b.department}`, cell: (b) => b.name },
+              { key: "dept", header: "部門", sortValue: (b) => b.department, cell: (b) => <span className="text-sm">{b.department}</span> },
+              { key: "base", header: "月薪", numeric: true, sortValue: (b) => b.base, cell: (b) => ntd(b.base) },
+              { key: "grade", header: "級距", sortValue: (b) => b.grade?.name ?? "", cell: (b) => (
+                <Select value={b.grade?.id ?? NONE} onValueChange={(v) => setEmployeeGrade(b.employeeId, v === NONE ? null : v)}>
+                  <SelectTrigger className="h-8 w-32 col-input"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>未指派</SelectItem>
+                    {grades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) },
+              { key: "compa", header: "compa-ratio", numeric: true, sortValue: (b) => b.compaRatio ?? -1, cell: (b) => (b.compaRatio == null ? "—" : ratioPct(b.compaRatio)) },
+              { key: "mcompa", header: "市場 compa", numeric: true, sortValue: (b) => b.marketCompaRatio ?? -1, cell: (b) => <span className={cn(b.marketCompaRatio != null && b.marketCompaRatio < 0.9 && "text-amber-600 font-medium")}>{b.marketCompaRatio == null ? "—" : ratioPct(b.marketCompaRatio)}</span> },
+              { key: "pen", header: "區間滲透率", numeric: true, sortValue: (b) => b.rangePenetration ?? -1, cell: (b) => (b.rangePenetration == null ? "—" : pctOf(b.rangePenetration, 0)) },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -625,27 +624,24 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
           <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>員工</TableHead><TableHead>部門</TableHead><TableHead>績效</TableHead><TableHead className="text-right">月薪</TableHead><TableHead className="text-right">試算獎金</TableHead><TableHead className="text-right">二代健保</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {result.rows.map((r) => (
-                <TableRow key={r.employeeId}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="text-sm">{r.department}</TableCell>
-                  <TableCell>
-                    <Select value={r.ratingKey} onValueChange={(v) => setEmployeeRating(r.employeeId, v)}>
-                      <SelectTrigger className="h-8 w-24 col-input"><SelectValue /></SelectTrigger>
-                      <SelectContent>{analytics.ratingTiers.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.base)}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{ntd(r.bonus)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">{ntd(r.supplementary)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter><TableRow><TableCell colSpan={4}>合計</TableCell><TableCell className="text-right font-bold tabular-nums">{ntd(result.totalBonus)}</TableCell><TableCell className="text-right tabular-nums">{ntd(result.totalSupplementary)}</TableCell></TableRow></TableFooter>
-          </Table>
+          <DataTable
+            rows={result.rows}
+            getRowKey={(r) => r.employeeId}
+            searchPlaceholder="搜尋員工／部門…"
+            columns={[
+              { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => `${r.name} ${r.department}`, cell: (r) => r.name },
+              { key: "dept", header: "部門", sortValue: (r) => r.department, cell: (r) => <span className="text-sm">{r.department}</span> },
+              { key: "rating", header: "績效", sortValue: (r) => r.ratingKey, cell: (r) => (
+                <Select value={r.ratingKey} onValueChange={(v) => setEmployeeRating(r.employeeId, v)}>
+                  <SelectTrigger className="h-8 w-24 col-input"><SelectValue /></SelectTrigger>
+                  <SelectContent>{analytics.ratingTiers.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>)}</SelectContent>
+                </Select>
+              ) },
+              { key: "base", header: "月薪", numeric: true, sortValue: (r) => r.base, cell: (r) => ntd(r.base) },
+              { key: "bonus", header: "試算獎金", numeric: true, sortValue: (r) => r.bonus, cell: (r) => <span className="font-medium">{ntd(r.bonus)}</span>, total: () => <span className="font-bold">{ntd(result.totalBonus)}</span> },
+              { key: "supp", header: "二代健保", numeric: true, sortValue: (r) => r.supplementary, cell: (r) => <span className="text-muted-foreground">{ntd(r.supplementary)}</span>, total: () => ntd(result.totalSupplementary) },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -790,25 +786,22 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>員工</TableHead><TableHead>績效</TableHead><TableHead className="text-right">現職月薪</TableHead><TableHead className="text-right">調幅%</TableHead><TableHead className="text-right">調後月薪</TableHead><TableHead className="text-right">月增額</TableHead><TableHead className="text-right">Δ雇主負擔</TableHead><TableHead className="text-right">年化成本增額</TableHead><TableHead className="text-right">調後compa</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {result.rows.map((r) => (
-                <TableRow key={r.employeeId}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell><Badge variant="outline">{r.ratingKey}</Badge></TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.currentSalary)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.raisePct.toFixed(1)}%</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{ntd(r.newSalary)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.monthlyIncrease)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">{ntd(r.employerDelta)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.annualizedCostDelta)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.newCompaRatio == null ? "—" : r.newCompaRatio.toFixed(2)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter><TableRow><TableCell colSpan={5}>合計</TableCell><TableCell className="text-right font-bold tabular-nums">{ntd(result.totalMonthlyIncrease)}</TableCell><TableCell /><TableCell className="text-right font-bold tabular-nums">{ntd(result.totalAnnualizedCostDelta)}</TableCell><TableCell /></TableRow></TableFooter>
-          </Table>
+          <DataTable
+            rows={result.rows}
+            getRowKey={(r) => r.employeeId}
+            searchPlaceholder="搜尋員工…"
+            columns={[
+              { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => `${r.name} ${r.ratingKey}`, cell: (r) => r.name },
+              { key: "rating", header: "績效", sortValue: (r) => r.ratingKey, cell: (r) => <Badge variant="outline">{r.ratingKey}</Badge> },
+              { key: "cur", header: "現職月薪", numeric: true, sortValue: (r) => r.currentSalary, cell: (r) => ntd(r.currentSalary) },
+              { key: "pct", header: "調幅%", numeric: true, sortValue: (r) => r.raisePct, cell: (r) => `${r.raisePct.toFixed(1)}%` },
+              { key: "new", header: "調後月薪", numeric: true, sortValue: (r) => r.newSalary, cell: (r) => <span className="font-medium">{ntd(r.newSalary)}</span> },
+              { key: "inc", header: "月增額", numeric: true, sortValue: (r) => r.monthlyIncrease, cell: (r) => ntd(r.monthlyIncrease), total: () => <span className="font-bold">{ntd(result.totalMonthlyIncrease)}</span> },
+              { key: "edelta", header: "Δ雇主負擔", numeric: true, sortValue: (r) => r.employerDelta, cell: (r) => <span className="text-muted-foreground">{ntd(r.employerDelta)}</span> },
+              { key: "annual", header: "年化成本增額", numeric: true, sortValue: (r) => r.annualizedCostDelta, cell: (r) => ntd(r.annualizedCostDelta), total: () => <span className="font-bold">{ntd(result.totalAnnualizedCostDelta)}</span> },
+              { key: "compa", header: "調後compa", numeric: true, sortValue: (r) => r.newCompaRatio ?? -1, cell: (r) => (r.newCompaRatio == null ? "—" : ratioPct(r.newCompaRatio)) },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -972,23 +965,22 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
           <CardTitle className="text-base">逐專案明細（含預算 vs 實際）</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>專案</TableHead><TableHead className="text-right">工時</TableHead><TableHead className="text-right">FTE</TableHead><TableHead className="text-right">總成本</TableHead><TableHead className="text-right">占比</TableHead><TableHead className="text-right">期間預算</TableHead><TableHead className="text-right">差異</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {shown.map((p) => (
-                <TableRow key={p.projectId} className={cn(p.projectId === UNALLOCATED_ID && "text-muted-foreground")}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.hours || "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.hours ? p.fte.toFixed(2) : "—"}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{ntd(p.totalCost)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{pctOf(p.pctOfCompany)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.budget ? ntd(p.budget) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.budget ? <Delta value={p.variance} posLabel="餘 " negLabel="超 " /> : "—"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter><TableRow><TableCell>合計</TableCell><TableCell className="text-right tabular-nums">{result.totalDirectHours || "—"}</TableCell><TableCell /><TableCell className="text-right font-bold tabular-nums">{ntd(result.companyTotal)}</TableCell><TableCell className="text-right">100%</TableCell><TableCell colSpan={2} /></TableRow></TableFooter>
-          </Table>
+          <DataTable
+            rows={shown}
+            getRowKey={(p) => p.projectId}
+            initialSort={{ key: "cost", dir: "desc" }}
+            searchable={false}
+            rowClassName={(p) => cn(p.projectId === UNALLOCATED_ID && "text-muted-foreground")}
+            columns={[
+              { key: "name", header: "專案", sortValue: (p) => p.name, cell: (p) => p.name },
+              { key: "hours", header: "工時", numeric: true, sortValue: (p) => p.hours, cell: (p) => p.hours || "—", total: () => result.totalDirectHours || "—" },
+              { key: "fte", header: "FTE", numeric: true, sortValue: (p) => p.fte, cell: (p) => (p.hours ? p.fte.toFixed(2) : "—") },
+              { key: "cost", header: "總成本", numeric: true, sortValue: (p) => p.totalCost, cell: (p) => <span className="font-medium">{ntd(p.totalCost)}</span>, total: () => <span className="font-bold">{ntd(result.companyTotal)}</span> },
+              { key: "pct", header: "占比", numeric: true, sortValue: (p) => p.pctOfCompany, cell: (p) => pctOf(p.pctOfCompany), total: () => "100%" },
+              { key: "budget", header: "期間預算", numeric: true, sortValue: (p) => p.budget, cell: (p) => (p.budget ? ntd(p.budget) : "—") },
+              { key: "var", header: "差異", numeric: true, sortValue: (p) => p.variance, cell: (p) => (p.budget ? <Delta value={p.variance} posLabel="餘 " negLabel="超 " /> : "—") },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -1245,24 +1237,25 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
                   <TrendChart data={sorted.map((s) => ({ label: s.period, value: Number(s.gini.toFixed(3)) }))} color={PALETTE[3]} valueFmt={(n) => n.toFixed(3)} zeroBased={false} selectedIndex={selIdx} onSelect={(it) => togglePeriod(it.label)} />
                 </div>
               </div>
-              <Table>
-                <TableHeader><TableRow><TableHead>期間</TableHead><TableHead className="text-right">人數</TableHead><TableHead className="text-right">月薪資總額</TableHead><TableHead className="text-right">中位薪資</TableHead><TableHead className="text-right">總成本</TableHead><TableHead className="text-right">加班費</TableHead><TableHead className="text-right">獎金</TableHead><TableHead className="text-right">Gini</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
-                <TableBody>
-                  {sorted.map((s) => (
-                    <TableRow key={s.period} className={cn("cursor-pointer", selPeriod === s.period && "bg-accent/60")} onClick={() => togglePeriod(s.period)}>
-                      <TableCell className="font-medium">{s.period}</TableCell>
-                      <TableCell className="text-right tabular-nums">{s.headcount}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(s.totalSalary)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(s.medianSalary)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(s.totalCost)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(s.overtimePay)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(s.bonusTotal)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{s.gini.toFixed(3)}</TableCell>
-                      <TableCell><Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => removeSnapshot(s.period)}><Trash2 className="size-3.5" /></Button></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable
+                rows={sorted}
+                getRowKey={(s) => s.period}
+                searchable={false}
+                initialSort={{ key: "period", dir: "desc" }}
+                rowClassName={(s) => cn(selPeriod === s.period && "bg-accent/60")}
+                onRowClick={(s) => togglePeriod(s.period)}
+                columns={[
+                  { key: "period", header: "期間", sortValue: (s) => s.period, cell: (s) => <span className="font-medium">{s.period}</span> },
+                  { key: "hc", header: "人數", numeric: true, sortValue: (s) => s.headcount, cell: (s) => s.headcount },
+                  { key: "tsal", header: "月薪資總額", numeric: true, sortValue: (s) => s.totalSalary, cell: (s) => ntd(s.totalSalary) },
+                  { key: "med", header: "中位薪資", numeric: true, sortValue: (s) => s.medianSalary, cell: (s) => ntd(s.medianSalary) },
+                  { key: "cost", header: "總成本", numeric: true, sortValue: (s) => s.totalCost, cell: (s) => ntd(s.totalCost) },
+                  { key: "ot", header: "加班費", numeric: true, sortValue: (s) => s.overtimePay, cell: (s) => ntd(s.overtimePay) },
+                  { key: "bonus", header: "獎金", numeric: true, sortValue: (s) => s.bonusTotal, cell: (s) => ntd(s.bonusTotal) },
+                  { key: "gini", header: "Gini", numeric: true, sortValue: (s) => s.gini, cell: (s) => s.gini.toFixed(3) },
+                  { key: "del", header: "", headerClassName: "w-10", cell: (s) => <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={(e) => { e.stopPropagation(); removeSnapshot(s.period); }}><Trash2 className="size-3.5" /></Button> },
+                ]}
+              />
             </>
           )}
         </CardContent>
