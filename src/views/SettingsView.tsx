@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { BracketTableCards } from "@/components/BracketTableCards";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,7 @@ import { parseIpList } from "@/lib/attendance";
 import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
 import { csvSerialize } from "@/lib/csv";
-import { cn } from "@/lib/utils";
+import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban } from "lucide-react";
@@ -299,25 +299,20 @@ export function SettingsView() {
             <Button variant="outline" size="sm" onClick={exportAudit} disabled={auditLog.length === 0}><Download /> 匯出紀錄 CSV</Button>
             <Button variant="outline" size="sm" onClick={() => { if (confirm("清空操作紀錄？")) clearAuditLog(); }} disabled={auditLog.length === 0}><Trash2 /> 清空紀錄</Button>
           </div>
-          {auditLog.length === 0 ? (
-            <p className="text-xs text-muted-foreground">尚無紀錄。</p>
-          ) : (
-            <div className="max-h-72 overflow-auto rounded-md border">
-              <Table>
-                <TableHeader><TableRow><TableHead className="w-36">時間</TableHead><TableHead>操作者</TableHead><TableHead>類別</TableHead><TableHead>說明</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {auditLog.slice(0, 100).map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="text-xs tabular-nums text-muted-foreground">{new Date(a.at).toLocaleString()}</TableCell>
-                      <TableCell className="text-sm">{a.actor}</TableCell>
-                      <TableCell><Badge variant="outline">{AUDIT_LABEL[a.action]}</Badge></TableCell>
-                      <TableCell className="text-sm">{a.summary}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <DataTable
+            rows={auditLog}
+            getRowKey={(a) => a.id}
+            initialSort={{ key: "time", dir: "desc" }}
+            searchPlaceholder="搜尋操作者／說明…"
+            maxHeight="max-h-96"
+            empty={{ title: "尚無操作紀錄" }}
+            columns={[
+              { key: "time", header: "時間", headerClassName: "w-36", sortValue: (a) => a.at, cell: (a) => <span className="text-xs tabular-nums text-muted-foreground">{new Date(a.at).toLocaleString()}</span> },
+              { key: "actor", header: "操作者", sortValue: (a) => a.actor, filterText: (a) => a.actor, cell: (a) => <span className="text-sm">{a.actor}</span> },
+              { key: "action", header: "類別", sortValue: (a) => AUDIT_LABEL[a.action], filterText: (a) => AUDIT_LABEL[a.action], cell: (a) => <Badge variant="outline">{AUDIT_LABEL[a.action]}</Badge> },
+              { key: "summary", header: "說明", sortValue: (a) => a.summary, filterText: (a) => a.summary, cell: (a) => <span className="text-sm">{a.summary}</span> },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -383,31 +378,26 @@ export function ProjectMasterCard() {
         <Button size="sm" onClick={() => { setDraft(blank()); setOpen(true); }}><Plus /> 新增專案</Button>
       </CardHeader>
       <CardContent>
-        {projects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">尚未建立專案。</p>
-        ) : (
-          <Table>
-            <TableHeader><TableRow><TableHead>代號</TableHead><TableHead>名稱</TableHead><TableHead>PM</TableHead><TableHead className="text-right">預算</TableHead><TableHead>期間</TableHead><TableHead>狀態</TableHead><TableHead className="w-16" /></TableRow></TableHeader>
-            <TableBody>
-              {projects.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.code}</TableCell>
-                  <TableCell>{p.name}</TableCell>
-                  <TableCell className="text-sm">{p.manager}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.budget ? p.budget.toLocaleString() : "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{p.startDate || "—"}～{p.endDate || "—"}</TableCell>
-                  <TableCell><Badge variant={p.status === "進行中" ? "success" : "secondary"}>{p.status}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="size-7" onClick={() => { setDraft({ ...p }); setOpen(true); }}><Pencil className="size-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => { if (confirm(`刪除專案 ${p.name}？（既有分攤中對此專案的設定會一併移除）`)) removeProject(p.id); }}><Trash2 className="size-3.5" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          rows={projects}
+          getRowKey={(p) => p.id}
+          searchPlaceholder="搜尋代號／名稱／PM…"
+          empty={{ title: "尚未建立專案" }}
+          columns={[
+            { key: "code", header: "代號", freeze: true, sortValue: (p) => p.code, filterText: (p) => `${p.code} ${p.name} ${p.manager}`, cell: (p) => <span className="font-medium">{p.code}</span> },
+            { key: "name", header: "名稱", sortValue: (p) => p.name, cell: (p) => p.name },
+            { key: "pm", header: "PM", sortValue: (p) => p.manager, cell: (p) => <span className="text-sm">{p.manager}</span> },
+            { key: "budget", header: "預算", numeric: true, sortValue: (p) => p.budget, cell: (p) => (p.budget ? ntd(p.budget) : "—") },
+            { key: "period", header: "期間", sortValue: (p) => p.startDate, cell: (p) => <span className="text-xs text-muted-foreground">{p.startDate || "—"}～{p.endDate || "—"}</span> },
+            { key: "status", header: "狀態", sortValue: (p) => p.status, filterText: (p) => p.status, cell: (p) => <Badge variant={p.status === "進行中" ? "success" : "secondary"}>{p.status}</Badge> },
+            { key: "ops", header: "", headerClassName: "w-16", cell: (p) => (
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" className="size-7" onClick={() => { setDraft({ ...p }); setOpen(true); }}><Pencil className="size-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => { if (confirm(`刪除專案 ${p.name}？（既有分攤中對此專案的設定會一併移除）`)) removeProject(p.id); }}><Trash2 className="size-3.5" /></Button>
+              </div>
+            ) },
+          ]}
+        />
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>

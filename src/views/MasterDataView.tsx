@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -515,38 +514,25 @@ export function MasterDataView() {
                 )}
                 <span className="text-xs text-muted-foreground">同編號將覆蓋既有員工。</span>
               </div>
-              <div className="max-h-[50vh] overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">列</TableHead><TableHead>編號／姓名</TableHead>
-                      <TableHead className="text-right">月薪總額</TableHead><TableHead>檢查</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {preview.rows.map((r) => {
-                      const total = monthlySalaryTotal(r.salary);
-                      return (
-                        <TableRow key={r.row} className={cn(r.errors.length && "bg-destructive/5")}>
-                          <TableCell className="text-xs text-muted-foreground">{r.row}</TableCell>
-                          <TableCell className="text-sm">
-                            <span className="font-medium">{r.employee.name || "（缺姓名）"}</span>
-                            <span className="ml-1.5 text-xs text-muted-foreground">{r.employee.id || "（缺編號）"}</span>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">{ntd(total)}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {r.errors.map((m, i) => <Badge key={`e${i}`} variant="destructive">{m}</Badge>)}
-                              {r.warnings.map((m, i) => <Badge key={`w${i}`} variant="warning">{m}</Badge>)}
-                              {r.errors.length === 0 && r.warnings.length === 0 && <span className="text-xs text-muted-foreground">OK</span>}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+              <DataTable
+                rows={preview.rows}
+                getRowKey={(r) => String(r.row)}
+                maxHeight="max-h-[50vh]"
+                searchPlaceholder="搜尋編號／姓名…"
+                rowClassName={(r) => cn(r.errors.length && "bg-destructive/5")}
+                columns={[
+                  { key: "row", header: "列", numeric: true, sortValue: (r) => r.row, cell: (r) => <span className="text-xs text-muted-foreground">{r.row}</span> },
+                  { key: "emp", header: "編號／姓名", sortValue: (r) => r.employee.name, filterText: (r) => `${r.employee.name} ${r.employee.id}`, cell: (r) => (<span className="text-sm"><span className="font-medium">{r.employee.name || "（缺姓名）"}</span><span className="ml-1.5 text-xs text-muted-foreground">{r.employee.id || "（缺編號）"}</span></span>) },
+                  { key: "total", header: "月薪總額", numeric: true, sortValue: (r) => monthlySalaryTotal(r.salary), cell: (r) => ntd(monthlySalaryTotal(r.salary)) },
+                  { key: "check", header: "檢查", filterText: (r) => [...r.errors, ...r.warnings].join(" "), cell: (r) => (
+                    <div className="flex flex-wrap gap-1">
+                      {r.errors.map((m, i) => <Badge key={`e${i}`} variant="destructive">{m}</Badge>)}
+                      {r.warnings.map((m, i) => <Badge key={`w${i}`} variant="warning">{m}</Badge>)}
+                      {r.errors.length === 0 && r.warnings.length === 0 && <span className="text-xs text-muted-foreground">OK</span>}
+                    </div>
+                  ) },
+                ]}
+              />
             </div>
           )}
           <DialogFooter>

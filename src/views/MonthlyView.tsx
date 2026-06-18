@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,11 +59,6 @@ export function MonthlyView({
     const r = calculatePayroll(emp, getSalary(emp.id), dependents, ev, parameters, brackets);
     return { emp, ev, r };
   });
-  const totals = rows.reduce(
-    (a, { r }) => ({ gross: a.gross + r.grossPay, ded: a.ded + r.totalDeductions, net: a.net + r.netPay }),
-    { gross: 0, ded: 0, net: 0 },
-  );
-
   // 編輯視窗的即時試算（含稅額建議）
   const editingEmp = employees.find((e) => e.id === editing);
   const liveResult =
@@ -104,64 +99,28 @@ export function MonthlyView({
       ) : (
         <Card>
           <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>員工</TableHead>
-                  <TableHead>本月異動</TableHead>
-                  <TableHead className="text-right">應發</TableHead>
-                  <TableHead className="text-right">代扣合計</TableHead>
-                  <TableHead className="text-right">實發</TableHead>
-                  <TableHead className="w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map(({ emp, ev, r }) => {
+            <DataTable
+              rows={rows}
+              getRowKey={({ emp }) => emp.id}
+              searchPlaceholder="搜尋姓名／部門…"
+              columns={[
+                { key: "name", header: "員工", freeze: true, sortValue: ({ emp }) => emp.name, filterText: ({ emp }) => `${emp.name} ${emp.department}`, cell: ({ emp }) => (<><span className="font-medium">{emp.name}</span><span className="ml-1.5 text-xs text-muted-foreground">{emp.department}</span></>) },
+                { key: "events", header: "本月異動", filterText: ({ ev }) => summarize(ev).join(" "), cell: ({ ev, r }) => {
                   const chips = summarize(ev);
-                  const needTax =
-                    r.withholdingSuggestion.type === "manual-lookup" && ev.withheldTax === null;
+                  const needTax = r.withholdingSuggestion.type === "manual-lookup" && ev.withheldTax === null;
                   return (
-                    <TableRow key={emp.id}>
-                      <TableCell>
-                        <span className="font-medium">{emp.name}</span>
-                        <span className="ml-1.5 text-xs text-muted-foreground">{emp.department}</span>
-                      </TableCell>
-                      <TableCell>
-                        {chips.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">無異動（固定薪資）</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {chips.map((c) => (
-                              <Badge key={c} variant="secondary">{c}</Badge>
-                            ))}
-                          </div>
-                        )}
-                        {needTax && (
-                          <Badge variant="warning" className="mt-1">需查稅額表填稅額</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(r.grossPay)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">−{ntd(r.totalDeductions)}</TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">{ntd(r.netPay)}</TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => openEdit(emp.id)}>
-                          <Pencil className="size-3.5" /> 編輯
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    <>
+                      {chips.length === 0 ? <span className="text-xs text-muted-foreground">無異動（固定薪資）</span> : <div className="flex flex-wrap gap-1">{chips.map((c) => <Badge key={c} variant="secondary">{c}</Badge>)}</div>}
+                      {needTax && <Badge variant="warning" className="mt-1">需查稅額表填稅額</Badge>}
+                    </>
                   );
-                })}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={2}>合計（{rows.length} 人）</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(totals.gross)}</TableCell>
-                  <TableCell className="text-right tabular-nums">−{ntd(totals.ded)}</TableCell>
-                  <TableCell className="text-right font-bold tabular-nums">{ntd(totals.net)}</TableCell>
-                  <TableCell />
-                </TableRow>
-              </TableFooter>
-            </Table>
+                } },
+                { key: "gross", header: "應發", numeric: true, sortValue: ({ r }) => r.grossPay, cell: ({ r }) => ntd(r.grossPay), total: (rs) => ntd(rs.reduce((a, { r }) => a + r.grossPay, 0)) },
+                { key: "ded", header: "代扣合計", numeric: true, sortValue: ({ r }) => r.totalDeductions, cell: ({ r }) => <span className="text-muted-foreground">−{ntd(r.totalDeductions)}</span>, total: (rs) => `−${ntd(rs.reduce((a, { r }) => a + r.totalDeductions, 0))}` },
+                { key: "net", header: "實發", numeric: true, sortValue: ({ r }) => r.netPay, cell: ({ r }) => <span className="font-semibold">{ntd(r.netPay)}</span>, total: (rs) => <span className="font-bold">{ntd(rs.reduce((a, { r }) => a + r.netPay, 0))}</span> },
+                { key: "ops", header: "", headerClassName: "w-24", cell: ({ emp }) => <Button variant="outline" size="sm" onClick={() => openEdit(emp.id)}><Pencil className="size-3.5" /> 編輯</Button> },
+              ]}
+            />
 
             {onNext && (
               <div className="mt-4 flex justify-end">

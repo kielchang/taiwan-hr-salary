@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -241,38 +241,20 @@ export function AttendanceView() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {daySummaries.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">該日尚無打卡紀錄。</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>員工</TableHead>
-                  <TableHead>上班</TableHead>
-                  <TableHead>下班</TableHead>
-                  <TableHead className="text-right">工時</TableHead>
-                  <TableHead>建議下班</TableHead>
-                  <TableHead>狀態</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {daySummaries.map((d) => (
-                  <TableRow key={d.employeeId}>
-                    <TableCell className="font-medium">{nameById[d.employeeId] ?? d.employeeId}</TableCell>
-                    <TableCell className="tabular-nums">{hhmm(d.firstIn)}</TableCell>
-                    <TableCell className="tabular-nums">{hhmm(d.lastOut)}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {d.workedMinutes != null ? formatMinutes(d.workedMinutes) : "—"}
-                    </TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">{hhmm(d.expectedOutISO)}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant(d)}>{d.status}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            rows={daySummaries}
+            getRowKey={(d) => d.employeeId}
+            searchPlaceholder="搜尋員工／狀態…"
+            empty={{ title: "該日尚無打卡紀錄" }}
+            columns={[
+              { key: "name", header: "員工", freeze: true, sortValue: (d) => nameById[d.employeeId] ?? d.employeeId, filterText: (d) => `${nameById[d.employeeId] ?? d.employeeId} ${d.status}`, cell: (d) => nameById[d.employeeId] ?? d.employeeId },
+              { key: "in", header: "上班", sortValue: (d) => d.firstIn ?? "", cell: (d) => <span className="tabular-nums">{hhmm(d.firstIn)}</span> },
+              { key: "out", header: "下班", sortValue: (d) => d.lastOut ?? "", cell: (d) => <span className="tabular-nums">{hhmm(d.lastOut)}</span> },
+              { key: "worked", header: "工時", numeric: true, sortValue: (d) => d.workedMinutes ?? -1, cell: (d) => (d.workedMinutes != null ? formatMinutes(d.workedMinutes) : "—") },
+              { key: "exp", header: "建議下班", sortValue: (d) => d.expectedOutISO ?? "", cell: (d) => <span className="tabular-nums text-muted-foreground">{hhmm(d.expectedOutISO)}</span> },
+              { key: "status", header: "狀態", sortValue: (d) => d.status, cell: (d) => <Badge variant={statusVariant(d)}>{d.status}</Badge> },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -317,55 +299,22 @@ export function AttendanceView() {
           </div>
         </CardHeader>
         <CardContent>
-          {todayPunches.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">今日尚無打卡紀錄。</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>時間</TableHead>
-                  <TableHead>員工</TableHead>
-                  <TableHead>類型</TableHead>
-                  <TableHead className="text-right">距公司</TableHead>
-                  <TableHead className="text-right">精度</TableHead>
-                  <TableHead className="text-center">範圍</TableHead>
-                  {attendance.ipCheckEnabled && <TableHead>IP</TableHead>}
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {todayPunches.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="tabular-nums">{new Date(p.timestamp).toLocaleTimeString("zh-TW")}</TableCell>
-                    <TableCell>{nameById[p.employeeId] ?? p.employeeId}</TableCell>
-                    <TableCell>
-                      <Badge variant={p.type === "in" ? "secondary" : "outline"}>{punchTypeLabel(p.type)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {p.distanceM != null ? `${Math.round(p.distanceM)} m` : "—"}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {p.accuracy != null ? `±${Math.round(p.accuracy)} m` : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {p.withinFence ? <Badge variant="success">範圍內</Badge> : <Badge variant="destructive">範圍外</Badge>}
-                    </TableCell>
-                    {attendance.ipCheckEnabled && (
-                      <TableCell className="text-xs tabular-nums">
-                        {p.ip ?? "—"}
-                        {p.ipAllowed === false && <Badge variant="destructive" className="ml-1">不允許</Badge>}
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => removePunch(p.id)}>
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            rows={todayPunches}
+            getRowKey={(p) => p.id}
+            searchPlaceholder="搜尋員工…"
+            empty={{ title: "今日尚無打卡紀錄" }}
+            columns={[
+              { key: "time", header: "時間", sortValue: (p) => p.timestamp, cell: (p) => <span className="tabular-nums">{new Date(p.timestamp).toLocaleTimeString("zh-TW")}</span> },
+              { key: "name", header: "員工", sortValue: (p) => nameById[p.employeeId] ?? p.employeeId, filterText: (p) => nameById[p.employeeId] ?? p.employeeId, cell: (p) => nameById[p.employeeId] ?? p.employeeId },
+              { key: "type", header: "類型", sortValue: (p) => p.type, cell: (p) => <Badge variant={p.type === "in" ? "secondary" : "outline"}>{punchTypeLabel(p.type)}</Badge> },
+              { key: "dist", header: "距公司", numeric: true, sortValue: (p) => p.distanceM ?? -1, cell: (p) => (p.distanceM != null ? `${Math.round(p.distanceM)} m` : "—") },
+              { key: "acc", header: "精度", numeric: true, sortValue: (p) => p.accuracy ?? -1, cell: (p) => (p.accuracy != null ? `±${Math.round(p.accuracy)} m` : "—") },
+              { key: "fence", header: "範圍", sortValue: (p) => (p.withinFence ? 1 : 0), cell: (p) => (p.withinFence ? <Badge variant="success">範圍內</Badge> : <Badge variant="destructive">範圍外</Badge>) },
+              ...(attendance.ipCheckEnabled ? [{ key: "ip", header: "IP", filterText: (p: typeof todayPunches[number]) => p.ip ?? "", cell: (p: typeof todayPunches[number]) => (<span className="text-xs tabular-nums">{p.ip ?? "—"}{p.ipAllowed === false && <Badge variant="destructive" className="ml-1">不允許</Badge>}</span>) }] : []),
+              { key: "ops", header: "", headerClassName: "w-10", cell: (p) => <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => removePunch(p.id)}><Trash2 className="size-3.5" /></Button> },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -386,26 +335,24 @@ export function AttendanceView() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">工時格式的下班時間＝上班＋工時＋午休（{attendance.breakMinutes} 分），使月工時還原為輸入值。相同時間/類型的重複紀錄不會重覆匯入。</p>
-              <div className="max-h-[50vh] overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader><TableRow><TableHead className="w-10">列</TableHead><TableHead>內容</TableHead><TableHead>檢查</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {preview.rows.map((r) => (
-                      <TableRow key={r.row} className={r.errors.length ? "bg-destructive/5" : ""}>
-                        <TableCell className="text-xs text-muted-foreground">{r.row}</TableCell>
-                        <TableCell className="text-sm">{r.summary}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {r.errors.map((m, i) => <Badge key={`e${i}`} variant="destructive">{m}</Badge>)}
-                            {r.warnings.map((m, i) => <Badge key={`w${i}`} variant="warning">{m}</Badge>)}
-                            {r.errors.length === 0 && r.warnings.length === 0 && <span className="text-xs text-muted-foreground">OK</span>}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <DataTable
+                rows={preview.rows}
+                getRowKey={(r) => String(r.row)}
+                maxHeight="max-h-[50vh]"
+                searchPlaceholder="搜尋內容…"
+                rowClassName={(r) => (r.errors.length ? "bg-destructive/5" : "")}
+                columns={[
+                  { key: "row", header: "列", numeric: true, sortValue: (r) => r.row, cell: (r) => <span className="text-xs text-muted-foreground">{r.row}</span> },
+                  { key: "summary", header: "內容", sortValue: (r) => r.summary, filterText: (r) => r.summary, cell: (r) => <span className="text-sm">{r.summary}</span> },
+                  { key: "check", header: "檢查", filterText: (r) => [...r.errors, ...r.warnings].join(" "), cell: (r) => (
+                    <div className="flex flex-wrap gap-1">
+                      {r.errors.map((m, i) => <Badge key={`e${i}`} variant="destructive">{m}</Badge>)}
+                      {r.warnings.map((m, i) => <Badge key={`w${i}`} variant="warning">{m}</Badge>)}
+                      {r.errors.length === 0 && r.warnings.length === 0 && <span className="text-xs text-muted-foreground">OK</span>}
+                    </div>
+                  ) },
+                ]}
+              />
             </div>
           )}
           <DialogFooter>
