@@ -1,6 +1,6 @@
 import { useState, useRef, createElement } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter, NumHead, NumCell, SortHead } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Delta } from "@/components/ui/delta";
@@ -10,7 +10,6 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary, type PayrollRow } from "@/store/selectors";
 import { cn, ntd, pctOf, formatPeriod } from "@/lib/utils";
-import { useSort } from "@/lib/useSort";
 import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
 import { buildPayslipMailto } from "@/lib/payslipEmail";
 import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
@@ -129,16 +128,21 @@ function SummaryReport() {
 
 type GroupAgg = { name: string; count: number; gross: number; ot: number; bonus: number; net: number; burden: number; cost: number };
 
-/** 部門/成本中心匯總表：可點欄頭排序、含占比欄與合計列、斑馬紋＋黏性表頭。 */
+/** 部門/成本中心匯總表：可排序、含占比欄與合計列、斑馬紋＋黏性表頭（通用 DataTable）。 */
 function GroupTable({ title, entries, grand }: { title: string; entries: GroupAgg[]; grand: Omit<GroupAgg, "name"> }) {
-  const { sorted, sort, toggle } = useSort<GroupAgg>(
-    entries,
-    {
-      name: (r) => r.name, count: (r) => r.count, gross: (r) => r.gross, ot: (r) => r.ot,
-      bonus: (r) => r.bonus, net: (r) => r.net, burden: (r) => r.burden, cost: (r) => r.cost,
-    },
-    { key: "cost", dir: "desc" },
-  );
+  const money = (key: string, header: string, get: (g: GroupAgg) => number): Column<GroupAgg> =>
+    ({ key, header, numeric: true, sortValue: get, cell: (g) => ntd(get(g)), total: (rs) => ntd(rs.reduce((a, g) => a + get(g), 0)) });
+  const columns: Column<GroupAgg>[] = [
+    { key: "name", header: "名稱", sortValue: (g) => g.name, filterText: (g) => g.name, cell: (g) => g.name },
+    { key: "count", header: "人數", numeric: true, sortValue: (g) => g.count, cell: (g) => g.count, total: (rs) => rs.reduce((a, g) => a + g.count, 0) },
+    money("gross", "應發合計", (g) => g.gross),
+    money("ot", "其中加班費", (g) => g.ot),
+    money("bonus", "其中獎金", (g) => g.bonus),
+    money("net", "實發金額", (g) => g.net),
+    money("burden", "公司負擔保費", (g) => g.burden),
+    money("cost", "公司總成本", (g) => g.cost),
+    { key: "pct", header: "占比", numeric: true, sortValue: (g) => g.cost, cell: (g) => <span className="text-muted-foreground">{grand.cost ? pctOf(g.cost / grand.cost) : "—"}</span>, total: () => "100%" },
+  ];
   return (
     <Card className="print-block">
       <CardHeader className="pb-2">
@@ -146,49 +150,7 @@ function GroupTable({ title, entries, grand }: { title: string; entries: GroupAg
         <CardDescription>點欄頭可排序（預設依公司總成本由大到小）。</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table zebra>
-          <TableHeader sticky>
-            <TableRow>
-              <SortHead sortKey="name" sort={sort} onSort={toggle}>名稱</SortHead>
-              <SortHead sortKey="count" sort={sort} onSort={toggle} numeric>人數</SortHead>
-              <SortHead sortKey="gross" sort={sort} onSort={toggle} numeric>應發合計</SortHead>
-              <SortHead sortKey="ot" sort={sort} onSort={toggle} numeric>其中加班費</SortHead>
-              <SortHead sortKey="bonus" sort={sort} onSort={toggle} numeric>其中獎金</SortHead>
-              <SortHead sortKey="net" sort={sort} onSort={toggle} numeric>實發金額</SortHead>
-              <SortHead sortKey="burden" sort={sort} onSort={toggle} numeric>公司負擔保費</SortHead>
-              <SortHead sortKey="cost" sort={sort} onSort={toggle} numeric>公司總成本</SortHead>
-              <NumHead>占比</NumHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((g) => (
-              <TableRow key={g.name}>
-                <TableCell>{g.name}</TableCell>
-                <NumCell>{g.count}</NumCell>
-                <NumCell>{ntd(g.gross)}</NumCell>
-                <NumCell>{ntd(g.ot)}</NumCell>
-                <NumCell>{ntd(g.bonus)}</NumCell>
-                <NumCell>{ntd(g.net)}</NumCell>
-                <NumCell>{ntd(g.burden)}</NumCell>
-                <NumCell>{ntd(g.cost)}</NumCell>
-                <NumCell className="text-muted-foreground">{grand.cost ? pctOf(g.cost / grand.cost) : "—"}</NumCell>
-              </TableRow>
-            ))}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell>合計</TableCell>
-              <NumCell>{grand.count}</NumCell>
-              <NumCell>{ntd(grand.gross)}</NumCell>
-              <NumCell>{ntd(grand.ot)}</NumCell>
-              <NumCell>{ntd(grand.bonus)}</NumCell>
-              <NumCell>{ntd(grand.net)}</NumCell>
-              <NumCell>{ntd(grand.burden)}</NumCell>
-              <NumCell>{ntd(grand.cost)}</NumCell>
-              <NumCell>100%</NumCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
+        <DataTable rows={entries} columns={columns} getRowKey={(g) => g.name} initialSort={{ key: "cost", dir: "desc" }} searchable={false} />
       </CardContent>
     </Card>
   );
@@ -209,8 +171,20 @@ function ProjectPnL({ rows, bonusOf }: { rows: PayrollRow[]; bonusOf: (id: strin
     baseByEmp, bonusByEmp, otherByEmp, defaultProjectByEmp,
   });
   const shown = result.projects.filter((p) => p.totalCost > 0 || p.budget > 0);
-  const totBudget = shown.reduce((a, p) => a + p.budget, 0);
   const totVariance = shown.reduce((a, p) => a + (p.budget > 0 ? p.variance : 0), 0);
+  type P = (typeof shown)[number];
+  const grossOf = (p: P) => p.base + p.allowance + p.ot + p.bonus + p.other;
+  const columns: Column<P>[] = [
+    { key: "name", header: "專案", sortValue: (p) => p.name, filterText: (p) => p.name, cell: (p) => p.name },
+    { key: "hours", header: "投入工時", numeric: true, sortValue: (p) => p.hours, cell: (p) => (p.hours ? ntd(p.hours) : "—"), total: () => (result.totalDirectHours ? ntd(result.totalDirectHours) : "—") },
+    { key: "fte", header: "FTE", numeric: true, sortValue: (p) => p.fte, cell: (p) => (p.hours ? p.fte.toFixed(2) : "—") },
+    { key: "gross", header: "應發小計", numeric: true, sortValue: grossOf, cell: (p) => ntd(grossOf(p)) },
+    { key: "burden", header: "雇主負擔", numeric: true, sortValue: (p) => p.burden, cell: (p) => ntd(p.burden) },
+    { key: "cost", header: "總成本", numeric: true, sortValue: (p) => p.totalCost, cell: (p) => <span className="font-medium">{ntd(p.totalCost)}</span>, total: () => <span className="font-bold">{ntd(result.companyTotal)}</span> },
+    { key: "pct", header: "占比", numeric: true, sortValue: (p) => p.pctOfCompany, cell: (p) => pctOf(p.pctOfCompany), total: () => "100%" },
+    { key: "budget", header: "期間預算", numeric: true, sortValue: (p) => p.budget, cell: (p) => (p.budget ? ntd(p.budget) : "—") },
+    { key: "variance", header: "差異", numeric: true, sortValue: (p) => p.variance, cell: (p) => (p.budget ? <Delta value={p.variance} posLabel="餘 " negLabel="超 " /> : "—"), total: () => <Delta value={totVariance} posLabel="餘 " negLabel="超 " /> },
+  ];
 
   return (
     <Card className="print-block">
@@ -222,52 +196,14 @@ function ProjectPnL({ rows, bonusOf }: { rows: PayrollRow[]; bonusOf: (id: strin
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader sticky>
-            <TableRow>
-              <TableHead>專案</TableHead>
-              <NumHead>投入工時</NumHead>
-              <NumHead>FTE</NumHead>
-              <NumHead>應發小計</NumHead>
-              <NumHead>雇主負擔</NumHead>
-              <NumHead>總成本</NumHead>
-              <NumHead>占比</NumHead>
-              <NumHead>期間預算</NumHead>
-              <NumHead>差異</NumHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.map((p) => {
-              const gross = p.base + p.allowance + p.ot + p.bonus + p.other;
-              const isBucket = p.projectId === UNALLOCATED_ID;
-              return (
-                <TableRow key={p.projectId} className={cn(isBucket && "text-muted-foreground")}>
-                  <TableCell>{p.name}</TableCell>
-                  <NumCell>{p.hours ? ntd(p.hours) : "—"}</NumCell>
-                  <NumCell>{p.hours ? p.fte.toFixed(2) : "—"}</NumCell>
-                  <NumCell>{ntd(gross)}</NumCell>
-                  <NumCell>{ntd(p.burden)}</NumCell>
-                  <NumCell className="font-medium">{ntd(p.totalCost)}</NumCell>
-                  <NumCell>{pctOf(p.pctOfCompany)}</NumCell>
-                  <NumCell>{p.budget ? ntd(p.budget) : "—"}</NumCell>
-                  <NumCell>{p.budget ? <Delta value={p.variance} posLabel="餘 " negLabel="超 " /> : "—"}</NumCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell>合計</TableCell>
-              <NumCell>{result.totalDirectHours ? ntd(result.totalDirectHours) : "—"}</NumCell>
-              <TableCell />
-              <TableCell colSpan={2} />
-              <NumCell className="font-bold">{ntd(result.companyTotal)}</NumCell>
-              <NumCell>100%</NumCell>
-              <NumCell>{totBudget ? ntd(totBudget) : "—"}</NumCell>
-              <NumCell>{totBudget ? <Delta value={totVariance} posLabel="餘 " negLabel="超 " /> : "—"}</NumCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
+        <DataTable
+          rows={shown}
+          columns={columns}
+          getRowKey={(p) => p.projectId}
+          initialSort={{ key: "cost", dir: "desc" }}
+          searchable={false}
+          rowClassName={(p) => cn(p.projectId === UNALLOCATED_ID && "text-muted-foreground")}
+        />
       </CardContent>
     </Card>
   );
@@ -286,6 +222,26 @@ function TaxReport() {
     return <Card><CardContent><EmptyState icon={<FileText className="size-7" />} title="本月尚無可代扣的薪資資料" hint="完成「每月薪資作業」後，這裡會列出每位員工的建議與實際代扣稅額。" /></CardContent></Card>;
   }
 
+  type T = { r: PayrollRow; method: string; ev: ReturnType<typeof getEvent>; sug: PayrollRow["withholdingSuggestion"] };
+  const taxRows: T[] = rows.map((r) => {
+    const emp = employees.find((e) => e.id === r.employeeId)!;
+    return { r, method: emp.taxResidency === "非居住者" ? "非居住者 6%/18%" : emp.withholdingMethod, ev: getEvent(r.employeeId), sug: r.withholdingSuggestion };
+  });
+  const columns: Column<T>[] = [
+    { key: "emp", header: "員工", freeze: true, sortValue: (t) => t.r.name, filterText: (t) => t.r.name, cell: (t) => t.r.name },
+    { key: "method", header: "身分／方式", sortValue: (t) => t.method, filterText: (t) => t.method, cell: (t) => <span className="text-sm">{t.method}</span> },
+    { key: "deps", header: "扶養人數", numeric: true, sortValue: (t) => t.r.dependents.taxDependents, cell: (t) => t.r.dependents.taxDependents },
+    { key: "taxable", header: "本月應稅薪資（估）", numeric: true, sortValue: (t) => t.r.taxableSalary, cell: (t) => ntd(t.r.taxableSalary) },
+    { key: "threshold", header: "起扣點（估）", numeric: true, sortValue: (t) => t.r.estimatedTaxThreshold ?? -1, cell: (t) => (t.r.estimatedTaxThreshold === null ? "—" : ntd(t.r.estimatedTaxThreshold)) },
+    { key: "suggest", header: "建議金額", numeric: true, sortValue: (t) => (t.sug.type === "auto" ? t.sug.amount : Number.MAX_SAFE_INTEGER), cell: (t) => (t.sug.type === "auto" ? ntd(t.sug.amount) : <Badge variant="warning">請查官方稅額表</Badge>) },
+    { key: "filled", header: "已填金額", numeric: true, sortValue: (t) => t.ev.withheldTax ?? -1, cell: (t) => (t.ev.withheldTax === null ? <span className="text-muted-foreground">未填</span> : <span className="font-medium">{ntd(t.ev.withheldTax)}</span>), total: (rs) => <span className="font-bold">{ntd(rs.reduce((a, t) => a + t.r.withheldTax, 0))}</span> },
+    { key: "ops", header: "", headerClassName: "w-24 print:hidden", cellClassName: "print:hidden", cell: (t) => {
+      const { sug, ev } = t;
+      if (sug.type !== "auto" || ev.withheldTax === sug.amount) return null;
+      return <Button variant="outline" size="sm" className="h-7" onClick={() => upsertEvent({ ...ev, withheldTax: sug.amount })}><Wand2 className="size-3.5" /> 帶入</Button>;
+    } },
+  ];
+
   return (
     <Card className="print-block">
       <CardHeader className="pb-3">
@@ -296,69 +252,17 @@ function TaxReport() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Table zebra>
-          <TableHeader sticky>
-            <TableRow>
-              <TableHead>員工</TableHead>
-              <TableHead>身分／方式</TableHead>
-              <NumHead>扶養人數</NumHead>
-              <NumHead>本月應稅薪資（估）</NumHead>
-              <NumHead>起扣點（估）</NumHead>
-              <NumHead>建議金額</NumHead>
-              <NumHead>已填金額</NumHead>
-              <TableHead className="w-24 print:hidden"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => {
-              const emp = employees.find((e) => e.id === r.employeeId)!;
-              const ev = getEvent(r.employeeId);
-              const sug = r.withholdingSuggestion;
-              return (
-                <TableRow key={r.employeeId}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="text-sm">
-                    {emp.taxResidency === "非居住者" ? "非居住者 6%/18%" : emp.withholdingMethod}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{r.dependents.taxDependents}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(r.taxableSalary)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.estimatedTaxThreshold === null ? "—" : ntd(r.estimatedTaxThreshold)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {sug.type === "auto" ? (
-                      <span className="tabular-nums">{ntd(sug.amount)}</span>
-                    ) : (
-                      <Badge variant="warning">請查官方稅額表</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {ev.withheldTax === null ? <span className="text-muted-foreground">未填</span> : ntd(ev.withheldTax)}
-                  </TableCell>
-                  <TableCell className="print:hidden">
-                    {sug.type === "auto" && ev.withheldTax !== sug.amount && (
-                      <Button
-                        variant="outline" size="sm" className="h-7"
-                        onClick={() => upsertEvent({ ...ev, withheldTax: sug.amount })}
-                      >
-                        <Wand2 className="size-3.5" /> 帶入
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={6}>本月代扣所得稅合計</TableCell>
-              <TableCell className="text-right font-bold tabular-nums">
-                {ntd(rows.reduce((a, r) => a + r.withheldTax, 0))}
-              </TableCell>
-              <TableCell className="print:hidden" />
-            </TableRow>
-          </TableFooter>
-        </Table>
+        <DataTable
+          rows={taxRows}
+          columns={columns}
+          getRowKey={(t) => t.r.employeeId}
+          searchPlaceholder="搜尋員工…"
+          csv={{
+            headers: ["員工編號", "姓名", "身分／方式", "扶養人數", "應稅薪資(估)", "起扣點(估)", "建議金額", "已填金額"],
+            row: (t) => [t.r.employeeId, t.r.name, t.method, t.r.dependents.taxDependents, t.r.taxableSalary, t.r.estimatedTaxThreshold ?? "", t.sug.type === "auto" ? t.sug.amount : "查表", t.ev.withheldTax ?? ""],
+            fileName: `代扣所得稅清單_${currentPeriod}.csv`,
+          }}
+        />
         <p className="mt-3 text-xs text-muted-foreground">
           選「依扣繳稅額表」且達起扣點的員工，系統不代為猜測金額：請至財政部公告的「薪資所得扣繳稅額表」
           依扶養人數欄查出正確稅額後填入（起扣點為估算值，接近門檻時以官方表為準）。
