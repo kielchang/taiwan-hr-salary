@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -839,23 +839,20 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
           <CardDescription>用目前的預算/調幅設定，把四種分配法跑一遍並列；同樣花費下，哪種更公平、是否在預算內，一眼比較。目前選用：<Badge variant="outline">{compare.find((c) => c.method === rs.method)?.label}</Badge></CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>分配法</TableHead><TableHead className="text-right">月增額合計</TableHead><TableHead className="text-right">年化成本增額</TableHead><TableHead className="text-right">平均調幅</TableHead><TableHead className="text-right">調後 Gini</TableHead>{rs.targetBudget > 0 && <TableHead className="text-right">預算差異</TableHead>}</TableRow></TableHeader>
-            <TableBody>
-              {compare.map((c) => (
-                <TableRow key={c.method} className={cn(c.method === rs.method && "bg-accent/50")}>
-                  <TableCell className="font-medium">
-                    {c.label}{c.method === rs.method && <Badge variant="outline" className="ml-1.5 text-[10px]">目前</Badge>}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(c.totalMonthlyIncrease)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(c.totalAnnualizedCostDelta)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{c.avgRaisePct.toFixed(1)}%</TableCell>
-                  <TableCell className={cn("text-right tabular-nums", c.giniAfter === bestFair && "font-bold text-emerald-600")}>{c.giniAfter.toFixed(3)}</TableCell>
-                  {rs.targetBudget > 0 && <TableCell className={cn("text-right tabular-nums", c.variance > 0 ? "text-red-600" : "text-emerald-600")}>{c.variance > 0 ? `超 ${ntd(c.variance)}` : `餘 ${ntd(-c.variance)}`}</TableCell>}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            rows={compare}
+            getRowKey={(c) => c.method}
+            searchable={false}
+            rowClassName={(c) => cn(c.method === rs.method && "bg-accent/50")}
+            columns={[
+              { key: "label", header: "分配法", sortValue: (c) => c.label, cell: (c) => (<>{c.label}{c.method === rs.method && <Badge variant="outline" className="ml-1.5 text-[10px]">目前</Badge>}</>) },
+              { key: "mi", header: "月增額合計", numeric: true, sortValue: (c) => c.totalMonthlyIncrease, cell: (c) => ntd(c.totalMonthlyIncrease) },
+              { key: "ac", header: "年化成本增額", numeric: true, sortValue: (c) => c.totalAnnualizedCostDelta, cell: (c) => ntd(c.totalAnnualizedCostDelta) },
+              { key: "avg", header: "平均調幅", numeric: true, sortValue: (c) => c.avgRaisePct, cell: (c) => `${c.avgRaisePct.toFixed(1)}%` },
+              { key: "gini", header: "調後 Gini", numeric: true, sortValue: (c) => c.giniAfter, cell: (c) => <span className={cn(c.giniAfter === bestFair && "font-bold text-emerald-600")}>{c.giniAfter.toFixed(3)}</span> },
+              ...(rs.targetBudget > 0 ? [{ key: "var", header: "預算差異", numeric: true, sortValue: (c: (typeof compare)[number]) => c.variance, cell: (c: (typeof compare)[number]) => <Delta value={c.variance} goodWhen="negative" posLabel="超 " negLabel="餘 " /> }] : []),
+            ]}
+          />
           <p className="mt-2 text-xs text-muted-foreground">綠色＝四法中調後最公平（Gini 最低）。一致調幅與按本薪不看績效；按績效/merit matrix 會向高績效（與級距偏低者）傾斜。切換上方「分配方法」即可套用。</p>
         </CardContent>
       </Card>
@@ -1020,25 +1017,18 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
             {charge.length === 0 ? (
               <p className="py-6 text-center text-xs text-muted-foreground">尚無可比較的專案工時。</p>
             ) : (
-              <Table>
-                <TableHeader sticky><TableRow><TableHead>專案</TableHead><TableHead className="text-right">應計(標準)</TableHead><TableHead className="text-right">實際</TableHead><TableHead className="text-right">差異</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {charge.map((c) => (
-                    <TableRow key={c.projectId}>
-                      <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(c.standard)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ntd(c.actual)}</TableCell>
-                      <TableCell className="text-right tabular-nums"><Delta value={c.variance} /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter><TableRow>
-                  <TableCell>合計</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(charge.reduce((a, c) => a + c.standard, 0))}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(charge.reduce((a, c) => a + c.actual, 0))}</TableCell>
-                  <TableCell className="text-right tabular-nums"><Delta value={charge.reduce((a, c) => a + c.variance, 0)} /></TableCell>
-                </TableRow></TableFooter>
-              </Table>
+              <DataTable
+                rows={charge}
+                getRowKey={(c) => c.projectId}
+                searchable={false}
+                initialSort={{ key: "variance", dir: "asc" }}
+                columns={[
+                  { key: "name", header: "專案", sortValue: (c) => c.name, cell: (c) => c.name },
+                  { key: "std", header: "應計(標準)", numeric: true, sortValue: (c) => c.standard, cell: (c) => ntd(c.standard), total: (rs) => ntd(rs.reduce((a, c) => a + c.standard, 0)) },
+                  { key: "act", header: "實際", numeric: true, sortValue: (c) => c.actual, cell: (c) => ntd(c.actual), total: (rs) => ntd(rs.reduce((a, c) => a + c.actual, 0)) },
+                  { key: "var", header: "差異", numeric: true, sortValue: (c) => c.variance, cell: (c) => <Delta value={c.variance} />, total: (rs) => <Delta value={rs.reduce((a, c) => a + c.variance, 0)} /> },
+                ]}
+              />
             )}
           </CardContent>
         </Card>
@@ -1075,30 +1065,21 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
               </div>
             ))}
           </div>
-          <Table>
-            <TableHeader><TableRow><TableHead>專案</TableHead><TableHead className="text-right">累計實際</TableHead><TableHead className="text-right">燃燒率/月</TableHead><TableHead className="text-right">EAC(燃燒率)</TableHead><TableHead className="text-right">EAC(EVM)</TableHead><TableHead className="text-right">完工差異</TableHead><TableHead className="text-right">%消耗</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {eac.map((e) => (
-                <TableRow key={e.projectId}>
-                  <TableCell className="font-medium">{e.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(e.ac)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ntd(e.burnRate)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{e.budget ? ntd(e.runRateEac) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{e.eacEvm != null ? ntd(e.eacEvm) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{e.budget ? <Delta value={e.varianceRunRate} posLabel="餘 " negLabel="超 " /> : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{e.budget ? pct(e.pctConsumed) : "—"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter><TableRow>
-              <TableCell>合計</TableCell>
-              <TableCell className="text-right font-bold tabular-nums">{ntd(eac.reduce((a, e) => a + e.ac, 0))}</TableCell>
-              <TableCell />
-              <TableCell className="text-right tabular-nums">{ntd(eac.reduce((a, e) => a + (e.budget ? e.runRateEac : 0), 0))}</TableCell>
-              <TableCell colSpan={2} />
-              <TableCell />
-            </TableRow></TableFooter>
-          </Table>
+          <DataTable
+            rows={eac}
+            getRowKey={(e) => e.projectId}
+            searchable={false}
+            initialSort={{ key: "ac", dir: "desc" }}
+            columns={[
+              { key: "name", header: "專案", sortValue: (e) => e.name, cell: (e) => e.name },
+              { key: "ac", header: "累計實際", numeric: true, sortValue: (e) => e.ac, cell: (e) => ntd(e.ac), total: (rs) => <span className="font-bold">{ntd(rs.reduce((a, e) => a + e.ac, 0))}</span> },
+              { key: "burn", header: "燃燒率/月", numeric: true, sortValue: (e) => e.burnRate, cell: (e) => ntd(e.burnRate) },
+              { key: "eacb", header: "EAC(燃燒率)", numeric: true, sortValue: (e) => e.runRateEac, cell: (e) => (e.budget ? ntd(e.runRateEac) : "—"), total: (rs) => ntd(rs.reduce((a, e) => a + (e.budget ? e.runRateEac : 0), 0)) },
+              { key: "eacevm", header: "EAC(EVM)", numeric: true, sortValue: (e) => e.eacEvm ?? -1, cell: (e) => (e.eacEvm != null ? ntd(e.eacEvm) : "—") },
+              { key: "vfin", header: "完工差異", numeric: true, sortValue: (e) => e.varianceRunRate, cell: (e) => (e.budget ? <Delta value={e.varianceRunRate} posLabel="餘 " negLabel="超 " /> : "—") },
+              { key: "cons", header: "%消耗", numeric: true, sortValue: (e) => e.pctConsumed, cell: (e) => (e.budget ? pct(e.pctConsumed) : "—") },
+            ]}
+          />
           <p className="text-xs text-muted-foreground">EAC(燃燒率)＝月均×專案總月數；EAC(EVM)＝預算÷CPI（需填「%完成」）。完工差異＝預算−EAC(燃燒率)。</p>
         </CardContent>
       </Card>
