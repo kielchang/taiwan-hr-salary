@@ -12,6 +12,10 @@ npx vitest run       # 全部測試（目前 179 項，必須全綠）
 npm run build        # tsc -b && vite build（CI 同款；tsc 增量快取可能漏抓，改用 npx tsc -b --force 驗證最準）
 ```
 
+本機 Node 23+ 注意：Node 內建實驗性 Web Storage 會以「屬性存在、值 undefined」遮蔽 jsdom 的
+localStorage，`tests/setup.ts` 已裝條件式記憶體墊片（CI Node 20 無此屬性、不受影響）——測試炸
+storage undefined 時先想到這裡，不要改測試本身。
+
 ## 分支與部署慣例
 
 - 開發分支：`claude/salary-calculator-react-shadcn-stxjp7`（所有變更先 commit 到這裡並 push）。
@@ -72,15 +76,16 @@ src/
    ?emp=/?tab= 深連結、帶入上月/儲存並下一位/全部帶入、分攤沿用上月、報表月份選擇器、
    調薪生效月排程（scheduledRaises）、出勤工時參考、精靈文案、主檔 ℹ。
 
-最新 commit（雙分支同步）：`7ffdda9`。測試 18 檔 179 項全綠。
+6. **backlog 清尾**（本次 session）：CostTab/DistTab/TrendTab CSV 匯出補齊、AnalyticsView 13 張單圖卡
+   收斂 ChartCard、BracketTables（投保級距主檔）遷 DataTable（維持唯讀＋搜尋/CSV）、validation.ts 註記
+   V3/V5 保留編號、tests/setup.ts Node 23+ Web Storage 墊片。
+
+最新 commit（開發分支）：`cb06cf3`。測試 18 檔 179 項全綠（Node 22/26 皆驗）。
 
 ## 已知可續作（backlog，未做）
 
 - 出勤→加班「自動分級回填」（目前僅顯示參考工時，使用者要求不自動回填 — 若要做需先確認規則）。
-- CostTab/DistTab/TrendTab 的 CSV 匯出（獎金/調薪已有）。
-- 剩餘少數圖表卡片收斂進 ChartCard（純外觀一致化）。
-- 級距主檔可編輯格（唯一未遷 DataTable 的表）。
-- 驗證 V3/V5 編號在 README 有保留字（現用 V1/V2/V4/V6–V12）。
+- 投保級距主檔改「可編輯」（現為刻意唯讀檢視＝設定頁明示文案；要做需使用者確認年度更新流程與稽核）。
 
 ## 改動驗證清單（每批必跑）
 
