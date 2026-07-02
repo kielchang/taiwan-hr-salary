@@ -8,7 +8,7 @@ import {
 } from "@/lib/validation";
 import { ytdBonusBefore } from "@/store/selectors";
 import { usePayrollStore, isPeriodLocked, blankEvent } from "@/store/usePayrollStore";
-import { SEED_EMPLOYEES, SEED_SALARIES, evt, salary } from "@/data/seed";
+import { SEED_EMPLOYEES, evt, salary } from "@/data/seed";
 import type { Allocation, Employee } from "@/lib/types";
 
 const emp = (over: Partial<Employee>): Employee => ({ ...SEED_EMPLOYEES[0], ...over });
