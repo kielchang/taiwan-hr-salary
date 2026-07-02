@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { monthWorkedHours } from "@/lib/attendance";
+import { addMonths } from "@/data/seed";
 import type { Allocation, AllocationMode } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
 import { Plus, Trash2, Pencil, FolderKanban, Clock } from "lucide-react";
@@ -44,6 +45,20 @@ export function AllocationEditor() {
     const cur = getAllocation(employeeId, currentPeriod);
     setDraft(cur ? { ...cur, lines: cur.lines.map((l) => ({ ...l })) } : { employeeId, period: currentPeriod, mode: "hours", lines: [] });
     setEditing(employeeId);
+  };
+
+  /** 沿用上月分攤：穩定編制的團隊每月免重打（複製 lines/模式/獎金歸屬；可用工時仍建議由出勤帶入） */
+  const copyLastMonth = () => {
+    if (!editing || !draft) return;
+    const prevPeriod = addMonths(currentPeriod, -1);
+    const prev = getAllocation(editing, prevPeriod);
+    if (!prev || prev.lines.length === 0) { alert(`上月（${prevPeriod}）沒有分攤設定可沿用。`); return; }
+    setDraft({
+      ...draft,
+      mode: prev.mode,
+      lines: prev.lines.map((l) => ({ ...l })),
+      bonusProjectId: prev.bonusProjectId,
+    });
   };
   const save = () => { if (draft) upsertAllocation(draft); setEditing(null); setDraft(null); };
 
@@ -107,7 +122,10 @@ export function AllocationEditor() {
                   <SelectContent><SelectItem value="hours">時數</SelectItem><SelectItem value="pct">百分比</SelectItem></SelectContent>
                 </Select>
                 <span className="text-xs text-muted-foreground">上限 {cap}{draft.mode === "pct" ? "%" : " 小時"}</span>
-                <Button variant="outline" size="sm" className="ml-auto" onClick={fromAttendance}><Clock /> 由出勤帶入</Button>
+                <span className="ml-auto flex gap-1.5">
+                  <Button variant="outline" size="sm" onClick={copyLastMonth} title="複製上月的專案分攤（模式/明細/獎金歸屬）"><Pencil /> 沿用上月</Button>
+                  <Button variant="outline" size="sm" onClick={fromAttendance}><Clock /> 由出勤帶入</Button>
+                </span>
               </div>
               {draft.mode === "hours" && (
                 <div className="flex items-center gap-3">

@@ -22,6 +22,7 @@ import type {
   DeclaredInsured,
   Project,
   Allocation,
+  ScheduledRaise,
 } from "@/lib/types";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { serializeState, type BackupEnvelope } from "@/lib/backup";
@@ -122,7 +123,7 @@ interface PayrollState {
   completeSetup: () => void;
   reopenSetup: () => void;
 
-  /** 每月結算之人事確認紀錄：period → 確認時間（ISO）；編輯該月資料即自動解除 */
+  /** 每月結算之人事確認紀錄：period → 確認時間（ISO）。已確認＝硬鎖定：需先取消確認才能異動薪資資料 */
   confirmations: Record<string, string>;
   confirmPeriod: (period: string) => void;
   unconfirmPeriod: (period: string) => void;
@@ -171,6 +172,13 @@ interface PayrollState {
   /** 調薪方案核定寫回薪資（four-eyes 確認後） */
   applyRaise: (rows: { employeeId: string; newSalary: number }[], note?: string) => void;
 
+  /** 調薪排程（核定於未來月份生效；到期由工作台套用） */
+  scheduledRaises: ScheduledRaise[];
+  scheduleRaises: (items: Omit<ScheduledRaise, "id">[]) => void;
+  cancelScheduledRaise: (id: string) => void;
+  /** 套用一筆到期排程（寫回薪資＋移除排程＋稽核） */
+  applyScheduledRaise: (id: string) => void;
+
   /** 投保級距申報基準（2/8 月申報調整） */
   declaredInsured: DeclaredInsured[];
   setDeclaredBaseline: (list: DeclaredInsured[]) => void;
@@ -185,6 +193,18 @@ interface PayrollState {
   upsertAllocation: (a: Allocation) => void;
   getAllocation: (employeeId: string, period: string) => Allocation | undefined;
 }
+
+/** 硬鎖定判斷：期間已確認即鎖定，需先取消確認才能異動薪資相關資料 */
+export const isPeriodLocked = (confirmations: Record<string, string>, period: string): boolean =>
+  Boolean(confirmations[period]);
+
+/** 影響薪資計算的員工主檔欄位（當期已確認時鎖定這些欄位的變更；聯絡資訊等仍可修改） */
+const EMP_PAY_FIELDS = [
+  "hireDate", "status", "leaveDate", "voluntaryPensionRate",
+  "taxResidency", "withholdingMethod", "exemptionFormReceivedDate",
+] as const;
+const empPayFieldsChanged = (prev: Employee, next: Employee): boolean =>
+  EMP_PAY_FIELDS.some((k) => (prev[k] ?? null) !== (next[k] ?? null));
 
 const AUDIT_CAP = 1000;
 const newId = () =>
@@ -314,6 +334,7 @@ export const usePayrollStore = create<PayrollState>()(
 
       applyRaise: (rows, note) =>
         set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
           const salaries = st.salaries.map((s) => {
             const r = rows.find((x) => x.employeeId === s.employeeId);
             if (!r) return s;
@@ -327,8 +348,42 @@ export const usePayrollStore = create<PayrollState>()(
           };
         }),
 
+      scheduledRaises: [],
+      scheduleRaises: (items) =>
+        set((st) => ({
+          scheduledRaises: [
+            ...st.scheduledRaises,
+            ...items.map((it) => ({ ...it, id: newId() })),
+          ],
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "raiseApply",
+            `排程調薪 ${items.length} 人，自 ${items[0]?.effectivePeriod ?? ""} 生效${items[0]?.note ? `（${items[0].note}）` : ""}`)),
+        })),
+      cancelScheduledRaise: (id) =>
+        set((st) => {
+          const item = st.scheduledRaises.find((r) => r.id === id);
+          return {
+            scheduledRaises: st.scheduledRaises.filter((r) => r.id !== id),
+            auditLog: item
+              ? pushAudit(st.auditLog, makeAudit(st.operatorName, "raiseApply",
+                  `取消排程調薪：${item.name}（生效 ${item.effectivePeriod}）`, { targetId: item.employeeId }))
+              : st.auditLog,
+          };
+        }),
+      applyScheduledRaise: (id) => {
+        const st = get();
+        const item = st.scheduledRaises.find((r) => r.id === id);
+        if (!item || isPeriodLocked(st.confirmations, st.currentPeriod)) return;
+        st.applyRaise([{ employeeId: item.employeeId, newSalary: item.newSalary }], `排程生效 ${item.effectivePeriod}・${item.note}`);
+        set((s) => ({ scheduledRaises: s.scheduledRaises.filter((r) => r.id !== id) }));
+      },
+
       declaredInsured: DEMO.declaredInsured,
-      setDeclaredBaseline: (list) => set({ declaredInsured: list }),
+      setDeclaredBaseline: (list) =>
+        set((st) => ({
+          declaredInsured: list,
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "declare",
+            `設定投保級距申報基準（${list.length} 名在職員工）`)),
+        })),
 
       projects: DEMO.projects,
       upsertProject: (p) =>
@@ -357,6 +412,9 @@ export const usePayrollStore = create<PayrollState>()(
           allocations: st.allocations.some((x) => x.employeeId === a.employeeId && x.period === a.period)
             ? st.allocations.map((x) => (x.employeeId === a.employeeId && x.period === a.period ? a : x))
             : [...st.allocations, a],
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "allocation",
+            `更新 ${a.period} 工時分攤（${a.mode === "hours" ? "時數" : "百分比"}・${a.lines.length} 條）`,
+            { targetId: a.employeeId, period: a.period })),
         })),
       getAllocation: (employeeId, period) =>
         get().allocations.find((a) => a.employeeId === employeeId && a.period === period),
@@ -387,20 +445,40 @@ export const usePayrollStore = create<PayrollState>()(
           const { [period]: _removed, ...rest } = st.confirmations;
           return {
             confirmations: rest,
-            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "confirm", `取消 ${period} 月結確認`, { period })),
+            // 取消確認 → 該期快照一併移除（重新確認時會以最新資料重建，避免趨勢/環比讀到失真快照）
+            snapshots: st.snapshots.filter((s) => s.period !== period),
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "confirm", `取消 ${period} 月結確認（快照已移除）`, { period })),
           };
         }),
 
       setParameters: (patch) =>
-        set((st) => ({ parameters: { ...st.parameters, ...patch } })),
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          return {
+            parameters: { ...st.parameters, ...patch },
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+              `更新法定/公司參數：${Object.keys(patch).join("、")}`)),
+          };
+        }),
       setBrackets: (patch) =>
-        set((st) => ({ brackets: { ...st.brackets, ...patch } })),
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          return {
+            brackets: { ...st.brackets, ...patch },
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+              `更新投保級距表：${Object.keys(patch).join("、")}`)),
+          };
+        }),
       setCurrentPeriod: (period) => set({ currentPeriod: period }),
 
-      upsertEmployee: (emp) =>
+      upsertEmployee: (raw) =>
         set((st) => {
+          // 自提率超界防呆（匯入/還原路徑也經此收斂）
+          const emp = { ...raw, voluntaryPensionRate: Math.min(0.06, Math.max(0, raw.voluntaryPensionRate)) };
           const prev = st.employees.find((e) => e.id === emp.id);
           const exists = !!prev;
+          // 硬鎖定：當期已確認時，影響薪資計算的主檔欄位不可變更（聯絡資訊等仍放行）
+          if (exists && isPeriodLocked(st.confirmations, st.currentPeriod) && empPayFieldsChanged(prev!, emp)) return st;
           const employees = exists
             ? st.employees.map((e) => (e.id === emp.id ? emp : e))
             : [...st.employees, emp];
@@ -416,16 +494,28 @@ export const usePayrollStore = create<PayrollState>()(
           return { employees, salaries, auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "employee", summary, { targetId: emp.id })) };
         }),
       removeEmployee: (id) =>
-        set((st) => ({
-          employees: st.employees.filter((e) => e.id !== id),
-          salaries: st.salaries.filter((s) => s.employeeId !== id),
-          dependents: st.dependents.filter((d) => d.employeeId !== id),
-          events: st.events.filter((e) => e.employeeId !== id),
-          punches: st.punches.filter((p) => p.employeeId !== id),
-        })),
+        set((st) => {
+          const name = st.employees.find((e) => e.id === id)?.name ?? id;
+          const { [id]: _g, ...gradeByEmployee } = st.analytics.gradeByEmployee;
+          const { [id]: _p, ...performanceByEmployee } = st.analytics.performanceByEmployee;
+          return {
+            employees: st.employees.filter((e) => e.id !== id),
+            salaries: st.salaries.filter((s) => s.employeeId !== id),
+            dependents: st.dependents.filter((d) => d.employeeId !== id),
+            events: st.events.filter((e) => e.employeeId !== id),
+            punches: st.punches.filter((p) => p.employeeId !== id),
+            allocations: st.allocations.filter((a) => a.employeeId !== id),
+            declaredInsured: st.declaredInsured.filter((d) => d.employeeId !== id),
+            scheduledRaises: st.scheduledRaises.filter((r) => r.employeeId !== id),
+            analytics: { ...st.analytics, gradeByEmployee, performanceByEmployee },
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "employee",
+              `刪除員工 ${name}（${id}）及其薪資/眷屬/事件/分攤/申報基準`, { targetId: id })),
+          };
+        }),
 
       upsertSalary: (s) =>
         set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
           const prev = st.salaries.find((x) => x.employeeId === s.employeeId);
           const exists = !!prev;
           const before = prev ? sumSalary(prev) : 0;
@@ -448,25 +538,47 @@ export const usePayrollStore = create<PayrollState>()(
         blankSalary(employeeId),
 
       upsertDependent: (d) =>
-        set((st) => ({
-          dependents: st.dependents.some((x) => x.id === d.id)
-            ? st.dependents.map((x) => (x.id === d.id ? d : x))
-            : [...st.dependents, d],
-        })),
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定
+          return {
+            dependents: st.dependents.some((x) => x.id === d.id)
+              ? st.dependents.map((x) => (x.id === d.id ? d : x))
+              : [...st.dependents, d],
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "dependent",
+              `異動眷屬 ${d.name}（${d.relationship}）`, { targetId: d.employeeId })),
+          };
+        }),
       removeDependent: (id) =>
-        set((st) => ({ dependents: st.dependents.filter((d) => d.id !== id) })),
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定
+          const dep = st.dependents.find((d) => d.id === id);
+          return {
+            dependents: st.dependents.filter((d) => d.id !== id),
+            auditLog: dep
+              ? pushAudit(st.auditLog, makeAudit(st.operatorName, "dependent", `刪除眷屬 ${dep.name}`, { targetId: dep.employeeId }))
+              : st.auditLog,
+          };
+        }),
       setEmployeeDependents: (employeeId, deps) =>
-        set((st) => ({
-          dependents: [
-            ...st.dependents.filter((d) => d.employeeId !== employeeId),
-            ...deps,
-          ],
-        })),
+        set((st) => {
+          const before = st.dependents.filter((d) => d.employeeId === employeeId);
+          const changed = JSON.stringify(before) !== JSON.stringify(deps);
+          if (!changed) return st;
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定
+          return {
+            dependents: [
+              ...st.dependents.filter((d) => d.employeeId !== employeeId),
+              ...deps,
+            ],
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "dependent",
+              `更新眷屬名冊 ${before.length} → ${deps.length} 名`, { targetId: employeeId })),
+          };
+        }),
 
       upsertEvent: (e) =>
         set((st) => {
-          // 結算資料異動 → 該月確認狀態自動解除（需重新查核）
-          const { [e.period]: _removed, ...confirmations } = st.confirmations;
+          // 硬鎖定：該月已確認 → 拒絕異動（需先於查核頁取消確認）
+          if (isPeriodLocked(st.confirmations, e.period)) return st;
           const prev = st.events.find((x) => x.employeeId === e.employeeId && x.period === e.period);
           // 僅就敏感欄位（代扣稅）留稽核，避免一般時數異動灌爆紀錄
           const taxChanged = (prev?.withheldTax ?? null) !== (e.withheldTax ?? null);
@@ -476,7 +588,6 @@ export const usePayrollStore = create<PayrollState>()(
                 { targetId: e.employeeId, period: e.period }))
             : st.auditLog;
           return {
-            confirmations,
             auditLog: log,
             events: st.events.some(
               (x) => x.employeeId === e.employeeId && x.period === e.period,
@@ -510,10 +621,11 @@ export const usePayrollStore = create<PayrollState>()(
           declaredInsured: demo.declaredInsured,
           projects: demo.projects,
           allocations: demo.allocations,
+          scheduledRaises: [],
         });
       },
       clearAll: () =>
-        set({
+        set((st) => ({
           employees: [],
           salaries: [],
           dependents: [],
@@ -521,10 +633,13 @@ export const usePayrollStore = create<PayrollState>()(
           punches: [],
           analytics: DEFAULT_ANALYTICS,
           snapshots: [],
+          confirmations: {},
           declaredInsured: [],
           projects: [],
           allocations: [],
-        }),
+          scheduledRaises: [],
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "clear", "清空全部員工與結算資料")),
+        })),
 
       exportAll: () => serializeState(get() as unknown as Record<string, unknown>, STORE_VERSION),
       importAll: (env) =>
@@ -554,6 +669,7 @@ export const usePayrollStore = create<PayrollState>()(
             declaredInsured: s.declaredInsured ?? st.declaredInsured,
             projects: s.projects ?? st.projects,
             allocations: s.allocations ?? st.allocations,
+            scheduledRaises: s.scheduledRaises ?? st.scheduledRaises,
             auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
           };
         }),

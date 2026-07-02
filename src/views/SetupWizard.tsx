@@ -298,13 +298,13 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               <Check className="mx-auto size-12 rounded-full bg-emerald-100 p-2 text-emerald-600" />
               <div>
                 <h2 className="text-lg font-bold">設定完成！</h2>
-                <p className="mt-1 text-sm text-muted-foreground">每個月只要照左側選單三步驟進行：</p>
+                <p className="mt-1 text-sm text-muted-foreground">每個月從「工作台」出發，照待辦提示進行：</p>
               </div>
               <div className="grid gap-3 text-left sm:grid-cols-3">
                 {[
-                  { icon: CalendarClock, t: "① 薪資結算", d: "系統已自動帶入固定薪資，只要替「有加班、請假或獎金」的人補上異動。" },
-                  { icon: ClipboardCheck, t: "② 結算查核", d: "檢視全公司試算總覽與統計檢查，確認沒問題後按「確認本月結算」。" },
-                  { icon: FileSpreadsheet, t: "③ 報表與薪資條", d: "產出部門匯總、所得稅扣繳清單與每人薪資條，可直接列印。" },
+                  { icon: CalendarClock, t: "① 薪資結算（兩步驟）", d: "輸入當月異動 → 查核與確認。系統已自動帶入固定薪資，只要替「有加班、請假或獎金」的人補上異動，查核無誤後確認本月結算。" },
+                  { icon: ClipboardCheck, t: "② 工作台待辦", d: "首頁彙整資料檢查、未填代扣稅、加退保與級距調整等待辦，點卡片直達處理位置。" },
+                  { icon: FileSpreadsheet, t: "③ 報表與申報", d: "確認後至「報表與申報」產出部門匯總、所得稅清單、每人薪資條與申報名冊，可直接列印。" },
                 ].map((s) => (
                   <div key={s.t} className="rounded-lg border p-3">
                     <s.icon className="mb-1.5 size-5 text-primary" />

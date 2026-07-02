@@ -23,9 +23,10 @@ import { AttendanceView } from "@/views/AttendanceView";
 import { AnalyticsView } from "@/views/AnalyticsView";
 import { ProjectsView } from "@/views/ProjectsView";
 import { ReportsHubView } from "@/views/ReportsHubView";
+import { DashboardView } from "@/views/DashboardView";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
-  FileText, FolderKanban, Menu,
+  FileText, FolderKanban, Menu, LayoutDashboard,
 } from "lucide-react";
 
 type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算" };
@@ -33,6 +34,7 @@ type NavItem = { to: string; match: string; label: string; icon: React.ElementTy
 /** 側邊欄：依領域分區（每月作業／規劃分析／專案／報表申報／主檔設定／說明） */
 const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   { title: "每月作業", items: [
+    { to: "/", match: "/__dashboard", label: "工作台", icon: LayoutDashboard },
     { to: "/payroll/monthly", match: "/payroll", label: "薪資結算", icon: CalendarClock, tag: "例行" },
     { to: "/attendance", match: "/attendance", label: "出勤打卡", icon: Clock },
   ] },
@@ -62,7 +64,7 @@ export default function App() {
     <Routes>
       <Route path="/setup" element={<SetupRoute />} />
       <Route element={<Layout />}>
-        <Route index element={<Navigate to="/payroll/monthly" replace />} />
+        <Route index element={<DashboardView />} />
         <Route path="/payroll/:step" element={<PayrollRoute />} />
         <Route path="/analytics" element={<AnalyticsView />} />
         <Route path="/projects" element={<ProjectsView />} />
@@ -100,7 +102,7 @@ function PayrollRoute() {
 
 /** 主版面：左側邊欄分區＋內容 Outlet；未完成初始設定則導向設定引導 */
 function Layout() {
-  const { setupCompleted, employees, salaries, dependents, events, parameters, currentPeriod, confirmations } =
+  const { setupCompleted, employees, salaries, dependents, events, parameters, brackets, currentPeriod, confirmations } =
     usePayrollStore();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -108,7 +110,7 @@ function Layout() {
   if (!setupCompleted) return <Navigate to="/setup" replace />;
 
   const periodEvents = events.filter((e) => e.period === currentPeriod);
-  const issues = validateAll(employees, salaries, dependents, periodEvents, parameters);
+  const issues = validateAll(employees, salaries, dependents, periodEvents, parameters, brackets);
   const errors = issues.filter((i) => i.severity === "error").length;
   const confirmed = Boolean(confirmations[currentPeriod]);
 
@@ -142,7 +144,7 @@ function Layout() {
                 <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{sec.title}</p>
                 <div className="space-y-0.5">
                   {sec.items.map((m) => {
-                    const active = location.pathname.startsWith(m.match);
+                    const active = m.to === "/" ? location.pathname === "/" : location.pathname.startsWith(m.match);
                     return (
                       <NavLink
                         key={m.to}

@@ -38,11 +38,12 @@ describe("client mount + 路由（白屏防護）", () => {
     expect(div.textContent).toContain("歡迎使用薪資管理系統");
   });
 
-  it("返回使用者：/ → 導向每月薪資作業（步驟列）", async () => {
+  it("返回使用者：/ → 本月工作台（待辦聚合首頁）", async () => {
     seedDone();
     const div = await mountAt("/");
-    expect(div.textContent).toContain("每月薪資作業");
-    expect(div.textContent).toContain("輸入當月異動");
+    expect(div.textContent).toContain("本月工作台");
+    expect(div.textContent).toContain("資料檢查錯誤");
+    expect(div.textContent).toContain("本月應加保");
   });
 
   it("深連結 /sources → 法規依據頁", async () => {

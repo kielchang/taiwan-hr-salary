@@ -23,8 +23,9 @@ import type { AuditAction } from "@/lib/types";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban } from "lucide-react";
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
-  salary: "薪資異動", employee: "員工異動", event: "結算異動", confirm: "月結確認",
+  salary: "薪資異動", employee: "員工異動", dependent: "眷屬異動", event: "結算異動", confirm: "月結確認",
   raiseApply: "調薪核定", import: "批次匯入", restore: "整檔還原", project: "專案異動",
+  parameter: "參數異動", declare: "申報基準", allocation: "工時分攤", clear: "清空資料",
 };
 
 interface Field {
@@ -98,7 +99,8 @@ type SecTab = "legal" | "company" | "data";
 const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", "公司與出勤"], ["data", "資料與安全"]];
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog } = usePayrollStore();
+  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, currentPeriod, confirmations } = usePayrollStore();
+  const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：當期已確認 → 參數/級距凍結
   const fileRef = useRef<HTMLInputElement>(null);
 
   const exportAudit = () => {
@@ -156,6 +158,8 @@ export function SettingsView() {
             step={f.kind === "rate" ? "0.01" : undefined}
             className={`h-8 ${tone === "company" ? "col-assumption" : "col-input"}`}
             value={display}
+            disabled={locked}
+            title={locked ? "本月已確認結算，參數已鎖定" : undefined}
             onChange={(e) => onChange(e.target.value)}
           />
           <span className="w-5 shrink-0 text-xs text-muted-foreground">
@@ -181,6 +185,13 @@ export function SettingsView() {
           <Wand2 /> 重新執行初始設定引導
         </Button>
       </div>
+
+      {locked && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <Info className="mt-0.5 size-4 shrink-0" />
+          <p><span className="font-medium">本月已確認結算，法定參數與級距已鎖定。</span>如需調整，請先至「查核與確認」取消本月確認。</p>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-1">
         {SEC_TABS.map(([k, label]) => (

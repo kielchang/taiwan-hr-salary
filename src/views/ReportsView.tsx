@@ -1,4 +1,5 @@
 import { useState, useRef, createElement } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -16,10 +17,11 @@ import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
 import { PayslipCard } from "@/views/PayslipCard";
 import { Printer, Wand2, Lock, Mail, AlertTriangle, Package, CheckCircle2, FileText, Users } from "lucide-react";
 
-type Tab = "summary" | "tax" | "payslip";
+export type ReportsTab = "summary" | "tax" | "payslip";
+type Tab = ReportsTab;
 
-export function ReportsView() {
-  const [tab, setTab] = useState<Tab>("summary");
+export function ReportsView({ initialTab }: { initialTab?: ReportsTab } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? "summary");
   const { currentPeriod, confirmations } = usePayrollStore();
   const confirmed = Boolean(confirmations[currentPeriod]);
 
@@ -212,7 +214,9 @@ function ProjectPnL({ rows, bonusOf }: { rows: PayrollRow[]; bonusOf: (id: strin
 /* ---------- 所得稅扣繳 ---------- */
 
 function TaxReport() {
-  const { employees, events, currentPeriod, upsertEvent } = usePayrollStore();
+  const { employees, events, currentPeriod, upsertEvent, confirmations } = usePayrollStore();
+  const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：已確認月份不可再帶入
+  const navigate = useNavigate();
   const rows = usePayrollRows();
 
   const getEvent = (id: string) =>
@@ -235,10 +239,14 @@ function TaxReport() {
     { key: "threshold", header: "起扣點（估）", numeric: true, sortValue: (t) => t.r.estimatedTaxThreshold ?? -1, cell: (t) => (t.r.estimatedTaxThreshold === null ? "—" : ntd(t.r.estimatedTaxThreshold)) },
     { key: "suggest", header: "建議金額", numeric: true, sortValue: (t) => (t.sug.type === "auto" ? t.sug.amount : Number.MAX_SAFE_INTEGER), cell: (t) => (t.sug.type === "auto" ? ntd(t.sug.amount) : <Badge variant="warning">請查官方稅額表</Badge>) },
     { key: "filled", header: "已填金額", numeric: true, sortValue: (t) => t.ev.withheldTax ?? -1, cell: (t) => (t.ev.withheldTax === null ? <span className="text-muted-foreground">未填</span> : <span className="font-medium">{ntd(t.ev.withheldTax)}</span>), total: (rs) => <span className="font-bold">{ntd(rs.reduce((a, t) => a + t.r.withheldTax, 0))}</span> },
-    { key: "ops", header: "", headerClassName: "w-24 print:hidden", cellClassName: "print:hidden", cell: (t) => {
+    { key: "ops", header: "", headerClassName: "w-28 print:hidden", cellClassName: "print:hidden", cell: (t) => {
       const { sug, ev } = t;
-      if (sug.type !== "auto" || ev.withheldTax === sug.amount) return null;
-      return <Button variant="outline" size="sm" className="h-7" onClick={() => upsertEvent({ ...ev, withheldTax: sug.amount })}><Wand2 className="size-3.5" /> 帶入</Button>;
+      if (sug.type === "auto") {
+        if (ev.withheldTax === sug.amount) return null;
+        return <Button variant="outline" size="sm" className="h-7" disabled={locked} title={locked ? "本月已確認鎖定" : undefined} onClick={() => upsertEvent({ ...ev, withheldTax: sug.amount })}><Wand2 className="size-3.5" /> 帶入</Button>;
+      }
+      // 查表類：直接跳到該員的結算對話框填入（免手動搜尋）
+      return <Button variant="outline" size="sm" className="h-7" disabled={locked} title={locked ? "本月已確認鎖定" : "查官方稅額表後至結算填入"} onClick={() => navigate(`/payroll/monthly?emp=${t.r.employeeId}`)}>前往填寫</Button>;
     } },
   ];
 
@@ -257,6 +265,21 @@ function TaxReport() {
           columns={columns}
           getRowKey={(t) => t.r.employeeId}
           searchPlaceholder="搜尋員工…"
+          toolbar={(() => {
+            const pendingAuto = taxRows.filter((t) => t.sug.type === "auto" && t.ev.withheldTax !== (t.sug.type === "auto" ? t.sug.amount : null));
+            return (
+              <Button
+                variant="outline" size="sm" disabled={locked || pendingAuto.length === 0}
+                title={locked ? "本月已確認鎖定" : undefined}
+                onClick={() => {
+                  if (!confirm(`將 ${pendingAuto.length} 名員工的「建議金額」一次帶入「已填金額」？（查表類不受影響）`)) return;
+                  pendingAuto.forEach((t) => { if (t.sug.type === "auto") upsertEvent({ ...t.ev, withheldTax: t.sug.amount }); });
+                }}
+              >
+                <Wand2 /> 全部帶入建議值{pendingAuto.length > 0 ? `（${pendingAuto.length}）` : ""}
+              </Button>
+            );
+          })()}
           csv={{
             headers: ["員工編號", "姓名", "身分／方式", "扶養人數", "應稅薪資(估)", "起扣點(估)", "建議金額", "已填金額"],
             row: (t) => [t.r.employeeId, t.r.name, t.method, t.r.dependents.taxDependents, t.r.taxableSalary, t.r.estimatedTaxThreshold ?? "", t.sug.type === "auto" ? t.sug.amount : "查表", t.ev.withheldTax ?? ""],

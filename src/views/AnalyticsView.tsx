@@ -27,6 +27,8 @@ import {
   analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
   analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost, type Insight,
 } from "@/lib/insights";
+import { addMonths } from "@/data/seed";
+import { useNavigate } from "react-router-dom";
 import { computeProjectCost, projectDeptMatrix, chargeOutVariance, UNALLOCATED_ID } from "@/lib/reports/projectCost";
 import { projectCostByPeriod, projectEac } from "@/lib/reports/projectTrend";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
@@ -666,16 +668,34 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
 
 /* ───────── 年度／季度調薪試算 ───────── */
 function RaiseTab({ rows }: { rows: PayrollRow[] }) {
-  const { analytics, parameters, brackets, setRaiseScenario, applyRaise } = usePayrollStore();
+  const { analytics, parameters, brackets, setRaiseScenario, applyRaise, scheduleRaises, currentPeriod, confirmations } = usePayrollStore();
   const rs = analytics.raiseScenario;
   const result: RaiseSimResult = simulateRaise(rows, analytics, parameters, brackets);
   const quarterly = rs.cadence === "quarterly";
   const [applyOpen, setApplyOpen] = useState(false);
+  const [effectivePeriod, setEffectivePeriod] = useState(() => addMonths(currentPeriod, 1)); // 預設下月生效
+  const [applyMsg, setApplyMsg] = useState<string | null>(null);
+  const navigate = useNavigate();
   const changedRows = result.rows.filter((r) => r.monthlyIncrease !== 0);
+  const note = `${RAISE_LABEL[rs.method]}・平均 ${result.avgRaisePct.toFixed(1)}%`;
   const doApply = () => {
-    applyRaise(changedRows.map((r) => ({ employeeId: r.employeeId, newSalary: r.newSalary })), `${RAISE_LABEL[rs.method]}・平均 ${result.avgRaisePct.toFixed(1)}%`);
+    if (effectivePeriod <= currentPeriod) {
+      // 當期（或過往）生效 → 立即寫回；硬鎖定時擋下
+      if (confirmations[currentPeriod]) {
+        alert(`本月（${currentPeriod}）已確認結算，無法立即寫回調薪。\n請改選未來生效月份（存為排程），或先取消本月確認。`);
+        return;
+      }
+      applyRaise(changedRows.map((r) => ({ employeeId: r.employeeId, newSalary: r.newSalary })), note);
+      setApplyMsg(`已將 ${changedRows.length} 人的調薪寫回薪資結構（差額套在本薪）。`);
+    } else {
+      // 未來月份 → 存為排程，到期由「工作台」套用
+      scheduleRaises(changedRows.map((r) => ({
+        employeeId: r.employeeId, name: r.name, newSalary: r.newSalary,
+        effectivePeriod, note, decidedAt: new Date().toISOString(),
+      })));
+      setApplyMsg(`已排程 ${changedRows.length} 人的調薪，自 ${effectivePeriod} 生效；到期後可在「工作台」一鍵套用。`);
+    }
     setApplyOpen(false);
-    alert(`已將 ${changedRows.length} 人的調薪寫回薪資結構。差額套用在本薪，可至「基本資料」或「每月薪資作業」確認。`);
   };
   const [selRating, setSelRating] = useState<string | null>(null);
 
@@ -705,6 +725,15 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
   return (
     <div className="space-y-4">
       <SandboxNotice applyHint />
+      {applyMsg && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2.5 text-sm text-emerald-900">
+          <span className="flex items-center gap-2"><CheckCircle2 className="size-4 shrink-0" />{applyMsg}</span>
+          <span className="flex shrink-0 gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/master")}>前往基本資料查看</Button>
+            <Button variant="ghost" size="sm" onClick={() => setApplyMsg(null)}>關閉</Button>
+          </span>
+        </div>
+      )}
       <InsightList insights={insights} />
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">調薪情境設定</CardTitle></CardHeader>
@@ -847,7 +876,17 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
           <div className="space-y-3">
             <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
               <Info className="mt-0.5 size-4 shrink-0" />
-              此操作會把 {changedRows.length} 人的調後月薪<strong>寫回薪資結構（差額套在本薪）</strong>，並留下稽核紀錄；之後當月結算會自動以新薪資計算。試算僅本次套用，請確認無誤。
+              此操作會把 {changedRows.length} 人的調後月薪<strong>寫回薪資結構（差額套在本薪）</strong>，並留下稽核紀錄。
+              生效月份為<strong>未來月份</strong>時先存為排程，到期後於「工作台」一鍵套用；為當月時立即寫回。
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="生效月份" help={effectivePeriod <= currentPeriod ? "＝當月：確認後立即寫回薪資結構" : `未來月份：先存排程，${effectivePeriod} 到期後套用`}>
+                <Input type="month" className="h-9 w-40 col-input" min={currentPeriod} value={effectivePeriod}
+                  onChange={(e) => e.target.value && setEffectivePeriod(e.target.value)} />
+              </Field>
+              <Badge variant={effectivePeriod <= currentPeriod ? "warning" : "secondary"}>
+                {effectivePeriod <= currentPeriod ? "立即寫回" : `排程・${effectivePeriod} 生效`}
+              </Badge>
             </div>
             <DataTable
               rows={changedRows}
@@ -1372,8 +1411,14 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
     </CardContent></Card>
   );
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1"><Label className="text-xs">{label}</Label>{children}</div>;
+function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      {children}
+      {help && <p className="text-[11px] leading-snug text-muted-foreground">{help}</p>}
+    </div>
+  );
 }
 function DetailPanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (

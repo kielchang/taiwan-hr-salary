@@ -95,6 +95,17 @@ export function sumTotals(rows: PayrollRow[], bonusByEmp: Map<string, number>): 
   );
 }
 
+/**
+ * 該員工「本期之前」的年度累計獎金（同一年份、期別小於 period 之 monthlyBonus 合計）。
+ * 供編輯對話框自動帶入累計值：系統累計＝本值＋本月發放，取代人工記憶（影響二代健保 4× 門檻）。
+ */
+export function ytdBonusBefore(events: MonthlyEvent[], employeeId: string, period: string): number {
+  const year = period.slice(0, 4);
+  return events
+    .filter((e) => e.employeeId === employeeId && e.period.startsWith(year) && e.period < period)
+    .reduce((a, e) => a + e.monthlyBonus, 0);
+}
+
 /** 投保單位（公司）二代健保補充保費（差額制，§5.7） */
 export function useCompanySupplementary(rows: PayrollRow[]): number {
   const parameters = usePayrollStore((s) => s.parameters);

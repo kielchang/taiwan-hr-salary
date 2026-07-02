@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { saveBlob } from "@/lib/payslipPdf";
 import { csvSerialize } from "@/lib/csv";
 import { parseEmployeeCsv, IMPORT_COLUMNS, type ImportPreview } from "@/lib/import/employeeCsv";
 import { cn, ntd } from "@/lib/utils";
+import { HelpHint } from "@/components/HelpHint";
 import { Pencil, Plus, Trash2, UserPlus, Upload, FileDown } from "lucide-react";
 
 const STATUS_OPTIONS: Employee["status"][] = ["在職", "離職", "留停"];
@@ -66,7 +68,9 @@ export function MasterDataView() {
   const {
     employees, salaries, dependents, parameters, brackets,
     upsertEmployee, upsertSalary, setEmployeeDependents, removeEmployee, importEmployees,
+    currentPeriod, confirmations,
   } = usePayrollStore();
+  const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：當期已確認
 
   const [importOpen, setImportOpen] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -121,6 +125,27 @@ export function MasterDataView() {
       setTab("basic");
       return;
     }
+    // 防呆：新增時員編不可與既有員工重複（否則會靜默覆蓋他人資料）
+    if (isNew && employees.some((e) => e.id === id)) {
+      alert(`員工編號「${id}」已存在（${employees.find((e) => e.id === id)?.name}）。請改用其他編號，或由清單開啟該員編輯。`);
+      setTab("basic");
+      return;
+    }
+    // 硬鎖定：當期已確認時，影響薪資之欄位（薪資結構/眷屬/到離職/扣繳設定）不可變更
+    if (locked) {
+      const prev = employees.find((e) => e.id === id);
+      const prevSalary = salaries.find((s) => s.employeeId === id);
+      const prevDeps = dependents.filter((d) => d.employeeId === id);
+      const PAY_KEYS = ["hireDate", "status", "leaveDate", "voluntaryPensionRate", "taxResidency", "withholdingMethod", "exemptionFormReceivedDate"] as const;
+      const payChanged =
+        !prev || PAY_KEYS.some((k) => (prev[k] ?? null) !== (draftEmp[k] ?? null)) ||
+        JSON.stringify(prevSalary ?? blankSalary(id)) !== JSON.stringify({ ...draftSalary, employeeId: id }) ||
+        JSON.stringify(prevDeps) !== JSON.stringify(draftDeps.map((d) => ({ ...d, employeeId: id })));
+      if (payChanged) {
+        alert(`本月（${currentPeriod}）已確認結算，薪資相關資料已鎖定。\n請先至「每月作業 → 查核與確認」取消確認，再修改到離職、薪資結構、眷屬或扣繳設定。`);
+        return;
+      }
+    }
     upsertEmployee({ ...draftEmp, id });
     upsertSalary({ ...draftSalary, employeeId: id });
     setEmployeeDependents(id, draftDeps.map((d) => ({ ...d, employeeId: id })));
@@ -129,6 +154,17 @@ export function MasterDataView() {
 
   const setEmp = <K extends keyof Employee>(k: K, v: Employee[K]) =>
     setDraftEmp((d) => ({ ...d, [k]: v }));
+
+  // 深連結 ?emp=E001：由查核/名冊等處跳轉時直接開啟該員檔案，免再搜尋
+  const [searchParams, setSearchParams] = useSearchParams();
+  const empParam = searchParams.get("emp");
+  useEffect(() => {
+    if (!empParam) return;
+    const target = employees.find((e) => e.id === empParam);
+    if (target) openEdit(target);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empParam]);
 
   const draftTotal = monthlySalaryTotal(draftSalary);
   const draftInsured = lookupInsuredAmounts(brackets, draftTotal);
@@ -212,7 +248,7 @@ export function MasterDataView() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold">基本資料</h1>
+          <h1 className="flex items-center gap-2 text-lg font-bold">基本資料 <HelpHint id="master" /></h1>
           <p className="text-sm text-muted-foreground">
             每位員工一份檔案：基本資料、固定薪資項目與眷屬都在同一個視窗維護。
             年資、特休與投保級距由系統自動計算。

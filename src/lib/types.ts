@@ -245,13 +245,18 @@ export interface Allocation {
 
 export type AuditAction =
   | "salary" // 薪資結構異動
-  | "employee" // 員工主檔異動
+  | "employee" // 員工主檔異動（含刪除）
+  | "dependent" // 眷屬異動（影響健保費與扣繳起扣點）
   | "event" // 結算事件（敏感欄位如代扣稅）異動
   | "confirm" // 月結確認／取消
   | "raiseApply" // 調薪方案核定寫回
   | "import" // 批次匯入
   | "restore" // 整檔還原
-  | "project"; // 專案主檔異動
+  | "project" // 專案主檔異動
+  | "parameter" // 法定參數／級距表異動（影響全體計算）
+  | "declare" // 投保級距申報基準設定
+  | "allocation" // 工時分攤異動
+  | "clear"; // 清空資料
 
 export interface AuditEntry {
   id: string;
@@ -261,6 +266,19 @@ export interface AuditEntry {
   targetId?: string; // 員工編號等
   period?: string;
   summary: string; // 一句話描述（含前後值）
+}
+
+/* ───────────── 調薪排程（核定於未來月份生效） ───────────── */
+
+/** 排程調薪：核定時指定生效月份，到期由工作台套用寫回薪資結構 */
+export interface ScheduledRaise {
+  id: string;
+  employeeId: string;
+  name: string; // 快照姓名（顯示用）
+  newSalary: number; // 調後月薪資總額
+  effectivePeriod: string; // 生效月份 yyyy-mm
+  note: string; // 方案摘要（如「merit matrix・平均 3.2%」）
+  decidedAt: string; // 核定時間 ISO
 }
 
 /* ───────────── 投保級距申報基準（2/8 月申報調整用） ───────────── */

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PrintHeader } from "@/components/PrintHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { useNavigate } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows } from "@/store/selectors";
 import { cn, ntd, formatPeriod } from "@/lib/utils";
@@ -15,7 +16,8 @@ import { enrollmentWorklist } from "@/lib/reports/enrollment";
 import type { DeclaredInsured } from "@/lib/types";
 import { Scale, UserPlus, UserMinus, ArrowRight } from "lucide-react";
 
-type Tab = "withholding" | "insurance" | "bracket" | "enrollment";
+export type FilingTab = "withholding" | "insurance" | "bracket" | "enrollment";
+type Tab = FilingTab;
 const TABS: [Tab, string][] = [
   ["withholding", "年度扣繳憑單"],
   ["insurance", "勞健退繳費清單"],
@@ -23,8 +25,8 @@ const TABS: [Tab, string][] = [
   ["enrollment", "加退保作業清單"],
 ];
 
-export function FilingView() {
-  const [tab, setTab] = useState<Tab>("withholding");
+export function FilingView({ initialTab }: { initialTab?: FilingTab } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? "withholding");
   const currentPeriod = usePayrollStore((s) => s.currentPeriod);
   return (
     <div className="space-y-4">
@@ -214,6 +216,21 @@ function BracketTab() {
 function EnrollmentTab() {
   const { employees, currentPeriod } = usePayrollStore();
   const { newHires, leavers } = enrollmentWorklist(employees, currentPeriod);
+  const navigate = useNavigate();
+  /** 名冊列可點：直接開該員檔案核對投保金額/薪資（免回主檔搜尋） */
+  const row = (e: (typeof newHires)[number], badge: React.ReactNode) => (
+    <li key={e.id}>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 rounded border p-2 text-left hover:bg-accent/50"
+        onClick={() => navigate(`/master?emp=${e.id}`)}
+        title="開啟員工檔案核對投保資料"
+      >
+        <span>{e.name}（{e.id}）{e.department}</span>
+        <span className="flex items-center gap-1.5">{badge}<ArrowRight className="size-3.5 text-muted-foreground" /></span>
+      </button>
+    </li>
+  );
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card className="print-block">
@@ -227,7 +244,7 @@ function EnrollmentTab() {
         <CardContent>
           {newHires.length === 0 ? <EmptyState title="本月無新進" compact /> : (
             <ul className="space-y-1 text-sm">
-              {newHires.map((e) => <li key={e.id} className="flex items-center justify-between rounded border p-2"><span>{e.name}（{e.id}）{e.department}</span><Badge variant="success">加保・{e.hireDate}</Badge></li>)}
+              {newHires.map((e) => row(e, <Badge variant="success">加保・{e.hireDate}</Badge>))}
             </ul>
           )}
         </CardContent>
@@ -243,7 +260,7 @@ function EnrollmentTab() {
         <CardContent>
           {leavers.length === 0 ? <EmptyState title="本月無退保" compact /> : (
             <ul className="space-y-1 text-sm">
-              {leavers.map((e) => <li key={e.id} className="flex items-center justify-between rounded border p-2"><span>{e.name}（{e.id}）{e.department}</span><Badge variant="warning">退保・{e.leaveDate}</Badge></li>)}
+              {leavers.map((e) => row(e, <Badge variant="warning">退保・{e.leaveDate}</Badge>))}
             </ul>
           )}
         </CardContent>

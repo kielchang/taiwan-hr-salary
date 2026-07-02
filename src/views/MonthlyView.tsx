@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { calculatePayroll } from "@/lib/calc";
+import { monthWorkedHours } from "@/lib/attendance";
+import { ytdBonusBefore } from "@/store/selectors";
+import { addMonths as addMonthsStr } from "@/data/seed";
 import type { MonthlyEvent } from "@/lib/types";
 import { ntd, formatPeriod } from "@/lib/utils";
 import { AllocationEditor } from "@/views/AllocationEditor";
@@ -35,8 +39,10 @@ export function MonthlyView({
 }) {
   const {
     employees, dependents, events, parameters, brackets,
-    currentPeriod, setCurrentPeriod, upsertEvent, getSalary,
+    currentPeriod, setCurrentPeriod, upsertEvent, getSalary, confirmations,
+    attendance, punches,
   } = usePayrollStore();
+  const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：已確認月份禁止異動
 
   const [editing, setEditing] = useState<string | null>(null); // employeeId
   const [draft, setDraft] = useState<MonthlyEvent | null>(null);
@@ -53,6 +59,39 @@ export function MonthlyView({
     setEditing(null);
     setDraft(null);
   };
+  /** 儲存並接續編輯清單中的下一位（減少逐人開關對話框的來回） */
+  const saveAndNext = () => {
+    if (draft) upsertEvent(draft);
+    const idx = employees.findIndex((e) => e.id === editing);
+    const next = employees[idx + 1];
+    if (next) openEdit(next.id);
+    else { setEditing(null); setDraft(null); }
+  };
+  /** 帶入上月異動：加班五欄＋事/病假＋其他加扣項（獎金、累計與代扣稅不帶，避免誤重發） */
+  const copyLastMonth = () => {
+    if (!editing || !draft) return;
+    const prevPeriod = addMonthsStr(currentPeriod, -1);
+    const prev = events.find((e) => e.employeeId === editing && e.period === prevPeriod);
+    if (!prev) { alert(`上月（${prevPeriod}）沒有 ${editingEmp?.name ?? editing} 的異動可帶入。`); return; }
+    setDraft({
+      ...draft,
+      overtimeWeekday1: prev.overtimeWeekday1, overtimeWeekday2: prev.overtimeWeekday2,
+      overtimeRestday1: prev.overtimeRestday1, overtimeRestday2: prev.overtimeRestday2,
+      overtimeHoliday: prev.overtimeHoliday,
+      personalLeaveHours: prev.personalLeaveHours, sickLeaveHours: prev.sickLeaveHours,
+      otherAddition: prev.otherAddition, otherDeduction: prev.otherDeduction,
+    });
+  };
+
+  // 深連結 ?emp=E001：由查核/稅表跳轉時直接開啟該員異動對話框
+  const [searchParams, setSearchParams] = useSearchParams();
+  const empParam = searchParams.get("emp");
+  useEffect(() => {
+    if (!empParam) return;
+    if (employees.some((e) => e.id === empParam)) openEdit(empParam);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empParam]);
 
   const rows = employees.map((emp) => {
     const ev = getEvent(emp.id);
@@ -65,6 +104,10 @@ export function MonthlyView({
     editingEmp && draft
       ? calculatePayroll(editingEmp, getSalary(editingEmp.id), dependents, draft, parameters, brackets)
       : null;
+  // 系統累計獎金（今年、本期之前）：自動帶入累計欄，取代人工記憶
+  const ytdPrior = editingEmp ? ytdBonusBefore(events, editingEmp.id, currentPeriod) : 0;
+  // 出勤參考：該員本月打卡工時 vs 標準工時（無資料則不顯示；僅供加班輸入參考）
+  const workedHours = editingEmp ? monthWorkedHours(attendance, currentPeriod, punches).get(editingEmp.id) : undefined;
 
   const patchDraft = (p: Partial<MonthlyEvent>) => setDraft((d) => (d ? { ...d, ...p } : d));
 
@@ -89,6 +132,16 @@ export function MonthlyView({
           </div>
         )}
       </div>
+
+      {locked && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <Info className="mt-0.5 size-4 shrink-0" />
+          <p>
+            <span className="font-medium">{formatPeriod(currentPeriod)} 已確認結算，資料已鎖定。</span>
+            如需修改加班/請假/獎金等異動，請先至「查核與確認」按「取消確認」（快照將移除，重新確認後重建）。
+          </p>
+        </div>
+      )}
 
       {employees.length === 0 ? (
         <Card>
@@ -118,7 +171,7 @@ export function MonthlyView({
                 { key: "gross", header: "應發", numeric: true, sortValue: ({ r }) => r.grossPay, cell: ({ r }) => ntd(r.grossPay), total: (rs) => ntd(rs.reduce((a, { r }) => a + r.grossPay, 0)) },
                 { key: "ded", header: "代扣合計", numeric: true, sortValue: ({ r }) => r.totalDeductions, cell: ({ r }) => <span className="text-muted-foreground">−{ntd(r.totalDeductions)}</span>, total: (rs) => `−${ntd(rs.reduce((a, { r }) => a + r.totalDeductions, 0))}` },
                 { key: "net", header: "實發", numeric: true, sortValue: ({ r }) => r.netPay, cell: ({ r }) => <span className="font-semibold">{ntd(r.netPay)}</span>, total: (rs) => <span className="font-bold">{ntd(rs.reduce((a, { r }) => a + r.netPay, 0))}</span> },
-                { key: "ops", header: "", headerClassName: "w-24", cell: ({ emp }) => <Button variant="outline" size="sm" onClick={() => openEdit(emp.id)}><Pencil className="size-3.5" /> 編輯</Button> },
+                { key: "ops", header: "", headerClassName: "w-24", cell: ({ emp }) => <Button variant="outline" size="sm" disabled={locked} title={locked ? "本月已確認鎖定" : undefined} onClick={() => openEdit(emp.id)}><Pencil className="size-3.5" /> 編輯</Button> },
               ]}
             />
 
@@ -137,7 +190,16 @@ export function MonthlyView({
 
       {/* 單人異動編輯視窗 */}
       <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
+          onKeyDown={(e) => {
+            // Enter＝儲存；Shift+Enter＝儲存並下一位（數字欄免滑鼠來回）
+            if (e.key !== "Enter" || (e.target as HTMLElement).tagName === "BUTTON") return;
+            e.preventDefault();
+            if (e.shiftKey) saveAndNext();
+            else saveDraft();
+          }}
+        >
           {editingEmp && draft && liveResult && (
             <>
               <DialogHeader>
@@ -162,6 +224,12 @@ export function MonthlyView({
                       <Badge variant="warning" className="ml-2">超過每月 46 小時上限，請留意</Badge>
                     )}
                   </p>
+                  {workedHours != null && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      出勤參考：本月打卡工時 <span className="font-medium text-foreground">{workedHours} h</span>
+                      （超出應工作時數的部分請對照出勤明細，分級填入上方加班欄；系統不自動回填）。
+                    </p>
+                  )}
                 </section>
 
                 <section>
@@ -181,19 +249,28 @@ export function MonthlyView({
                   <div className="grid grid-cols-2 gap-3">
                     <Num
                       label="本月發放獎金" wide v={draft.monthlyBonus}
-                      on={(v) => patchDraft({ monthlyBonus: v, cumulativeBonus: Math.max(draft.cumulativeBonus, v) })}
+                      on={(v) => patchDraft({ monthlyBonus: v, cumulativeBonus: ytdPrior + v })}
                     />
                     <Num
-                      label="今年累計獎金（含本月）" wide help="供二代健保補充保費「年度累計」判斷；首次發放填同本月金額"
+                      label="今年累計獎金（含本月）" wide
+                      help={`系統累計 ${ntd(ytdPrior + draft.monthlyBonus)} 元（今年已輸入 ${ntd(ytdPrior)}＋本月），已自動帶入，可覆寫`}
                       v={draft.cumulativeBonus} on={(v) => patchDraft({ cumulativeBonus: v })}
                     />
                   </div>
-                  {draft.monthlyBonus > 0 && (
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      二代健保補充保費：<span className="font-medium text-foreground">{ntd(liveResult.personalSupplementary)}</span> 元
-                      （超過投保金額 4 倍門檻的部分 × 2.11%）
-                    </p>
-                  )}
+                  <div className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+                    {draft.cumulativeBonus < draft.monthlyBonus && (
+                      <p><Badge variant="destructive">累計小於本月發放</Badge> 補充保費將少算，請修正。</p>
+                    )}
+                    {draft.cumulativeBonus !== ytdPrior + draft.monthlyBonus && draft.cumulativeBonus >= draft.monthlyBonus && (
+                      <p><Badge variant="warning">與系統累計不同</Badge> 系統依今年已輸入獎金推得 {ntd(ytdPrior + draft.monthlyBonus)} 元；若有系統外發放才需自行覆寫。</p>
+                    )}
+                    {draft.monthlyBonus > 0 && (
+                      <p>
+                        二代健保補充保費：<span className="font-medium text-foreground">{ntd(liveResult.personalSupplementary)}</span> 元
+                        （超過投保金額 4 倍門檻的部分 × 2.11%）
+                      </p>
+                    )}
+                  </div>
                 </section>
 
                 <section>
@@ -251,9 +328,15 @@ export function MonthlyView({
                 </div>
               </div>
 
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setEditing(null)}>取消</Button>
-                <Button onClick={saveDraft}>儲存本月異動</Button>
+              <DialogFooter className="flex-wrap gap-1.5 sm:justify-between">
+                <Button variant="outline" size="sm" onClick={copyLastMonth} title="帶入上月的加班/請假/其他加扣項（不含獎金與代扣稅）">
+                  <Wand2 className="size-3.5" /> 帶入上月異動
+                </Button>
+                <span className="flex gap-1.5">
+                  <Button variant="outline" onClick={() => setEditing(null)}>取消</Button>
+                  <Button variant="secondary" onClick={saveAndNext} title="儲存後接續編輯下一位員工">儲存並下一位</Button>
+                  <Button onClick={saveDraft}>儲存本月異動</Button>
+                </span>
               </DialogFooter>
             </>
           )}

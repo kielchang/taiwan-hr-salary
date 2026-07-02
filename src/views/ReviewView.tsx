@@ -9,7 +9,7 @@ import { PrintHeader } from "@/components/PrintHeader";
 import { useNavigate } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary } from "@/store/selectors";
-import { validateAll } from "@/lib/validation";
+import { validateAll, allocationIssues } from "@/lib/validation";
 import { lookupBracket, monthlySalaryTotal, supplementaryBaseDifferential, bonusWithholding } from "@/lib/calc";
 import { buildSnapshot } from "@/lib/analytics";
 import { simulateAnnual } from "@/lib/reports/annual";
@@ -21,9 +21,9 @@ type Tab = "overview" | "checks" | "bonus";
 
 export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => void }) {
   const {
-    employees, salaries, dependents, events, parameters,
+    employees, salaries, dependents, events, parameters, brackets,
     currentPeriod, confirmations, confirmPeriod, unconfirmPeriod,
-    snapshots, saveSnapshot, analytics,
+    snapshots, saveSnapshot, analytics, allocations, projects,
   } = usePayrollStore();
   const [tab, setTab] = useState<Tab>("overview");
   const navigate = useNavigate();
@@ -31,7 +31,11 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
   const rows = usePayrollRows();
   const companySupp = useCompanySupplementary(rows);
   const periodEvents = events.filter((e) => e.period === currentPeriod);
-  const issues = validateAll(employees, salaries, dependents, periodEvents, parameters);
+  const nameById = new Map(employees.map((e) => [e.id, e.name]));
+  const issues = [
+    ...validateAll(employees, salaries, dependents, periodEvents, parameters, brackets),
+    ...allocationIssues(allocations, parameters, currentPeriod, nameById),
+  ];
   const errors = issues.filter((i) => i.severity === "error");
 
   const pendingTax = rows.filter(
@@ -243,7 +247,14 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
                           variant="ghost"
                           size="sm"
                           className="h-6 shrink-0 px-2 text-xs print:hidden"
-                          onClick={() => navigate("/master")}
+                          onClick={() =>
+                            // 事件類問題（加班超時/累計獎金/分攤）到結算對話框；主檔類到員工檔案 — 直接開該員，免再搜尋
+                            navigate(
+                              ["V4", "V10", "V11"].includes(i.rule)
+                                ? `/payroll/monthly?emp=${i.employeeId}`
+                                : `/master?emp=${i.employeeId}`,
+                            )
+                          }
                         >
                           前往修正 <ArrowRight className="size-3" />
                         </Button>
@@ -264,7 +275,11 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
               {(["department", "costCenter", "project"] as const).map((dim) => {
                 const label = { department: "部門別", costCenter: "成本中心別", project: "專案別" }[dim];
                 const sum = rows.reduce((a, r) => a + r.grossPay, 0);
-                const grouped = rows.reduce((a, r) => a + (r[dim] ? r.grossPay : 0), 0);
+                // 專案別以「主檔代碼存在」為準：自由字串打錯的代碼視為未分類（與專案成本分攤一致）
+                const projectCodes = new Set(projects.map((p) => p.code));
+                const classified = (r: (typeof rows)[number]) =>
+                  dim === "project" ? Boolean(r.project && projectCodes.has(r.project)) : Boolean(r[dim]);
+                const grouped = rows.reduce((a, r) => a + (classified(r) ? r.grossPay : 0), 0);
                 const unclassified = sum - grouped;
                 return (
                   <div key={dim} className="flex items-center justify-between rounded-md border px-3 py-2">
