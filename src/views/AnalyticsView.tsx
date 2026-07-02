@@ -19,7 +19,7 @@ import {
   buildBasis, simulateBonusPool, simulateRaise, buildSnapshot, compareRaiseMethods,
   type BonusSimResult, type RaiseSimResult,
 } from "@/lib/analytics";
-import { StackedBar, Legend, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, TrendChart, PALETTE } from "@/components/charts";
+import { StackedBar, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, TrendChart, PALETTE } from "@/components/charts";
 import { Delta } from "@/components/ui/delta";
 import { DataTable } from "@/components/ui/data-table";
 import { ChartCard } from "@/components/ui/chart-card";
@@ -234,6 +234,12 @@ function CostTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
     costPerHead: rows.map((r) => r.employerTotalCost),
   });
 
+  const exportCsv = () => csvDownload(
+    ["員工編號", "姓名", "部門", "本薪", "加給/津貼", "加班費", "獎金", "其他加項", "雇主負擔", "雇主總成本"],
+    rows.map((r) => { const c = comp(r); return [r.employeeId, r.name, r.department, c.base, c.allowance, c.ot, c.bonus, c.other, c.burden, r.employerTotalCost]; }),
+    `成本結構_${period}.csv`,
+  );
+
   return (
     <div className="space-y-4">
       <InsightList insights={insights} />
@@ -274,13 +280,13 @@ function CostTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
         </DetailPanel>
       )}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">員工成本 Pareto（集中度 80/20）</CardTitle>
-          <CardDescription>少數高成本人力佔總成本比例，評估關鍵人力與集中風險。點任一長條看該員成本組成。</CardDescription>
-        </CardHeader>
-        <CardContent><Pareto data={rows.map((r) => ({ label: r.name, value: r.employerTotalCost, id: r.employeeId }))} onSelect={(it) => { setSelEmp((cur) => (cur === it.id ? null : it.id ?? null)); setSelDept(null); }} /></CardContent>
-      </Card>
+      <ChartCard
+        title="員工成本 Pareto（集中度 80/20）"
+        description="少數高成本人力佔總成本比例，評估關鍵人力與集中風險。點任一長條看該員成本組成。"
+        toolbar={<Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>}
+      >
+        <Pareto data={rows.map((r) => ({ label: r.name, value: r.employerTotalCost, id: r.employeeId }))} onSelect={(it) => { setSelEmp((cur) => (cur === it.id ? null : it.id ?? null)); setSelDept(null); }} />
+      </ChartCard>
 
       {selEmp && (() => {
         const r = rows.find((x) => x.employeeId === selEmp);
@@ -334,6 +340,12 @@ function DistTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
 
   const insights = analyzeDistribution(pays, deptMedian);
 
+  const exportCsv = () => csvDownload(
+    ["員工編號", "姓名", "部門", "年資(月)", "月薪資總額", "實發", "雇主總成本"],
+    rows.map((r) => [r.employeeId, r.name, r.department, r.seniorityMonths, r.salaryTotal, r.netPay, r.employerTotalCost]),
+    `分布與公平_${period}.csv`,
+  );
+
   return (
     <div className="space-y-4">
       <InsightList insights={insights} />
@@ -349,20 +361,16 @@ function DistTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">月薪資總額分布（直方圖）</CardTitle>
-            <CardDescription>點任一桶，看落在該薪資區間的員工。</CardDescription>
-          </CardHeader>
-          <CardContent><BarChart data={hist.map((b) => ({ label: `${ntd(b.start)}–${ntd(b.end)}`, value: b.count }))} valueFmt={(n) => `${n} 人`} showValues color={PALETTE[0]} selectedIndex={selBin} onSelect={(_, i) => { setSelBin((cur) => (cur === i ? null : i)); setSelDept(null); setSelEmp(null); }} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Lorenz 曲線（薪資不均）</CardTitle>
-            <CardDescription>曲線越偏離對角線，分配越不均（對應 Gini {g.toFixed(3)}）。</CardDescription>
-          </CardHeader>
-          <CardContent><LineChart points={lorenz} diagonal /></CardContent>
-        </Card>
+        <ChartCard
+          title="月薪資總額分布（直方圖）"
+          description="點任一桶，看落在該薪資區間的員工。"
+          toolbar={<Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>}
+        >
+          <BarChart data={hist.map((b) => ({ label: `${ntd(b.start)}–${ntd(b.end)}`, value: b.count }))} valueFmt={(n) => `${n} 人`} showValues color={PALETTE[0]} selectedIndex={selBin} onSelect={(_, i) => { setSelBin((cur) => (cur === i ? null : i)); setSelDept(null); setSelEmp(null); }} />
+        </ChartCard>
+        <ChartCard title="Lorenz 曲線（薪資不均）" description={`曲線越偏離對角線，分配越不均（對應 Gini ${g.toFixed(3)}）。`}>
+          <LineChart points={lorenz} diagonal />
+        </ChartCard>
       </div>
 
       {selBin !== null && hist[selBin] && (
@@ -371,13 +379,9 @@ function DistTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
         </DetailPanel>
       )}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">部門薪資中位數比較</CardTitle>
-          <CardDescription>點任一部門長條，看該部門員工薪資。</CardDescription>
-        </CardHeader>
-        <CardContent><BarChart data={deptMedian} color={PALETTE[1]} selectedIndex={selDept ? deptMedian.findIndex((d) => d.label === selDept) : null} onSelect={(it) => { setSelDept((cur) => (cur === it.label ? null : it.label)); setSelBin(null); setSelEmp(null); }} /></CardContent>
-      </Card>
+      <ChartCard title="部門薪資中位數比較" description="點任一部門長條，看該部門員工薪資。">
+        <BarChart data={deptMedian} color={PALETTE[1]} selectedIndex={selDept ? deptMedian.findIndex((d) => d.label === selDept) : null} onSelect={(it) => { setSelDept((cur) => (cur === it.label ? null : it.label)); setSelBin(null); setSelEmp(null); }} />
+      </ChartCard>
 
       {selDept && (
         <DetailPanel title={`部門明細：${selDept}`} onClose={() => setSelDept(null)}>
@@ -385,17 +389,11 @@ function DistTab({ rows, period }: { rows: PayrollRow[]; period: string }) {
         </DetailPanel>
       )}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">薪資 vs 年資（薪資壓縮檢視）</CardTitle>
-          <CardDescription>年資高但薪資未相稱，可能為薪資壓縮（pay compression）。點任一點看該員。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Scatter xLabel="年資(月)" yLabel="月薪"
-            points={rows.map((r) => ({ x: r.seniorityMonths, y: r.salaryTotal, id: r.employeeId, label: `${r.name}：年資 ${r.seniorityMonths} 月、${ntd(r.salaryTotal)}` }))}
-            onSelect={(p) => { setSelEmp((cur) => (cur === p.id ? null : p.id ?? null)); setSelBin(null); setSelDept(null); }} />
-        </CardContent>
-      </Card>
+      <ChartCard title="薪資 vs 年資（薪資壓縮檢視）" description="年資高但薪資未相稱，可能為薪資壓縮（pay compression）。點任一點看該員。">
+        <Scatter xLabel="年資(月)" yLabel="月薪"
+          points={rows.map((r) => ({ x: r.seniorityMonths, y: r.salaryTotal, id: r.employeeId, label: `${r.name}：年資 ${r.seniorityMonths} 月、${ntd(r.salaryTotal)}` }))}
+          onSelect={(p) => { setSelEmp((cur) => (cur === p.id ? null : p.id ?? null)); setSelBin(null); setSelDept(null); }} />
+      </ChartCard>
 
       {selEmp && (() => {
         const r = rows.find((x) => x.employeeId === selEmp);
@@ -525,13 +523,9 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
       </Card>
 
       {hasGrades && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">部門 × 級距 compa-ratio 熱圖</CardTitle>
-            <CardDescription>綠＝接近中位(1.0)，藍＝偏低、紅＝偏高。</CardDescription>
-          </CardHeader>
-          <CardContent><Heatmap rowLabels={depts} colLabels={grades.map((g) => g.name)} cells={cells} fmt={(n) => ratioPct(n)} /></CardContent>
-        </Card>
+        <ChartCard title="部門 × 級距 compa-ratio 熱圖" description="綠＝接近中位(1.0)，藍＝偏低、紅＝偏高。">
+          <Heatmap rowLabels={depts} colLabels={grades.map((g) => g.name)} cells={cells} fmt={(n) => ratioPct(n)} />
+        </ChartCard>
       )}
     </div>
   );
@@ -632,20 +626,12 @@ function BonusTab({ rows }: { rows: PayrollRow[] }) {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">試算獎金分布</CardTitle>
-            <CardDescription>點任一長條看該員試算細項。</CardDescription>
-          </CardHeader>
-          <CardContent><BarChart data={result.rows.map((r) => ({ label: r.name, value: r.bonus, id: r.employeeId }))} color={PALETTE[3]} selectedIndex={selEmp ? result.rows.findIndex((r) => r.employeeId === selEmp) : null} onSelect={(it) => setSelEmp((cur) => (cur === it.id ? null : it.id ?? null))} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">績效係數 vs 試算獎金</CardTitle>
-            <CardDescription>檢視 pay-for-performance 對齊度。點任一點看該員。</CardDescription>
-          </CardHeader>
-          <CardContent><Scatter xLabel="績效係數" yLabel="獎金" color={PALETTE[3]} points={result.rows.map((r) => ({ x: r.coefficient, y: r.bonus, id: r.employeeId, label: `${r.name}：${r.ratingKey}、${ntd(r.bonus)}` }))} onSelect={(p) => setSelEmp((cur) => (cur === p.id ? null : p.id ?? null))} /></CardContent>
-        </Card>
+        <ChartCard title="試算獎金分布" description="點任一長條看該員試算細項。">
+          <BarChart data={result.rows.map((r) => ({ label: r.name, value: r.bonus, id: r.employeeId }))} color={PALETTE[3]} selectedIndex={selEmp ? result.rows.findIndex((r) => r.employeeId === selEmp) : null} onSelect={(it) => setSelEmp((cur) => (cur === it.id ? null : it.id ?? null))} />
+        </ChartCard>
+        <ChartCard title="績效係數 vs 試算獎金" description="檢視 pay-for-performance 對齊度。點任一點看該員。">
+          <Scatter xLabel="績效係數" yLabel="獎金" color={PALETTE[3]} points={result.rows.map((r) => ({ x: r.coefficient, y: r.bonus, id: r.employeeId, label: `${r.name}：${r.ratingKey}、${ntd(r.bonus)}` }))} onSelect={(p) => setSelEmp((cur) => (cur === p.id ? null : p.id ?? null))} />
+        </ChartCard>
       </div>
 
       {selEmp && (() => {
@@ -818,13 +804,9 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">平均調幅% by 績效</CardTitle>
-          <CardDescription>點任一評等，看該評等員工的逐人調薪。</CardDescription>
-        </CardHeader>
-        <CardContent><BarChart data={raiseByRating} valueFmt={(n) => `${n.toFixed(1)}%`} color={PALETTE[2]} selectedIndex={selRating ? raiseByRating.findIndex((d) => d.label === selRating) : null} onSelect={(it) => setSelRating((cur) => (cur === it.label ? null : it.label))} /></CardContent>
-      </Card>
+      <ChartCard title="平均調幅% by 績效" description="點任一評等，看該評等員工的逐人調薪。">
+        <BarChart data={raiseByRating} valueFmt={(n) => `${n.toFixed(1)}%`} color={PALETTE[2]} selectedIndex={selRating ? raiseByRating.findIndex((d) => d.label === selRating) : null} onSelect={(it) => setSelRating((cur) => (cur === it.label ? null : it.label))} />
+      </ChartCard>
 
       {selRating && (
         <DetailPanel title={`評等 ${selRating} 的逐人調薪`} onClose={() => setSelRating(null)}>
@@ -962,19 +944,14 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
         <Stat label="未分攤占比" value={pct(result.companyTotal ? (result.projects.find((p) => p.projectId === UNALLOCATED_ID)?.totalCost ?? 0) / result.companyTotal : 0)} />
       </div>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle className="text-base">各專案成本組成</CardTitle>
-            <CardDescription>每位員工全載成本依工時分攤；合計＝全公司總成本（勾稽）。</CardDescription>
-          </div>
-          <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <StackedBar rows={shown.map((p) => ({ label: p.name, segments: SEGS.map((s) => ({ label: s.label, value: p[s.key], color: s.color })) }))} />
-          <Legend items={SEGS.map((s) => ({ label: s.label, color: s.color }))} />
-        </CardContent>
-      </Card>
+      <ChartCard
+        title="各專案成本組成"
+        description="每位員工全載成本依工時分攤；合計＝全公司總成本（勾稽）。"
+        toolbar={<Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>}
+        legend={SEGS.map((s) => ({ label: s.label, color: s.color }))}
+      >
+        <StackedBar rows={shown.map((p) => ({ label: p.name, segments: SEGS.map((s) => ({ label: s.label, value: p[s.key], color: s.color })) }))} />
+      </ChartCard>
 
       <Card>
         <CardHeader className="pb-2">
@@ -1001,32 +978,22 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">成本集中度（Pareto 80/20）</CardTitle></CardHeader>
-          <CardContent><Pareto data={shown.filter((p) => p.projectId !== UNALLOCATED_ID).map((p) => ({ label: p.name, value: p.totalCost }))} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">預算 vs 實際</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {shown.filter((p) => p.budget > 0).length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">尚未設定專案預算（系統設定 → 專案主檔）。</p>
-            ) : shown.filter((p) => p.budget > 0).map((p) => (
-              <Bullet key={p.projectId} label={p.name} value={p.totalCost} target={p.budget} />
-            ))}
-          </CardContent>
-        </Card>
+        <ChartCard title="成本集中度（Pareto 80/20）">
+          <Pareto data={shown.filter((p) => p.projectId !== UNALLOCATED_ID).map((p) => ({ label: p.name, value: p.totalCost }))} />
+        </ChartCard>
+        <ChartCard title="預算 vs 實際" contentClassName="space-y-3">
+          {shown.filter((p) => p.budget > 0).length === 0 ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">尚未設定專案預算（系統設定 → 專案主檔）。</p>
+          ) : shown.filter((p) => p.budget > 0).map((p) => (
+            <Bullet key={p.projectId} label={p.name} value={p.totalCost} target={p.budget} />
+          ))}
+        </ChartCard>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">專案 × 部門成本矩陣</CardTitle>
-            <CardDescription>各專案人事成本由哪些部門投入；每列加總＝該專案總成本。</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Heatmap rowLabels={matrix.rowLabels} colLabels={matrix.colLabels} cells={matrix.cells} domain={[0, maxCell]} fmt={(n) => ntd(n)} />
-          </CardContent>
-        </Card>
+        <ChartCard title="專案 × 部門成本矩陣" description="各專案人事成本由哪些部門投入；每列加總＝該專案總成本。">
+          <Heatmap rowLabels={matrix.rowLabels} colLabels={matrix.colLabels} cells={matrix.cells} domain={[0, maxCell]} fmt={(n) => ntd(n)} />
+        </ChartCard>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">標準工率差異（charge-out）</CardTitle>
@@ -1142,17 +1109,28 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
   const estimatedCount = aMonths.filter((m) => m.estimated).length;
   const sim = simulateAnnual(year, currentPeriod, currentMonthlyCost, snapshots);
 
+  const exportAnnualCsv = () => csvDownload(
+    ["期間", "人數", "月薪資總額", "中位薪資", "總成本", "加班費", "獎金", "估算"],
+    aMonths.map((m) => [m.period, m.snapshot.headcount, m.snapshot.totalSalary, m.snapshot.medianSalary, m.snapshot.totalCost, m.snapshot.overtimePay, m.snapshot.bonusTotal, m.estimated ? "是" : ""]),
+    `年度累計_${year}.csv`,
+  );
+
   return (
     <div className="space-y-4">
       {/* 年報：當年累計與全年推估 */}
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{year} 年累計與全年推估</CardTitle>
-          <CardDescription>
-            「實際累計」為當年各月已確認月結快照之加總（缺快照月份以目前資料回推、標示估算）；
-            「模擬全年」＝當年已實際 ＋ 剩餘月以本月 run-rate 外推。
-            {estimatedCount > 0 && <span className="text-amber-700">　含 {estimatedCount} 個估算月份（建議於各月結算後確認以留存快照）。</span>}
-          </CardDescription>
+        <CardHeader className="flex-row items-start justify-between gap-2 pb-2">
+          <div>
+            <CardTitle className="text-base">{year} 年累計與全年推估</CardTitle>
+            <CardDescription>
+              「實際累計」為當年各月已確認月結快照之加總（缺快照月份以目前資料回推、標示估算）；
+              「模擬全年」＝當年已實際 ＋ 剩餘月以本月 run-rate 外推。
+              {estimatedCount > 0 && <span className="text-amber-700">　含 {estimatedCount} 個估算月份（建議於各月結算後確認以留存快照）。</span>}
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" className="shrink-0 print:hidden" disabled={aMonths.length === 0} onClick={exportAnnualCsv}>
+            <Download /> 匯出 CSV
+          </Button>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-4">
@@ -1242,6 +1220,11 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
                 getRowKey={(s) => s.period}
                 searchable={false}
                 initialSort={{ key: "period", dir: "desc" }}
+                csv={{
+                  headers: ["期間", "人數", "月薪資總額", "中位薪資", "總成本", "加班費", "獎金", "Gini"],
+                  row: (s) => [s.period, s.headcount, s.totalSalary, s.medianSalary, s.totalCost, s.overtimePay, s.bonusTotal, s.gini.toFixed(3)],
+                  fileName: `薪酬趨勢快照_${currentPeriod}.csv`,
+                }}
                 rowClassName={(s) => cn(selPeriod === s.period && "bg-accent/60")}
                 onRowClick={(s) => togglePeriod(s.period)}
                 columns={[

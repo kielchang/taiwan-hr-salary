@@ -14,6 +14,10 @@ import { calculatePayroll } from "./calc";
 export type Severity = "error" | "warning";
 
 export interface ValidationIssue {
+  /**
+   * V3、V5 為 README §8 保留編號，不產生逐筆 issue：
+   * V3 彙總勾稽＝報表層 reconciliationDiff（差異紅標）；V5 級距申報一致＝程序面（申報名冊／級距調整報表）。
+   */
   rule: "V1" | "V2" | "V4" | "V6" | "V7" | "V8" | "V9" | "V10" | "V11" | "V12";
   severity: Severity;
   employeeId?: string;

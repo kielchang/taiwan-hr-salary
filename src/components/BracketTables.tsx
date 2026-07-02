@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import type { InsuranceBrackets } from "@/config/brackets";
 import { cn, ntd } from "@/lib/utils";
 
@@ -39,7 +39,7 @@ function toRows(amounts: number[]): Row[] {
   });
 }
 
-/** 直接顯示系統採用的四張投保級距表（資料來自系統設定的級距）。 */
+/** 直接顯示系統採用的四張投保級距表（資料來自系統設定的級距，唯讀）。 */
 export function BracketTables({
   brackets,
   initial = "labor",
@@ -49,6 +49,7 @@ export function BracketTables({
 }) {
   const [tab, setTab] = useState<keyof InsuranceBrackets>(initial);
   const rows = toRows(brackets[tab]);
+  const label = TABS.find((t) => t.key === tab)?.label ?? "";
 
   return (
     <div>
@@ -67,28 +68,24 @@ export function BracketTables({
           </button>
         ))}
       </div>
-      <div className="max-h-80 overflow-auto rounded-md border">
-        <Table>
-          <TableHeader className="sticky top-0 bg-background">
-            <TableRow>
-              <TableHead className="w-14">等級</TableHead>
-              <TableHead className="text-right">月薪資總額下限</TableHead>
-              <TableHead className="text-right">月薪資總額上限</TableHead>
-              <TableHead className="text-right">月投保金額</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.level}>
-                <TableCell className="text-muted-foreground">{r.level}</TableCell>
-                <TableCell className="text-right tabular-nums">{ntd(r.lower)}</TableCell>
-                <TableCell className="text-right tabular-nums">{r.upperLabel}</TableCell>
-                <TableCell className="text-right font-medium tabular-nums">{ntd(r.amount)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        rows={rows}
+        getRowKey={(r) => String(r.level)}
+        maxHeight="max-h-80"
+        pageSize={100}
+        searchPlaceholder="搜尋金額／等級…"
+        csv={{
+          headers: ["等級", "月薪資總額下限", "月薪資總額上限", "月投保金額"],
+          row: (r) => [r.level, r.lower, r.upperLabel, r.amount],
+          fileName: `投保級距_${label}.csv`,
+        }}
+        columns={[
+          { key: "level", header: "等級", headerClassName: "w-14", sortValue: (r) => r.level, filterText: (r) => String(r.level), cell: (r) => <span className="text-muted-foreground">{r.level}</span> },
+          { key: "lower", header: "月薪資總額下限", numeric: true, sortValue: (r) => r.lower, filterText: (r) => `${r.lower} ${ntd(r.lower)}`, cell: (r) => ntd(r.lower) },
+          { key: "upper", header: "月薪資總額上限", numeric: true, sortValue: (r) => r.amount, filterText: (r) => r.upperLabel, cell: (r) => r.upperLabel },
+          { key: "amount", header: "月投保金額", numeric: true, sortValue: (r) => r.amount, filterText: (r) => `${r.amount} ${ntd(r.amount)}`, cell: (r) => <span className="font-medium">{ntd(r.amount)}</span> },
+        ]}
+      />
       <p className="mt-1.5 text-xs text-muted-foreground">
         月薪資總額落在「下限～上限」區間者，即以該級「月投保金額」投保；超過最高一級以最高級計（觸頂）。
       </p>
