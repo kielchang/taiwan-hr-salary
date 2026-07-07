@@ -13,8 +13,8 @@ import { cn, ntd, formatPeriod } from "@/lib/utils";
 import { yearlyWithholding, availableYears } from "@/lib/reports/withholding";
 import { bracketWorklist } from "@/lib/reports/bracketAdjust";
 import { enrollmentWorklist } from "@/lib/reports/enrollment";
-import type { DeclaredInsured } from "@/lib/types";
-import { Scale, UserPlus, UserMinus, ArrowRight } from "lucide-react";
+import type { DeclaredInsured, Employee } from "@/lib/types";
+import { Scale, UserPlus, UserMinus, PauseCircle, PlayCircle, ArrowRight } from "lucide-react";
 
 export type FilingTab = "withholding" | "insurance" | "bracket" | "enrollment";
 type Tab = FilingTab;
@@ -215,10 +215,10 @@ function BracketTab() {
 /* B4 加退保作業清單 */
 function EnrollmentTab() {
   const { employees, currentPeriod } = usePayrollStore();
-  const { newHires, leavers } = enrollmentWorklist(employees, currentPeriod);
+  const { newHires, leavers, suspends, returns } = enrollmentWorklist(employees, currentPeriod);
   const navigate = useNavigate();
   /** 名冊列可點：直接開該員檔案核對投保金額/薪資（免回主檔搜尋） */
-  const row = (e: (typeof newHires)[number], badge: React.ReactNode) => (
+  const row = (e: Employee, badge: React.ReactNode) => (
     <li key={e.id}>
       <button
         type="button"
@@ -231,40 +231,36 @@ function EnrollmentTab() {
       </button>
     </li>
   );
+  const card = (icon: React.ReactNode, title: string, list: Employee[], variant: "success" | "warning" | "secondary", desc: string, empty: string, badgeFor: (e: Employee) => React.ReactNode) => (
+    <Card className="print-block">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          {icon} {title}
+          <Badge variant={list.length ? variant : "secondary"}>{list.length} 人</Badge>
+        </CardTitle>
+        <CardDescription>{desc}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {list.length === 0 ? <EmptyState title={empty} compact /> : (
+          <ul className="space-y-1 text-sm">{list.map((e) => row(e, badgeFor(e)))}</ul>
+        )}
+      </CardContent>
+    </Card>
+  );
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="print-block">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <UserPlus className="size-4 text-emerald-600" /> 本月應加保（新進）
-            <Badge variant="success">{newHires.length} 人</Badge>
-          </CardTitle>
-          <CardDescription>到職日落在 {formatPeriod(currentPeriod)} 者，請於到職當日辦理加保。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {newHires.length === 0 ? <EmptyState title="本月無新進" compact /> : (
-            <ul className="space-y-1 text-sm">
-              {newHires.map((e) => row(e, <Badge variant="success">加保・{e.hireDate}</Badge>))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-      <Card className="print-block">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <UserMinus className="size-4 text-amber-600" /> 本月應退保（離職）
-            <Badge variant={leavers.length ? "warning" : "secondary"}>{leavers.length} 人</Badge>
-          </CardTitle>
-          <CardDescription>離職生效日落在 {formatPeriod(currentPeriod)} 者，請於離職當日辦理退保。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {leavers.length === 0 ? <EmptyState title="本月無退保" compact /> : (
-            <ul className="space-y-1 text-sm">
-              {leavers.map((e) => row(e, <Badge variant="warning">退保・{e.leaveDate}</Badge>))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {card(<UserPlus className="size-4 text-emerald-600" />, "本月應加保（新進）", newHires, "success",
+        `到職日落在 ${formatPeriod(currentPeriod)} 者，請於到職當日辦理加保。`, "本月無新進",
+        (e) => <Badge variant="success">加保・{e.hireDate}</Badge>)}
+      {card(<UserMinus className="size-4 text-amber-600" />, "本月應退保（離職）", leavers, "warning",
+        `離職生效日落在 ${formatPeriod(currentPeriod)} 者，請於離職當日辦理退保。`, "本月無退保",
+        (e) => <Badge variant="warning">退保・{e.leaveDate}</Badge>)}
+      {card(<PauseCircle className="size-4 text-amber-600" />, "本月應停保（留停/停職/暫離）", suspends, "warning",
+        `生效日落在 ${formatPeriod(currentPeriod)} 者，依規定辦理停保（健保得續保自費）。`, "本月無停保",
+        (e) => <Badge variant="warning">{e.status}停保・{e.leaveDate}</Badge>)}
+      {card(<PlayCircle className="size-4 text-emerald-600" />, "本月應復保（復職）", returns, "success",
+        `復職日落在 ${formatPeriod(currentPeriod)} 者，請辦理復保並恢復計薪。`, "本月無復保",
+        (e) => <Badge variant="success">復保・{e.returnDate}</Badge>)}
     </div>
   );
 }

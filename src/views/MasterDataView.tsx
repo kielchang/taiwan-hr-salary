@@ -19,9 +19,11 @@ import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import { Pencil, Plus, Trash2, UserPlus, Upload, FileDown } from "lucide-react";
 
-const STATUS_OPTIONS: Employee["status"][] = ["在職", "離職", "留停"];
+const STATUS_OPTIONS: Employee["status"][] = ["在職", "離職", "留停", "停職", "暫離"];
+const LEAVE_STATUSES = ["留停", "停職", "暫離"];
 
-const SALARY_ITEMS: { key: keyof Omit<SalaryStructure, "employeeId">; label: string; help?: string }[] = [
+export type SalaryNumKey = Exclude<keyof Omit<SalaryStructure, "employeeId">, "customAllowances">;
+export const SALARY_ITEMS: { key: SalaryNumKey; label: string; help?: string }[] = [
   { key: "baseSalary", label: "本薪" },
   { key: "managerAllowance", label: "主管加給" },
   { key: "dutyAllowance", label: "職務加給" },
@@ -68,7 +70,7 @@ export function MasterDataView() {
   const {
     employees, salaries, dependents, parameters, brackets,
     upsertEmployee, upsertSalary, setEmployeeDependents, removeEmployee, importEmployees,
-    currentPeriod, confirmations,
+    currentPeriod, confirmations, leavePolicy, salaryDefaults,
   } = usePayrollStore();
   const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：當期已確認
 
@@ -103,7 +105,12 @@ export function MasterDataView() {
 
   const openNew = () => {
     setDraftEmp(blankEmployee());
-    setDraftSalary(blankSalary(""));
+    // 帶入公司預設固定薪資/津貼（可再改）
+    setDraftSalary({
+      ...blankSalary(""),
+      ...salaryDefaults.standard,
+      customAllowances: salaryDefaults.custom.map((c) => ({ id: `CA${Date.now()}${Math.random().toString(36).slice(2, 6)}`, name: c.name, amount: c.amount })),
+    });
     setDraftDeps([]);
     setIsNew(true);
     setTab("basic");
@@ -136,7 +143,7 @@ export function MasterDataView() {
       const prev = employees.find((e) => e.id === id);
       const prevSalary = salaries.find((s) => s.employeeId === id);
       const prevDeps = dependents.filter((d) => d.employeeId === id);
-      const PAY_KEYS = ["hireDate", "status", "leaveDate", "voluntaryPensionRate", "taxResidency", "withholdingMethod", "exemptionFormReceivedDate"] as const;
+      const PAY_KEYS = ["hireDate", "status", "leaveDate", "returnDate", "leavePaidRatio", "voluntaryPensionRate", "taxResidency", "withholdingMethod", "exemptionFormReceivedDate"] as const;
       const payChanged =
         !prev || PAY_KEYS.some((k) => (prev[k] ?? null) !== (draftEmp[k] ?? null)) ||
         JSON.stringify(prevSalary ?? blankSalary(id)) !== JSON.stringify({ ...draftSalary, employeeId: id }) ||
@@ -154,6 +161,9 @@ export function MasterDataView() {
 
   const setEmp = <K extends keyof Employee>(k: K, v: Employee[K]) =>
     setDraftEmp((d) => ({ ...d, [k]: v }));
+
+  const isLeave = draftEmp.status != null && LEAVE_STATUSES.includes(draftEmp.status); // 留停/停職/暫離
+  const policyRatio = isLeave ? leavePolicy[draftEmp.status as "留停" | "停職" | "暫離"] : 0; // 該狀態公司預設比例
 
   // 深連結 ?emp=E001：由查核/名冊等處跳轉時直接開啟該員檔案，免再搜尋
   const [searchParams, setSearchParams] = useSearchParams();
@@ -337,7 +347,7 @@ export function MasterDataView() {
               <Field label="到職日" help="用於計算年資與特休天數；到職當月固定薪資按比例（破月）">
                 <Input type="date" className="col-input" value={draftEmp.hireDate} onChange={(e) => setEmp("hireDate", e.target.value)} />
               </Field>
-              <Field label="任職狀態" help="離職/留停者不列入當期計薪；離職當月按比例（破月）">
+              <Field label="任職狀態" help="離職＝終止契約（計至離職日）；留停/停職/暫離＝可復職之非在職區間，依生效日/復職日破月、給薪比例計薪">
                 <Select value={draftEmp.status ?? "在職"} onValueChange={(v) => setEmp("status", v as Employee["status"])}>
                   <SelectTrigger className="col-input"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -345,10 +355,34 @@ export function MasterDataView() {
                   </SelectContent>
                 </Select>
               </Field>
-              {draftEmp.status && draftEmp.status !== "在職" && (
-                <Field label="離職／留停生效日" help="用於破月計算與加退保清單">
+              {draftEmp.status === "離職" && (
+                <Field label="離職日" help="計至此日（含）；當月按在職天數破月、辦理退保">
                   <Input type="date" className="col-input" value={draftEmp.leaveDate ?? ""} onChange={(e) => setEmp("leaveDate", e.target.value || null)} />
                 </Field>
+              )}
+              {isLeave && (
+                <>
+                  <Field label={`${draftEmp.status}生效日`} help="區間起日；此日起依給薪比例計薪、辦理停保">
+                    <Input type="date" className="col-input" value={draftEmp.leaveDate ?? ""} onChange={(e) => setEmp("leaveDate", e.target.value || null)} />
+                  </Field>
+                  <Field label="復職日（空＝尚未復職）" help="復職日起恢復全額計薪並辦理復保；填此即閉合區間">
+                    <Input type="date" className="col-input" value={draftEmp.returnDate ?? ""} onChange={(e) => setEmp("returnDate", e.target.value || null)} />
+                  </Field>
+                  <Field label="給薪比例" help={`留白＝沿用公司政策（目前 ${draftEmp.status}：${Math.round(policyRatio * 100)}%）；可逐案覆寫`}>
+                    <Select
+                      value={draftEmp.leavePaidRatio == null ? "policy" : String(draftEmp.leavePaidRatio)}
+                      onValueChange={(v) => setEmp("leavePaidRatio", v === "policy" ? null : Number(v))}
+                    >
+                      <SelectTrigger className="col-input"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="policy">沿用公司政策（{Math.round(policyRatio * 100)}%）</SelectItem>
+                        <SelectItem value="0">無給（0%）</SelectItem>
+                        <SelectItem value="0.5">半薪（50%）</SelectItem>
+                        <SelectItem value="1">全薪（100%）</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </>
               )}
               <Field label="勞退自願提繳率（%）" help="員工自願從薪資提繳 0～6% 到退休金專戶，此金額免稅">
                 <Input
@@ -399,6 +433,40 @@ export function MasterDataView() {
                   </Field>
                 ))}
               </div>
+
+              {/* 自訂固定津貼（命名項目，如語言/值班/危險津貼）；計入月薪資總額與級距 */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">自訂固定津貼</p>
+                    <p className="text-xs text-muted-foreground">8 項標準項目外的每月固定津貼，可自行命名；皆屬工資、計入月薪資總額與投保級距。</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setDraftSalary((s) => ({ ...s, customAllowances: [...(s.customAllowances ?? []), { id: `CA${Date.now()}${(s.customAllowances?.length ?? 0)}`, name: "", amount: 0 }] }))}>
+                    <Plus /> 新增津貼
+                  </Button>
+                </div>
+                {(draftSalary.customAllowances?.length ?? 0) === 0 ? (
+                  <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">無自訂津貼。如語言津貼、值班津貼、危險津貼等，按「新增津貼」命名建立。</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(draftSalary.customAllowances ?? []).map((c, i) => (
+                      <div key={c.id} className="flex flex-wrap items-center gap-2 rounded-md border p-2">
+                        <Input placeholder="津貼名稱（如語言津貼）" className="col-input h-8 w-44"
+                          value={c.name}
+                          onChange={(e) => setDraftSalary((s) => ({ ...s, customAllowances: (s.customAllowances ?? []).map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) }))} />
+                        <Input type="number" placeholder="金額" className="col-input h-8 w-28 text-right tabular-nums"
+                          value={c.amount || ""}
+                          onChange={(e) => setDraftSalary((s) => ({ ...s, customAllowances: (s.customAllowances ?? []).map((x, j) => (j === i ? { ...x, amount: Number(e.target.value) || 0 } : x)) }))} />
+                        <Button variant="ghost" size="icon" className="ml-auto size-7 text-destructive"
+                          onClick={() => setDraftSalary((s) => ({ ...s, customAllowances: (s.customAllowances ?? []).filter((_, j) => j !== i) }))}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="rounded-md border bg-muted/40 p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
                   <span>

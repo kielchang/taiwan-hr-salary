@@ -8,7 +8,7 @@
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npx vitest run       # 全部測試（目前 179 項，必須全綠）
+npx vitest run       # 全部測試（目前 188 項，必須全綠）
 npm run build        # tsc -b && vite build（CI 同款；tsc 增量快取可能漏抓，改用 npx tsc -b --force 驗證最準）
 ```
 
@@ -26,7 +26,8 @@ storage undefined 時先想到這裡，不要改測試本身。
 ## 鐵律（違反會壞驗收或破壞既有決策）
 
 1. **TC-9 不可動**：`src/data/seed.ts` 的 `SEED_*`（8 名員工）是 `tests/acceptance.test.ts` 硬編碼的驗收基準
-   （合計 686,417／622,426／773,287）。要改示範資料改 `src/data/demoCompany.ts`（60 人示範公司＝開箱預設）。
+   （合計 686,417／622,426／773,287）。要改示範資料改 `src/data/demoCompany.ts`（62 人示範公司＝開箱預設）。
+   TC-9 保證：`calculatePayroll` **無 `opts.period`** 時 payFactor/勞保按天/leavePolicy 皆不觸發、seed 無 customAllowances/非在職狀態，故破月與津貼改動不影響驗收。
 2. **計算層是純函數**：`src/lib/calc/*` 不 import store、不碰 UI；改公式必須先對 README §5 與附錄A 條號。
 3. **硬鎖定語意**（使用者拍板）：已確認月份（`confirmations[period]` 存在）＝資料凍結。
    store 守衛（`isPeriodLocked`，`usePayrollStore.ts`）對事件/薪資/眷屬/參數/級距/調薪核定一律 no-op，
@@ -43,25 +44,33 @@ storage undefined 時先想到這裡，不要改測試本身。
 
 ```
 src/
+├── lib/calc/wage.ts   payFactor（逐日破月：生效日+復職日+給薪比例）/employmentDaysFactor（勞保按天）/
+│                       effectiveLeaveRatio（逐案覆寫∥公司政策）/monthlySalaryTotal（含 customAllowances）
 ├── lib/calc/          薪資計算純函數（§5：級距/保費/加班/稅/補充保費/破月）— 動它前先讀 README
-├── lib/validation.ts  V1–V12 驗證＋allocationIssues（V8 離職未填日/V9 負實發/V10 累計<當月＝error）
-├── lib/reports/       withholding/bracketAdjust/enrollment/projectCost/projectTrend(EAC)/annual
+├── lib/validation.ts  V1–V12 驗證＋allocationIssues（V8 非在職未填生效日/復職日<生效日/V9 負實發/V10 累計<當月＝error）
+├── lib/reports/       withholding/bracketAdjust/enrollment(加保/退保/停保/復保 4 類)/projectCost/projectTrend(EAC)/annual
 ├── lib/insights.ts    各分析頁「重點意見」規則
-├── store/usePayrollStore.ts  zustand persist；硬鎖定守衛、稽核、scheduledRaises、刪除連鎖都在這
-├── store/selectors.ts buildPayrollRows/isActiveInPeriod/ytdBonusBefore
+├── store/usePayrollStore.ts  zustand persist；硬鎖定守衛、稽核、scheduledRaises、刪除連鎖；leavePolicy/salaryDefaults 也在這
+├── store/selectors.ts buildPayrollRows/isActiveInPeriod(吃 leavePolicy，僅整月無給剔除)/ytdBonusBefore
 ├── data/seed.ts       TC-9 8 人 fixture（勿動）＋buildDemoData（歷史回填）＋salary/dep/evt/addMonths 工廠
-├── data/demoCompany.ts 60 人示範公司（開箱預設；含邊界個案/多月快照/確認/稽核/申報基準）
+├── data/demoCompany.ts 62 人示範公司（開箱預設；含離職/留停/停職半薪/復職邊界/多月快照/確認/稽核/申報基準）
 ├── components/ui/     DataTable/ChartCard/Delta/EmptyState/table(zebra/sticky/SortHead)/…
 ├── components/charts/ 零相依 SVG 圖表（StackedBar/Pareto/Heatmap 含圖例/TrendChart/Bullet…）
 ├── content/help.tsx   情境式說明內容（HelpHint ℹ 用；鍵：payroll/master/analytics/projects/reports/settings/attendance）
 └── views/
-    ├── DashboardView  「本月工作台」＝首頁 /：六待辦卡＋排程調薪＋深連結（?tab=、?emp=）
+    ├── DashboardView  「本月工作台」＝首頁 /：待辦卡（含停保/復保）＋排程調薪＋深連結（?tab=、?emp=）
     ├── PayrollFlow    每月結算兩步（MonthlyView 輸入異動 → ReviewView 查核確認）
     ├── ReportsHubView /reports：月結報表(ReportsView)＋申報名冊(FilingView)；?tab= 深連結；頂部月份選擇器
     ├── AnalyticsView  月報/規劃試算(沙盒)/年報 兩層分組；RaiseTab 含生效月排程
     ├── ProjectsView   專案之家（主檔+工時分攤+成本/EAC）
-    └── MasterDataView/AttendanceView/SettingsView(三分頁)/SetupWizard/HelpView/SourcesView
+    └── MasterDataView(狀態5種＋生效日/復職日/給薪比例＋自訂津貼)/AttendanceView/
+        SettingsView(公司分頁含 LeavePolicyCard 非在職給薪比例＋SalaryDefaultsCard 新進預設)/SetupWizard/HelpView/SourcesView
 ```
+
+**員工生命週期**（使用者拍板）：`EmployeeStatus` 5 種＝在職/離職/留停/停職/暫離。
+`leaveDate` 語意＝離職日（離職）或**生效日(起)**（留停/停職/暫離）；`returnDate`＝復職日（空＝尚未復職）；
+`leavePaidRatio`＝逐案覆寫給薪比例（空＝採公司 `leavePolicy` 該狀態預設 0/0/0）。破月用 `payFactor`（逐日加權），
+勞保費到/離職當月按 `employmentDaysFactor`（在職天數）比例、健保與勞退整月。復職＝補填復職日，之後自動全薪（不必改回在職）。
 
 側邊欄 IA（App.tsx `NAV_SECTIONS`）：每月作業（工作台/薪資結算/出勤）／規劃與分析／專案／報表與申報／主檔與設定／說明。
 
@@ -75,23 +84,30 @@ src/
    硬鎖定、V7–V12 驗證、累計獎金自動化、稽核補洞＋刪員工連鎖、本月工作台、
    ?emp=/?tab= 深連結、帶入上月/儲存並下一位/全部帶入、分攤沿用上月、報表月份選擇器、
    調薪生效月排程（scheduledRaises）、出勤工時參考、精靈文案、主檔 ℹ。
+6. **backlog 清尾**：CostTab/DistTab/TrendTab CSV 匯出補齊、AnalyticsView 13 張單圖卡收斂 ChartCard、
+   BracketTables（投保級距主檔）遷 DataTable（維持唯讀＋搜尋/CSV）、validation.ts 註記 V3/V5 保留編號、
+   tests/setup.ts Node 23+ Web Storage 墊片。
+7. **員工生命週期＋固定津貼**（使用者拍板）：
+   狀態擴為 5 種（＋停職/暫離），`payFactor` 逐日破月（生效日+復職日+**每狀態可調給薪比例**，公司政策 `leavePolicy` 預設＋逐案 `leavePaidRatio` 覆寫），
+   勞保費到/離職當月按在職天數（`employmentDaysFactor`）、健保勞退整月；名冊加**停保/復保**（enrollment 4 類）＋工作台待辦；
+   V8 擴充（復職日<生效日 error）；主檔狀態欄（生效日/復職日/給薪比例）；SettingsView 加 LeavePolicyCard；
+   `customAllowances` **自訂固定津貼**（計入月薪資總額/級距/加班）＋SalaryDefaultsCard **新進預設帶入**＋MonthlyView/help 動線指引。
 
-6. **backlog 清尾**（本次 session）：CostTab/DistTab/TrendTab CSV 匯出補齊、AnalyticsView 13 張單圖卡
-   收斂 ChartCard、BracketTables（投保級距主檔）遷 DataTable（維持唯讀＋搜尋/CSV）、validation.ts 註記
-   V3/V5 保留編號、tests/setup.ts Node 23+ Web Storage 墊片。
-
-最新 commit（開發分支）：`cb06cf3`。測試 18 檔 179 項全綠（Node 22/26 皆驗）。
+最新 commit（開發分支）：見 `git log`（本批＝生命週期＋固定津貼；前批 backlog 清尾＝`cb06cf3`）。測試 18 檔 188 項全綠（Node 22/26 皆驗）。
 
 ## 已知可續作（backlog，未做）
 
+- **留停/停職多段歷史**：目前每員單一 `leaveDate`+`returnDate` 區間（同月僅一段），多次留停/復職的歷史未建模（使用者已知的取捨，避免 migration）。若要做需改 leaveRecords 陣列。
+- **停保/復保為提醒性質**：名冊列出加退保/停保/復保供人工辦理，系統**不自動改保費**（健保續保自費等依公司規定）。
 - 出勤→加班「自動分級回填」（目前僅顯示參考工時，使用者要求不自動回填 — 若要做需先確認規則）。
 - 投保級距主檔改「可編輯」（現為刻意唯讀檢視＝設定頁明示文案；要做需使用者確認年度更新流程與稽核）。
 
 ## 改動驗證清單（每批必跑）
 
 1. `npx tsc -b --force`（CI 是全新編譯，增量快取會騙人——曾因此炸過一次 CI）。
-2. `npx vitest run` 179 全綠；動到路由/首頁要同步改 `tests/clientmount.test.tsx`，
-   動到鎖定/驗證要看 `tests/guards.test.ts`，動到示範資料看 `tests/demoCompany.test.ts`。
+2. `npx vitest run` 188 全綠；動到路由/首頁要同步改 `tests/clientmount.test.tsx`，
+   動到鎖定/驗證要看 `tests/guards.test.ts`，動到示範資料看 `tests/demoCompany.test.ts`，
+   動到破月/保費/津貼看 `tests/proration.test.ts`。
 3. `npm run build`。
 4. 大改後更新 `docs/appendix/附錄C_網站實作架構.md` 的導覽/工作邏輯註記。
 

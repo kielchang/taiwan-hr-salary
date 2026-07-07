@@ -1,20 +1,30 @@
 // 衍生計算：以純函數計算模組（§5）將 store 狀態轉為當月薪資結算結果與彙總。
-import { calculatePayroll, type PayrollResult } from "@/lib/calc";
+import { calculatePayroll, type PayrollResult, isLeaveStatus, effectiveLeaveRatio } from "@/lib/calc";
 import { companySupplementary } from "@/lib/calc";
-import type { Employee, SalaryStructure, Dependent, MonthlyEvent } from "@/lib/types";
+import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy } from "@/lib/types";
 import type { Parameters } from "@/config/parameters";
 import type { InsuranceBrackets } from "@/config/brackets";
-import { usePayrollStore, blankEvent } from "./usePayrollStore";
+import { usePayrollStore, blankEvent, DEFAULT_LEAVE_POLICY } from "./usePayrollStore";
 
-/** 該員工於某期間是否在職（用於當期計薪過濾；undefined 狀態＝在職） */
-export function isActiveInPeriod(emp: Employee, period: string): boolean {
+/**
+ * 該員工於某期間是否列入計薪（undefined 狀態＝在職）。
+ * 未到職／離職前月＝否；整月且無給之留停/停職/暫離＝否（避免 0 薪列被扣保費成負實發，
+ * 仍出現在停保名冊與主檔）；部分月或有給之非在職＝是（由 payFactor 依比例計）。
+ */
+export function isActiveInPeriod(emp: Employee, period: string, leavePolicy: LeavePolicy = DEFAULT_LEAVE_POLICY): boolean {
   const [y, m] = period.split("-").map(Number);
   if (!y || !m) return true;
   const monthEnd = new Date(y, m, 0);
   const monthStart = new Date(y, m - 1, 1);
-  if (emp.status === "留停") return false;
   if (emp.hireDate && new Date(emp.hireDate) > monthEnd) return false; // 尚未到職
   if (emp.status === "離職" && emp.leaveDate && new Date(emp.leaveDate) < monthStart) return false; // 期前已離職
+  if (isLeaveStatus(emp.status)) {
+    const ratio = effectiveLeaveRatio(emp, leavePolicy);
+    const start = emp.leaveDate ? new Date(emp.leaveDate) : monthStart;
+    const ret = emp.returnDate ? new Date(emp.returnDate) : null;
+    const coversWholeMonth = start <= monthStart && (!ret || ret > monthEnd);
+    if (ratio === 0 && coversWholeMonth) return false; // 整月無給休假 → 不列入計薪
+  }
   return true;
 }
 
@@ -37,29 +47,31 @@ export interface PayrollData {
   events: MonthlyEvent[];
   parameters: Parameters;
   brackets: InsuranceBrackets;
+  leavePolicy?: LeavePolicy;
 }
 
 /** 純函數：計算指定期間全體在職員工之薪資結算列（供 hook 與跨期重算共用） */
 export function buildPayrollRows(period: string, data: PayrollData): PayrollRow[] {
   const { employees, salaries, dependents, events, parameters, brackets } = data;
-  return employees.filter((emp) => isActiveInPeriod(emp, period)).map((emp) => {
+  const leavePolicy = data.leavePolicy ?? DEFAULT_LEAVE_POLICY;
+  return employees.filter((emp) => isActiveInPeriod(emp, period, leavePolicy)).map((emp) => {
     const salary = salaries.find((s) => s.employeeId === emp.id) ?? blankSalary(emp.id);
     const event = events.find((e) => e.employeeId === emp.id && e.period === period) ?? blankEvent(emp.id, period);
-    const result = calculatePayroll(emp, salary, dependents, event, parameters, brackets, { period });
+    const result = calculatePayroll(emp, salary, dependents, event, parameters, brackets, { period, leavePolicy });
     return { ...result, name: emp.name, department: emp.department, costCenter: emp.costCenter, project: emp.project };
   });
 }
 
 /** 計算當月（currentPeriod）全體員工薪資結算 */
 export function usePayrollRows(): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod } = usePayrollStore();
-  return buildPayrollRows(currentPeriod, { employees, salaries, dependents, events, parameters, brackets });
+  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod, leavePolicy } = usePayrollStore();
+  return buildPayrollRows(currentPeriod, { employees, salaries, dependents, events, parameters, brackets, leavePolicy });
 }
 
 /** 計算指定期間全體員工薪資結算（檢視歷史/其他月份用） */
 export function usePayrollRowsFor(period: string): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets } = usePayrollStore();
-  return buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets });
+  const { employees, salaries, dependents, events, parameters, brackets, leavePolicy } = usePayrollStore();
+  return buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets, leavePolicy });
 }
 
 export interface Totals {

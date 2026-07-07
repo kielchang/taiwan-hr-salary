@@ -14,7 +14,7 @@ const evById = new Map(curEvents.map((e) => [e.employeeId, e]));
 
 describe("示範公司 — 規模與組織複雜度", () => {
   it("約 60 名員工", () => {
-    expect(demo.employees.length).toBe(60);
+    expect(demo.employees.length).toBe(62);
   });
   it("≥12 部門、≥6 成本中心、≥6 專案、4 職等", () => {
     expect(new Set(demo.employees.map((e) => e.department)).size).toBeGreaterThanOrEqual(12);
@@ -31,9 +31,11 @@ describe("示範公司 — 規模與組織複雜度", () => {
 });
 
 describe("示範公司 — 生命週期狀態", () => {
-  it("含離職、留停、期中到職", () => {
+  it("含離職、留停、停職、復職、期中到職", () => {
     expect(demo.employees.some((e) => e.status === "離職" && e.leaveDate?.startsWith(DEMO_PERIOD))).toBe(true);
     expect(demo.employees.some((e) => e.status === "留停")).toBe(true);
+    expect(demo.employees.some((e) => e.status === "停職" && e.leavePaidRatio === 0.5)).toBe(true);
+    expect(demo.employees.some((e) => e.status === "留停" && e.returnDate?.startsWith(DEMO_PERIOD))).toBe(true);
     expect(demo.employees.some((e) => e.hireDate.startsWith(DEMO_PERIOD))).toBe(true);
   });
   it("含非居住者", () => {

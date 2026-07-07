@@ -7,8 +7,15 @@ export type TaxResidency = "居住者" | "非居住者";
 /** 扣繳方式（員工主檔；README §5.9 分流） */
 export type WithholdingMethod = "依扣繳稅額表" | "固定5%";
 
-/** 員工任職狀態（生命週期；undefined 視為「在職」以相容舊資料） */
-export type EmployeeStatus = "在職" | "離職" | "留停";
+/** 員工任職狀態（生命週期；undefined 視為「在職」以相容舊資料）
+ *  離職＝終態（單向）；留停/停職/暫離＝可復職之非在職區間（以 leaveDate 起、returnDate 迄界定）。 */
+export type EmployeeStatus = "在職" | "離職" | "留停" | "停職" | "暫離";
+
+/** 可復職之非在職狀態（留停/停職/暫離）——享有「生效日＋復職日＋給薪比例」區間破月 */
+export type LeaveStatus = "留停" | "停職" | "暫離";
+
+/** 公司各非在職狀態之預設給薪比例（0＝無給、0.5＝半薪、1＝全薪）；員工可逐案覆寫 */
+export type LeavePolicy = Record<LeaveStatus, number>;
 
 /**
  * 員工主檔（README §3.2）
@@ -31,7 +38,9 @@ export interface Employee {
   nationalId: string; // 身分證字號／居留證號（薪資條加密 PDF 之開啟密碼）
   email: string; // 員工 Email（薪資條 email 通知收件人）
   status?: EmployeeStatus; // 任職狀態（undefined＝在職）
-  leaveDate?: string | null; // 離職／留停生效日 ISO（用於破月與加退保清單）
+  leaveDate?: string | null; // 離職＝離職日；留停/停職/暫離＝生效日(起) ISO（破月與加退/停保清單用）
+  returnDate?: string | null; // 復職日／請假迄日 ISO（留停/停職/暫離用；空＝尚未復職）
+  leavePaidRatio?: number | null; // 逐案覆寫給薪比例（0/0.5/1）；空＝採公司該狀態預設（LeavePolicy）
   note?: string;
 }
 
@@ -50,6 +59,15 @@ export interface SalaryStructure {
   transportAllowance: number; // 交通津貼（固定）
   attendanceBonus: number; // 全勤獎金
   otherFixedAllowance: number; // 其他固定津貼
+  /** 自訂固定津貼（HR 命名，如語言/值班/危險津貼）；皆屬工資、計入月薪資總額與級距（應稅） */
+  customAllowances?: CustomAllowance[];
+}
+
+/** 自訂固定津貼項目（每月固定發放） */
+export interface CustomAllowance {
+  id: string;
+  name: string;
+  amount: number;
 }
 
 /** 眷屬名冊（README §3.2、P4 分流眷屬模型） */

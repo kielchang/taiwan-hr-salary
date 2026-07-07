@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -119,6 +119,11 @@ export function MonthlyView({
           <p className="text-sm text-muted-foreground">
             固定薪資與保費已自動帶入。大多數員工不需要動；只要替「有加班、請假或獎金」的人按「編輯」補上異動即可。
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            月薪與每月固定津貼不在這裡調整 —— 請到{" "}
+            <Link to="/master" className="font-medium text-primary underline underline-offset-2">基本資料 → 固定薪資項目</Link>
+            {" "}設定（可自訂津貼名目、設公司預設帶入新人）。
+          </p>
         </div>
         {showPeriodPicker && (
           <div className="space-y-1">
@@ -207,6 +212,17 @@ export function MonthlyView({
                   {editingEmp.name}｜{formatPeriod(currentPeriod)} 異動
                 </DialogTitle>
               </DialogHeader>
+              <p className="-mt-1 text-xs text-muted-foreground">
+                這裡只填當月異動（加班／請假／獎金）。月薪與固定津貼請至{" "}
+                <Link
+                  to={`/master?emp=${editingEmp.id}`}
+                  className="font-medium text-primary underline underline-offset-2"
+                  onClick={() => setEditing(null)}
+                >
+                  {editingEmp.name} 的基本資料
+                </Link>
+                {" "}調整。
+              </p>
 
               <div className="space-y-5">
                 <section>

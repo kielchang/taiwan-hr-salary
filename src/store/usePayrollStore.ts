@@ -23,7 +23,13 @@ import type {
   Project,
   Allocation,
   ScheduledRaise,
+  LeavePolicy,
 } from "@/lib/types";
+
+/** 新進員工預設固定薪資範本（8 標準欄 partial ＋ 自訂津貼範本） */
+export type SalaryDefaults = { standard: Partial<Omit<SalaryStructure, "employeeId" | "customAllowances">>; custom: { name: string; amount: number }[] };
+export const DEFAULT_LEAVE_POLICY: LeavePolicy = { 留停: 0, 停職: 0, 暫離: 0 };
+export const EMPTY_SALARY_DEFAULTS: SalaryDefaults = { standard: {}, custom: [] };
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { serializeState, type BackupEnvelope } from "@/lib/backup";
 import { buildDemoData } from "@/data/seed";
@@ -89,6 +95,13 @@ interface PayrollState {
   dependents: Dependent[];
   events: MonthlyEvent[]; // 跨期間扁平儲存，以 employeeId+period 識別
   currentPeriod: string;
+
+  /** 公司各非在職狀態（留停/停職/暫離）之預設給薪比例；員工可逐案覆寫 */
+  leavePolicy: LeavePolicy;
+  setLeavePolicy: (patch: Partial<LeavePolicy>) => void;
+  /** 新進員工預設固定薪資/津貼範本（openNew 帶入；可再改） */
+  salaryDefaults: SalaryDefaults;
+  setSalaryDefaults: (v: SalaryDefaults) => void;
 
   /** 出勤打卡（額外模組） */
   attendance: AttendanceConfig;
@@ -200,7 +213,7 @@ export const isPeriodLocked = (confirmations: Record<string, string>, period: st
 
 /** 影響薪資計算的員工主檔欄位（當期已確認時鎖定這些欄位的變更；聯絡資訊等仍可修改） */
 const EMP_PAY_FIELDS = [
-  "hireDate", "status", "leaveDate", "voluntaryPensionRate",
+  "hireDate", "status", "leaveDate", "returnDate", "leavePaidRatio", "voluntaryPensionRate",
   "taxResidency", "withholdingMethod", "exemptionFormReceivedDate",
 ] as const;
 const empPayFieldsChanged = (prev: Employee, next: Employee): boolean =>
@@ -471,6 +484,23 @@ export const usePayrollStore = create<PayrollState>()(
         }),
       setCurrentPeriod: (period) => set({ currentPeriod: period }),
 
+      leavePolicy: DEFAULT_LEAVE_POLICY,
+      setLeavePolicy: (patch) =>
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          return {
+            leavePolicy: { ...st.leavePolicy, ...patch },
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+              `更新非在職狀態給薪政策：${Object.entries(patch).map(([k, v]) => `${k} ${Math.round((v as number) * 100)}%`).join("、")}`)),
+          };
+        }),
+      salaryDefaults: EMPTY_SALARY_DEFAULTS,
+      setSalaryDefaults: (v) =>
+        set((st) => ({
+          salaryDefaults: v,
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter", "更新新進員工預設固定薪資/津貼")),
+        })),
+
       upsertEmployee: (raw) =>
         set((st) => {
           // 自提率超界防呆（匯入/還原路徑也經此收斂）
@@ -670,6 +700,8 @@ export const usePayrollStore = create<PayrollState>()(
             projects: s.projects ?? st.projects,
             allocations: s.allocations ?? st.allocations,
             scheduledRaises: s.scheduledRaises ?? st.scheduledRaises,
+            leavePolicy: { ...DEFAULT_LEAVE_POLICY, ...(s.leavePolicy ?? {}) },
+            salaryDefaults: s.salaryDefaults ?? st.salaryDefaults,
             auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
           };
         }),

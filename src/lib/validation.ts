@@ -123,6 +123,9 @@ export function checkLifecycleDates(employee: Employee): ValidationIssue[] {
   if (employee.leaveDate && employee.hireDate && employee.leaveDate < employee.hireDate) {
     issues.push({ rule: "V8", severity: "error", employeeId: employee.id, message: `${employee.name}：離職／留停生效日（${employee.leaveDate}）早於到職日（${employee.hireDate}）` });
   }
+  if (employee.returnDate && employee.leaveDate && employee.returnDate < employee.leaveDate) {
+    issues.push({ rule: "V8", severity: "error", employeeId: employee.id, message: `${employee.name}：復職日（${employee.returnDate}）早於生效日（${employee.leaveDate}）` });
+  }
   return issues;
 }
 

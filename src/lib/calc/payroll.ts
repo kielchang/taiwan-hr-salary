@@ -7,12 +7,16 @@ import type {
   SalaryStructure,
   Dependent,
   MonthlyEvent,
+  LeavePolicy,
 } from "@/lib/types";
 import { round } from "@/lib/rounding";
 import { lookupInsuredAmounts, type InsuredAmounts } from "./brackets";
 import { dependentStats, type DependentStats } from "./dependents";
 import { seniorityMonths, annualLeaveDays } from "./seniority";
-import { monthlySalaryTotal, overtimePay, leaveDeduction, prorationFactor } from "./wage";
+import { monthlySalaryTotal, overtimePay, leaveDeduction, payFactor, employmentDaysFactor, effectiveLeaveRatio } from "./wage";
+
+/** 破月給薪比例預設政策（無給）；呼叫端未提供 leavePolicy 時採用 */
+const DEFAULT_LEAVE_POLICY: LeavePolicy = { 留停: 0, 停職: 0, 暫離: 0 };
 import { insurancePremiums, type InsurancePremiums } from "./insurance";
 import { personalSupplementary } from "./supplementary";
 import {
@@ -60,7 +64,7 @@ export function calculatePayroll(
   event: MonthlyEvent,
   p: Parameters,
   brackets: InsuranceBrackets,
-  opts?: { period?: string }, // 提供 period 才啟用破月（全月者比例＝1，結果與不傳完全相同）
+  opts?: { period?: string; leavePolicy?: LeavePolicy }, // 提供 period 才啟用破月（全月者比例＝1，結果與不傳完全相同）
 ): PayrollResult {
   const salaryTotal = monthlySalaryTotal(salary);
   const insured = lookupInsuredAmounts(brackets, salaryTotal);
@@ -68,8 +72,13 @@ export function calculatePayroll(
   const months = seniorityMonths(employee.hireDate, p.seniorityBaseDate);
 
   // 破月：僅當提供 period 且非全月在職時 factor<1；factor===1 短路保持與原本逐位元相同
+  // 固定薪資依 payFactor（含請假區間給薪比例）；勞保費另依在職天數（employmentDaysFactor）。
+  const leaveRatio = effectiveLeaveRatio(employee, opts?.leavePolicy ?? DEFAULT_LEAVE_POLICY);
   const factor = opts?.period
-    ? prorationFactor(opts.period, employee.hireDate, employee.leaveDate ?? null, employee.status)
+    ? payFactor(opts.period, employee.hireDate, employee.leaveDate ?? null, employee.status, employee.returnDate ?? null, leaveRatio)
+    : 1;
+  const empFactor = opts?.period
+    ? employmentDaysFactor(opts.period, employee.hireDate, employee.leaveDate ?? null, employee.status)
     : 1;
   const paidSalaryTotal = factor === 1 ? salaryTotal : round(salaryTotal * factor);
 
@@ -78,12 +87,21 @@ export function calculatePayroll(
   const grossPay = paidSalaryTotal + ot + event.otherAddition + event.monthlyBonus;
 
   const leave = leaveDeduction(salaryTotal, event, p);
-  const premiums = insurancePremiums(
+  const fullPremiums = insurancePremiums(
     insured,
     stats.billableDependents,
     employee.voluntaryPensionRate,
     p,
   );
+  // 勞保/就保/職保按在職天數比例（到/離職當月）；健保、勞退維持整月（健保以月計）。
+  const premiums = empFactor === 1
+    ? fullPremiums
+    : {
+        ...fullPremiums,
+        laborEmployee: round(fullPremiums.laborEmployee * empFactor),
+        laborEmployer: round(fullPremiums.laborEmployer * empFactor),
+        occupationalEmployer: round(fullPremiums.occupationalEmployer * empFactor),
+      };
   const personalSupp = personalSupplementary(
     event.monthlyBonus,
     event.cumulativeBonus,

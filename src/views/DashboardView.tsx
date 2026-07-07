@@ -11,7 +11,7 @@ import { ntd, formatPeriod } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import {
   LayoutDashboard, AlertTriangle, FileText, UserPlus, UserMinus, Scale,
-  CheckCircle2, ArrowRight, CalendarClock, Banknote, TrendingUp, XCircle,
+  CheckCircle2, ArrowRight, CalendarClock, Banknote, TrendingUp, XCircle, PauseCircle,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -73,7 +73,7 @@ export function DashboardView() {
       (r.withholdingSuggestion.type === "manual-lookup" || (r.withholdingSuggestion.type === "auto" && r.withholdingSuggestion.amount > 0));
   }).length;
 
-  const { newHires, leavers } = enrollmentWorklist(employees, currentPeriod);
+  const { newHires, leavers, suspends, returns } = enrollmentWorklist(employees, currentPeriod);
   const bracketChanged = bracketWorklist(
     rows.map((r) => ({ employeeId: r.employeeId, name: r.name, insured: r.insured })),
     declaredInsured,
@@ -158,6 +158,12 @@ export function DashboardView() {
           icon={<UserMinus className="size-4" />}
           title="本月應退保（離職）" count={leavers.length} unit="人"
           hint="離職生效日在本月者，請於離職當日辦理退保。"
+          to="/reports?tab=enrollment" cta="前往加退保名冊"
+        />
+        <TodoCard
+          icon={<PauseCircle className="size-4" />}
+          title="本月停保/復保" count={suspends.length + returns.length} unit="人"
+          hint={`留停/停職/暫離生效 ${suspends.length} 人、復職 ${returns.length} 人，請辦理停保/復保。`}
           to="/reports?tab=enrollment" cta="前往加退保名冊"
         />
         <TodoCard

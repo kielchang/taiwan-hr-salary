@@ -40,7 +40,7 @@ src/
 │   └── calc/                §5 計算模組（純函數）
 │       ├── brackets.ts      §5.1 投保級距查表
 │       ├── seniority.ts     §5.2 年資與特休
-│       ├── wage.ts          §5.0 基底量、§5.3 加班費、§5.4 請假扣款
+│       ├── wage.ts          §5.0 基底量、§5.3 加班費、§5.4 請假扣款、破月（payFactor 逐日＋給薪比例／employmentDaysFactor 勞保按天）
 │       ├── dependents.ts    §3.2 眷屬統計（P4）
 │       ├── insurance.ts     §5.6 四險保費
 │       ├── supplementary.ts §5.7 二代健保補充保費
@@ -58,7 +58,7 @@ src/
 ├── components/charts/       零相依 SVG 圖表（薪酬分析用）
 ├── views/                   依 HR 工作流程組織的操作頁（見 C3）；HashRouter 路由
 ├── data/seed.ts             8 名測試員工（TC-9 驗收基準＋buildDemoData 歷史回填工具），測試用，維持不變
-└── data/demoCompany.ts      開箱預設：約 60 人「示範公司」（12 部門/8 專案/4 職等，含多月歷史·確認·稽核·加退保·離職/留停·出勤·級距申報基準·驗證警告/錯誤），重用 buildDemoData 產生快照
+└── data/demoCompany.ts      開箱預設：62 人「示範公司」（12 部門/8 專案/4 職等，含多月歷史·確認·稽核·加退保/停復保·離職/留停/停職半薪/復職·出勤·級距申報基準·驗證警告/錯誤），重用 buildDemoData 產生快照
 tests/*.test.ts(x)           §9 驗收＋analytics/attendance/payslip 純函數＋路由掛載（白屏防護）
 ```
 
@@ -92,23 +92,28 @@ config（參數/級距） ──► store（主檔：員工·眷屬·薪資結�
 >
 > **HR 工作邏輯層（正確性與效率）**：首頁為 `DashboardView`「本月工作台」（聚合驗證錯誤/未填稅/加退保/級距調整/排程調薪，`?tab=`、`?emp=` 深連結直達）。
 > 已確認月份採**硬鎖定**（`usePayrollStore` `isPeriodLocked` 守衛：事件/薪資/眷屬/參數/級距/調薪一律 no-op，UI 預攔提示；取消確認同步移除快照，重確認重建）。
-> 驗證層擴至 V1–V12（身分證格式/重複、離職未填生效日、實發為負、累計獎金<當月、分攤超額 `allocationIssues`、眷屬欄位缺漏）；
+> 驗證層擴至 V1–V12（身分證格式/重複、非在職未填生效日、復職日早於生效日、實發為負、累計獎金<當月、分攤超額 `allocationIssues`、眷屬欄位缺漏）；
 > 累計獎金由 `ytdBonusBefore` 自動帶入。調薪支援**生效月排程**（`scheduledRaises`，到期於工作台套用）。
 > 效率：帶入上月異動/儲存並下一位/Enter 送出、分攤沿用上月、稅表全帶入、報表中心月份選擇器。守護測試見 `tests/guards.test.ts`。
+>
+> **員工生命週期與固定津貼**（使用者拍板）：`EmployeeStatus` 5 種＝在職/離職/留停/停職/暫離。破月用 `payFactor`（逐日加權；`leaveDate` 生效日＋`returnDate` 復職日界定非在職區間，
+> 給薪比例＝逐案 `leavePaidRatio`∥公司 `leavePolicy`[狀態]，預設 0/0/0）；離職/到職當月勞保費按在職天數（`employmentDaysFactor`），健保/勞退整月。復職＝補填復職日、之後自動全薪。
+> 名冊與工作台加**停保/復保**（`enrollment` 4 類）。固定薪資支援**自訂津貼**（`customAllowances`，計入月薪資總額/級距/加班）；公司可設**新進預設**（`salaryDefaults`）於新增員工時帶入。
+> `MonthlyView` 提示固定薪資與津貼改於基本資料設定（`?emp=` 深連結直達）。破月與津貼均以 `calc` 純函數 opt-in（無 `opts.period`／全月＝factor 1、seed 無新欄），**不影響 TC-9**。
 
 | 導覽區 | 頁面（views/） | 涵蓋的規格功能 |
 |---|---|---|
 | 首次開啟 | `SetupWizard` 初始設定引導 | 選擇範例/空白起點 → 公司自訂參數（職保費率、年資基準日）→ 快速建立員工 → 每月三步驟導引；完成旗標存於 store（`setupCompleted`） |
-| 系統 | `SettingsView` 系統設定 | §4 參數登錄表（分「公司專屬」黃色與「法定值」分組、附年度更新提醒）＋四張級距表唯讀檢視＋資料管理＋重跑精靈 |
-| 資料維護 | `MasterDataView` 基本資料 | 員工主檔＋薪資結構（八項目、即時 V1 檢核與投保級距預覽）＋眷屬雙旗標——以「人」為單位在同一視窗的三個分頁維護 |
-| 每月作業① | `MonthlyView` 薪資結算 | 預設自動帶入固定薪資（「無異動」即不必操作）；逐人開窗編輯加班/請假/獎金/其他/代扣稅，含即時試算、46 小時加班提醒、稅額建議一鍵帶入、查表分支黃色指引（§7 控制點） |
+| 系統 | `SettingsView` 系統設定 | §4 參數登錄表（分「公司專屬」黃色與「法定值」分組、附年度更新提醒）＋四張級距表唯讀檢視＋**非在職狀態給薪比例（LeavePolicyCard：留停/停職/暫離）**＋**新進員工預設固定薪資/津貼（SalaryDefaultsCard）**＋資料管理＋重跑精靈 |
+| 資料維護 | `MasterDataView` 基本資料 | 員工主檔（狀態 5 種；非在職顯示生效日/復職日/給薪比例）＋薪資結構（八項目＋**自訂固定津貼**、即時 V1 檢核與投保級距預覽）＋眷屬雙旗標——以「人」為單位在同一視窗的三個分頁維護 |
+| 每月作業① | `MonthlyView` 薪資結算 | 預設自動帶入固定薪資（「無異動」即不必操作）；逐人開窗編輯加班/請假/獎金/其他/代扣稅，含即時試算、46 小時加班提醒、稅額建議一鍵帶入、查表分支黃色指引（§7 控制點）；頂部與編輯視窗提示「固定薪資與津貼於基本資料設定」（`?emp=` 深連結直達該員） |
 | 每月作業② | `ReviewView` 結算查核 | 試算總覽（摘要卡＋全員明細）＋統計查核（§8 檢核以 HR 語言呈現＋V3 勾稽＋公司補充保費）＋獎金試算（§5.7 差分式＋獎金 5%）＋「確認本月結算」（four-eyes；資料再異動即自動解除確認） |
 | 每月作業③ | `ReportsView` 報表與薪資條 | 三維度匯總報表＋本月代扣所得稅清單（建議值/已填值分離、可帶入）＋逐人薪資條（§23）；薪資條可列印、產身分證加密 PDF、mailto 通知草稿、批次 ZIP |
 | 月報/年報 | `AnalyticsView`／`ReviewView`／`lib/reports/annual.ts` | 月報依「檢視月份」呈現（`usePayrollRowsFor`；情境徽章：試算暫定/已確認/歷史實際）；年報＝當年各月快照累計（缺月以 `buildPayrollRows`+`buildSnapshot` 回推估算）＋模擬全年（`simulateAnnual`：YTD＋剩餘月 run-rate）；月結確認時自動 `saveSnapshot`；結算查核頁內嵌「模擬年度」面板 |
 | 薪酬分析 | `AnalyticsView` 薪酬分析（額外模組） | 成本結構／分布與公平（CV·Gini·Lorenz·百分位）／級距與 compa-ratio（含**市場行情對標**：級距選填市場中位→對市場 compa-ratio）／獎金·分紅試算／年度·季度調薪試算（含**分配法並排比較** `compareRaiseMethods`）／**趨勢與預算**（每期 `buildSnapshot` 快照存 `snapshots` slice→成本/中位/Gini 走勢＋年度預算追蹤）／指標說明（用途＋怎麼看，非公式）；各分頁最上方以 `src/lib/insights.ts` 純函數產生**白話「重點意見」**（good/info/warn＋結論＋建議＋佐證）；零相依 SVG 圖表、CSV 與多頁 PDF 月報；**只讀薪資、試算不寫回** |
-| 法規申報 | `FilingView` 法規申報（額外模組） | 年度扣繳憑單彙總（`lib/reports/withholding.ts` 跨期聚合）／勞健退繳費清單（重用 `usePayrollRows` 的 insured/premiums）／投保級距申報調整（`lib/reports/bracketAdjust.ts` 比對 `declaredInsured` 基準）／加退保作業清單（`lib/reports/enrollment.ts` 依生命週期日期）；皆 CSV 匯出，不直接介接政府平台 |
+| 法規申報 | `FilingView` 法規申報（額外模組） | 年度扣繳憑單彙總（`lib/reports/withholding.ts` 跨期聚合）／勞健退繳費清單（重用 `usePayrollRows` 的 insured/premiums）／投保級距申報調整（`lib/reports/bracketAdjust.ts` 比對 `declaredInsured` 基準）／加退保/停復保作業清單（`lib/reports/enrollment.ts` 依生命週期日期＝加保/退保/停保/復保 4 類）；皆 CSV 匯出，不直接介接政府平台 |
 | 專案成本 | `ReportsView`／`AnalyticsView`／`SettingsView`／`MonthlyView` | 專案主檔（`SettingsView` CRUD，含預算/起訖/%完成）＋每月工時分攤（`AllocationEditor`，時數/百分比、「由出勤帶入」`attendance.monthWorkedHours`、availableHours 基礎）；`lib/reports/projectCost.ts`（`allocateEmployee` 共用切分）以 `distributeRounded` 把每員工全載成本切到各專案＋未分攤桶（勾稽：Σ＝全公司總成本），算 FTE/稼動率/預算 vs 實際、`projectDeptMatrix`（專案×部門）、`chargeOutVariance`（標準工率＝全載÷標準工時）；`lib/reports/projectTrend.ts` 逐月重算→`projectEac`（AC/燃燒率/run-rate EAC＋選用 EVM CPI）；報表頁專案 P&L＋分析頁「專案成本」分頁（StackedBar/Pareto/Bullet/Heatmap/TrendChart＋`analyzeProjectCost` 白話意見） |
-| 資料治理 | `SettingsView`／`MasterDataView` 內 | 整檔 JSON 備份/還原（`lib/backup.ts`＋persist `version/migrate`）／員工 CSV 批次匯入含驗證預覽（`lib/import/employeeCsv.ts`）／員工生命週期（status/leaveDate）與破月比例（`calc/wage.ts prorationFactor`，opt-in、factor=1 不破壞 TC-9）／調薪試算核定寫回（store `applyRaise`）／變更稽核軌跡（store `auditLog`＋操作者姓名） |
+| 資料治理 | `SettingsView`／`MasterDataView` 內 | 整檔 JSON 備份/還原（`lib/backup.ts`＋persist `version/migrate`）／員工 CSV 批次匯入含驗證預覽（`lib/import/employeeCsv.ts`）／員工生命週期（status 5 種＋生效日 `leaveDate`／復職日 `returnDate`／給薪比例 `leavePaidRatio`∥公司 `leavePolicy`）與破月精算（`calc/wage.ts payFactor` 逐日、勞保費按在職天數 `employmentDaysFactor`；以 `opts.period` opt-in、無 period／全月＝factor 1 不破壞 TC-9）／調薪試算核定寫回（store `applyRaise`）／變更稽核軌跡（store `auditLog`＋操作者姓名） |
 | 出勤匯入 | `AttendanceView`／`lib/import/attendanceCsv.ts` | 出勤/工時 CSV 批次匯入：打卡格式（上/下班）或工時格式（每日工時→合成上下班、扣午休）；驗證預覽後 `importPunches` 寫入 punches（去重），供「由出勤帶入」分攤 |
 | 出勤打卡 | `AttendanceView` 出勤打卡（額外模組） | GPS 軟性圍欄＋選用 IP 限制的上下班打卡、彈性上下班每日彙整（遲到/工時不足/缺卡）、CSV 匯出；前端定位/IP 僅供輔助稽核、非強制 |
 | 說明 | `HelpView` 使用說明／`SourcesView` 法規與費率依據 | 純操作說明＋FAQ＋薪酬分析指引；法源出處卡片（法條連結指向全國法規資料庫條文＋主管機關），即來源01–05 的使用者版 |

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { SALARY_ITEMS, type SalaryNumKey } from "@/views/MasterDataView";
 import { BracketTableCards } from "@/components/BracketTableCards";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -215,6 +216,9 @@ export function SettingsView() {
         </CardContent>
       </Card>
       )}
+
+      {secTab === "company" && <LeavePolicyCard locked={locked} />}
+      {secTab === "company" && <SalaryDefaultsCard locked={locked} />}
 
       {secTab === "legal" && (<>
       <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
@@ -438,6 +442,86 @@ export function ProjectMasterCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </Card>
+  );
+}
+
+/** 非在職狀態給薪政策（留停/停職/暫離 各狀態預設給薪比例；員工可逐案覆寫） */
+function LeavePolicyCard({ locked }: { locked: boolean }) {
+  const { leavePolicy, setLeavePolicy } = usePayrollStore();
+  const STATUSES: ("留停" | "停職" | "暫離")[] = ["留停", "停職", "暫離"];
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">非在職狀態給薪比例</CardTitle>
+        <CardDescription>留停／停職／暫離期間的公司預設給薪比例（0＝無給、50＝半薪、100＝全薪）；員工檔案可逐案覆寫。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {STATUSES.map((s) => (
+            <div key={s} className="space-y-1">
+              <Label className="text-xs">{s}給薪比例</Label>
+              <div className="flex items-center gap-1.5">
+                <Input type="number" min="0" max="100" step="10" className="h-8 col-assumption" disabled={locked}
+                  value={Math.round(leavePolicy[s] * 100)}
+                  onChange={(e) => setLeavePolicy({ [s]: Math.min(100, Math.max(0, Number(e.target.value))) / 100 })} />
+                <span className="w-4 shrink-0 text-xs text-muted-foreground">%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 新進員工預設固定薪資/津貼範本（openNew 帶入） */
+function SalaryDefaultsCard({ locked }: { locked: boolean }) {
+  const { salaryDefaults, setSalaryDefaults } = usePayrollStore();
+  const std = salaryDefaults.standard;
+  const custom = salaryDefaults.custom;
+  const setStd = (k: SalaryNumKey, v: number | undefined) => setSalaryDefaults({ ...salaryDefaults, standard: { ...std, [k]: v } });
+  const setCustom = (c: { name: string; amount: number }[]) => setSalaryDefaults({ ...salaryDefaults, custom: c });
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">新進員工預設固定薪資／津貼</CardTitle>
+        <CardDescription>設定後，於「基本資料 → 新增員工」時自動帶入（可再逐人調整）；留空＝0。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {SALARY_ITEMS.map((it) => (
+            <div key={it.key} className="space-y-1">
+              <Label className="text-xs">{it.label}</Label>
+              <Input type="number" className="h-8 col-assumption text-right tabular-nums" disabled={locked} placeholder="0"
+                value={std[it.key] ?? ""}
+                onChange={(e) => setStd(it.key, e.target.value === "" ? undefined : Number(e.target.value))} />
+            </div>
+          ))}
+        </div>
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-medium">自訂津貼範本</p>
+            <Button variant="outline" size="sm" disabled={locked} onClick={() => setCustom([...custom, { name: "", amount: 0 }])}><Plus /> 新增</Button>
+          </div>
+          {custom.length === 0 ? (
+            <p className="text-xs text-muted-foreground">無。可新增公司通用之自訂津貼（如語言/值班津貼），新進自動帶入。</p>
+          ) : (
+            <div className="space-y-2">
+              {custom.map((c, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border p-2">
+                  <Input placeholder="津貼名稱" className="h-8 w-40 col-assumption" disabled={locked} value={c.name}
+                    onChange={(e) => setCustom(custom.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
+                  <Input type="number" placeholder="金額" className="h-8 w-28 col-assumption text-right tabular-nums" disabled={locked} value={c.amount || ""}
+                    onChange={(e) => setCustom(custom.map((x, j) => (j === i ? { ...x, amount: Number(e.target.value) || 0 } : x)))} />
+                  <Button variant="ghost" size="icon" className="ml-auto size-7 text-destructive" disabled={locked}
+                    onClick={() => setCustom(custom.filter((_, j) => j !== i))}><Trash2 className="size-3.5" /></Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
     </Card>
   );
 }

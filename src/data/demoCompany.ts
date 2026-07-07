@@ -180,9 +180,17 @@ function addPinned(b: Built) {
   add(b, E("P12", "洪離職", "業務部", "業務代表", CCS[3], { status: "離職", leaveDate: "2026-06-20" }),
     salaryForTotal("P12", 52000), "G2", "B", [], cur("P12", {}));
 
-  // P13 留停（factor 0）
+  // P13 留停（整月無給，採公司政策 0 → 不列入計薪、出現在停保名冊）
   add(b, E("P13", "鄭留停", "後端部", "資深工程師", CCS[2], { status: "留停", leaveDate: "2026-05-01", project: "PJ-F" }),
     salaryForTotal("P13", 88000), "G3", "B", []);
+
+  // P16 停職半薪（本月 16 號起、逐案覆寫 0.5）→ 全月半薪＋破月
+  add(b, E("P16", "許停職", "研發部", "工程師", CCS[2], { status: "停職", leaveDate: `${DEMO_PERIOD}-16`, leavePaidRatio: 0.5 }),
+    salaryForTotal("P16", 60000), "G2", "C", [], cur("P16", {}));
+
+  // P17 留停含復職日（1 號留停、16 號復職、無給）→ 當月兩端破月、次月全薪
+  add(b, E("P17", "曾復職", "前端部", "資深專員", CCS[2], { status: "留停", leaveDate: `${DEMO_PERIOD}-01`, returnDate: `${DEMO_PERIOD}-16` }),
+    salaryForTotal("P17", 56000), "G2", "B", [], cur("P17", {}));
 
   // P14 居住者但未收免稅證明（→ V6 warning）
   add(b, E("P14", "謝未繳", "人資部", "專員", CCS[0], { exemptionFormReceivedDate: null }),
