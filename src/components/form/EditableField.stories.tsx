@@ -23,6 +23,8 @@ export const 唯讀文字: Story = { render: () => <Demo label="部門" kind="te
 export const 已變更_文字: Story = { render: () => <Demo label="部門" kind="text" value="測試部" original="行銷部" /> };
 export const 金額: Story = { render: () => <Demo label="本薪" kind="money" value={45000} original={45000} /> };
 export const 已變更_金額: Story = { render: () => <Demo label="本薪" kind="money" value={48000} original={45000} /> };
+export const 數字_含小數: Story = { render: () => <Demo label="本月工時" kind="number" value={168.5} original={168.5} help="千分位並保留小數" /> };
+export const 已變更_數字: Story = { render: () => <Demo label="本月工時" kind="number" value={176} original={168.5} /> };
 export const 比率: Story = { render: () => <Demo label="勞退自提率" kind="rate" value={0.06} original={0.06} help="0～6%" /> };
 export const 下拉: Story = {
   render: () => (

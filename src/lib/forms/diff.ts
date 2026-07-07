@@ -1,5 +1,5 @@
 // 表單欄位比對工具：供「變更偵測 / 送出前摘要 / 稽核 before→after」共用。
-import { ntd, pctOf } from "@/lib/utils";
+import { pctOf } from "@/lib/utils";
 
 export type FieldKind = "text" | "number" | "money" | "rate" | "date" | "select" | "checkbox";
 
@@ -44,11 +44,14 @@ export function fmtValue(v: unknown, kind: FieldKind, format?: (v: unknown) => s
   if (isEmptyValue(v)) return "—";
   switch (kind) {
     case "money":
-      return ntd(Number(v));
+      // 金額：整數千分位（如 45,000）
+      return Number(v).toLocaleString("zh-TW", { maximumFractionDigits: 0 });
     case "rate":
+      // 比率：百分比（如 6.0%）
       return pctOf(Number(v));
     case "number":
-      return String(v);
+      // 一般數字：千分位並保留小數（如 8.5、1,250、0.06）
+      return Number(v).toLocaleString("zh-TW", { maximumFractionDigits: 4 });
     case "checkbox":
       return v ? "是" : "否";
     default:

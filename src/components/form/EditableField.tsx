@@ -76,7 +76,7 @@ export function EditableField({
         title={disabled ? lockHint : undefined}
         className={cn(fieldBtnCls(changed, !!disabled))}
       >
-        <span className="underline decoration-dashed underline-offset-4">{value ? "是" : "否"}</span>
+        <span>{value ? "是" : "否"}</span>
         {disabled && <Lock className="ml-auto size-3.5 opacity-60" />}
       </button>,
     );
@@ -85,7 +85,7 @@ export function EditableField({
   if (disabled) {
     return shell(
       <div title={lockHint} className={cn(fieldBtnCls(false, true))}>
-        <span className={cn(!isEmpty && "underline decoration-dashed underline-offset-4", isEmpty && "text-muted-foreground")}>{display}</span>
+        <span className={cn(isEmpty && "text-muted-foreground")}>{display}</span>
         <Lock className="ml-auto size-3.5 opacity-60" />
       </div>,
     );
@@ -110,7 +110,7 @@ export function EditableField({
     }
     return shell(
       <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
-        <span className={cn(!isEmpty && "underline decoration-dashed underline-offset-4", isEmpty && "text-muted-foreground")}>{display}</span>
+        <span className={cn(isEmpty && "text-muted-foreground")}>{display}</span>
       </button>,
     );
   }
@@ -143,7 +143,7 @@ export function EditableField({
   const numeric = kind === "money" || kind === "number" || kind === "rate";
   return shell(
     <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
-      <span className={cn(!isEmpty && "underline decoration-dashed underline-offset-4", isEmpty && "text-muted-foreground", numeric && "ml-auto tabular-nums")}>{display}</span>
+      <span className={cn(isEmpty && "text-muted-foreground", numeric && "ml-auto tabular-nums")}>{display}</span>
     </button>,
   );
 }
