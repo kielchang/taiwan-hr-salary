@@ -27,7 +27,7 @@ import { DashboardView } from "@/views/DashboardView";
 import { VERSION_LABEL, COMMIT_URL } from "@/version";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
-  FileText, FolderKanban, Menu, LayoutDashboard,
+  FileText, FolderKanban, Menu, LayoutDashboard, X,
 } from "lucide-react";
 
 type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算" };
@@ -137,9 +137,32 @@ function Layout() {
         </div>
       </header>
 
+      {/* 行動版抽屜背景遮罩：點擊關閉 */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden print:hidden"
+          onClick={() => setOpen(false)}
+          aria-hidden
+        />
+      )}
+
       <div className="mx-auto max-w-[1280px] gap-4 px-4 py-4 md:grid md:grid-cols-[200px_1fr]">
-        <aside className={cn("print:hidden", open ? "block" : "hidden md:block")}>
+        <aside
+          className={cn(
+            "print:hidden",
+            // 行動版：固定抽屜、從左滑出（不再擠壓內容）；桌機（md+）：一般側欄
+            "fixed inset-y-0 left-0 z-50 w-[264px] overflow-y-auto border-r bg-background p-4 shadow-xl transition-transform duration-200 ease-out",
+            open ? "translate-x-0" : "-translate-x-full",
+            "md:static md:z-auto md:w-auto md:translate-x-0 md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:transition-none",
+          )}
+        >
           <nav className="space-y-3 md:sticky md:top-[64px]">
+            <div className="mb-1 flex items-center justify-between md:hidden">
+              <span className="flex items-center gap-2 text-sm font-bold"><Building2 className="size-5 text-primary" /> 選單</span>
+              <button onClick={() => setOpen(false)} aria-label="關閉選單" className="rounded-md p-1.5 hover:bg-accent">
+                <X className="size-5" />
+              </button>
+            </div>
             {NAV_SECTIONS.map((sec) => (
               <div key={sec.title}>
                 <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{sec.title}</p>
