@@ -1,0 +1,58 @@
+import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
+import { HelpHint } from "./HelpHint";
+import { NumberInput } from "./NumberInput";
+import { PrintHeader } from "./PrintHeader";
+import { BracketTables } from "./BracketTables";
+import { BracketTableCards } from "./BracketTableCards";
+import { DEFAULT_BRACKETS } from "@/config/brackets";
+
+const meta: Meta = { title: "元件/其他", parameters: { layout: "padded" } };
+export default meta;
+type S = StoryObj;
+
+export const 情境說明_HelpHint: S = {
+  render: () => (
+    <div className="flex items-center gap-2 text-lg font-bold">
+      基本資料 <HelpHint id="master" />
+      <span className="ml-4 text-sm font-normal text-muted-foreground">（點 ℹ 展開情境式說明）</span>
+    </div>
+  ),
+};
+
+export const 數字輸入_NumberInput: S = {
+  render: () => {
+    const Demo = () => {
+      const [v, setV] = useState(45000);
+      return <div className="w-40"><NumberInput value={v} onChange={setV} /></div>;
+    };
+    return <Demo />;
+  },
+};
+
+export const 列印頁首頁尾_PrintHeader: S = {
+  render: () => (
+    <div className="rounded border p-4">
+      {/* 平時 .print-header 僅列印顯示；此處強制顯示以便檢視版式 */}
+      <style>{`.print-header{display:block !important}`}</style>
+      <PrintHeader title="薪資明細表" period="2026-06" company="示範公司" />
+      <p className="mt-2 text-xs text-muted-foreground">（實際僅於列印時顯示；此為版式預覽）</p>
+    </div>
+  ),
+};
+
+export const 投保級距表_分頁版_BracketTables: S = {
+  render: () => (
+    <div className="max-w-3xl">
+      <BracketTables brackets={DEFAULT_BRACKETS} initial="labor" />
+    </div>
+  ),
+};
+
+export const 投保級距卡_設定用_BracketTableCards: S = {
+  render: () => (
+    <div className="max-w-3xl">
+      <BracketTableCards brackets={DEFAULT_BRACKETS} />
+    </div>
+  ),
+};

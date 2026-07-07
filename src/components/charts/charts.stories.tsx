@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { StackedBar, Pareto, TrendChart, Bullet, Heatmap, PALETTE } from "./index";
+import { StackedBar, Pareto, TrendChart, Bullet, Heatmap, BarChart, LineChart, Scatter, Legend, PALETTE } from "./index";
 
 const meta: Meta = { title: "元件/圖表", parameters: { layout: "padded" } };
 export default meta;
@@ -27,6 +27,26 @@ export const 堆疊長條_StackedBar: S = {
 export const 柏拉圖_Pareto: S = { render: () => <div className="w-[420px]"><Pareto data={bars} /></div> };
 export const 趨勢_TrendChart: S = { render: () => <div className="w-[420px]"><TrendChart data={trend} /></div> };
 export const 子彈圖_Bullet: S = { render: () => <div className="w-[420px]"><Bullet label="年度預算 vs 實際" value={5_400_000} target={6_000_000} /></div> };
+export const 長條圖_BarChart: S = { render: () => <div className="w-[420px]"><BarChart data={bars} showValues /></div> };
+export const 折線_LineChart: S = {
+  render: () => (
+    <div className="w-[320px]">
+      <LineChart diagonal points={[0, 0.15, 0.35, 0.6, 1].map((p, i, a) => ({ x: i / (a.length - 1), y: p }))} />
+    </div>
+  ),
+};
+export const 散佈圖_Scatter: S = {
+  render: () => (
+    <div className="w-[420px]">
+      <Scatter xLabel="年資（月）" yLabel="月薪" points={[
+        { x: 12, y: 38000, label: "A" }, { x: 36, y: 52000, label: "B" }, { x: 60, y: 68000, label: "C" }, { x: 120, y: 95000, label: "D" },
+      ]} />
+    </div>
+  ),
+};
+export const 圖例_Legend: S = {
+  render: () => <Legend items={[{ label: "本薪", color: PALETTE[0] }, { label: "加給", color: PALETTE[1] }, { label: "雇主負擔", color: PALETTE[5] }]} />,
+};
 export const 熱區圖_Heatmap: S = {
   render: () => (
     <div className="w-[420px]">
