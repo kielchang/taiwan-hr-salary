@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -17,6 +16,9 @@ import { csvSerialize } from "@/lib/csv";
 import { parseEmployeeCsv, IMPORT_COLUMNS, type ImportPreview } from "@/lib/import/employeeCsv";
 import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
+import { EditableField } from "@/components/form/EditableField";
+import { ChangeSummary } from "@/components/form/ChangeSummary";
+import { diffRecord, type FieldSpec, type Change, type FieldKind } from "@/lib/forms/diff";
 import { Pencil, Plus, Trash2, UserPlus, Upload, FileDown } from "lucide-react";
 
 const STATUS_OPTIONS: Employee["status"][] = ["在職", "離職", "留停", "停職", "暫離"];
@@ -33,6 +35,34 @@ export const SALARY_ITEMS: { key: SalaryNumKey; label: string; help?: string }[]
   { key: "attendanceBonus", label: "全勤獎金" },
   { key: "otherFixedAllowance", label: "其他固定津貼" },
 ];
+
+const STATUS_OPTS = STATUS_OPTIONS.map((s) => ({ value: s as string, label: s as string }));
+const RESIDENCY_OPTS = [{ value: "居住者", label: "居住者" }, { value: "非居住者", label: "非居住者（6%／18%）" }];
+const WITHHOLD_OPTS = [{ value: "固定5%", label: "固定 5%" }, { value: "依扣繳稅額表", label: "依扣繳稅額表（查表）" }];
+const ratioLabel = (v: unknown) => (v == null || v === "policy" || v === "" ? "沿用公司政策" : `${Math.round(Number(v) * 100)}%`);
+
+// 送出前變更摘要用的欄位中繼（label/kind/format）；key 對映 Employee/SalaryStructure 欄位
+const EMP_SPECS: FieldSpec[] = [
+  { key: "name", label: "姓名", kind: "text" },
+  { key: "department", label: "部門", kind: "text" },
+  { key: "title", label: "職稱", kind: "text" },
+  { key: "hireDate", label: "到職日", kind: "date" },
+  { key: "status", label: "任職狀態", kind: "select" },
+  { key: "leaveDate", label: "離職／生效日", kind: "date" },
+  { key: "returnDate", label: "復職日", kind: "date" },
+  { key: "leavePaidRatio", label: "給薪比例", kind: "select", format: ratioLabel },
+  { key: "voluntaryPensionRate", label: "勞退自提率", kind: "rate" },
+  { key: "costCenter", label: "成本中心", kind: "text" },
+  { key: "project", label: "專案別", kind: "text" },
+  { key: "nationalId", label: "身分證字號", kind: "text" },
+  { key: "email", label: "Email", kind: "text" },
+  { key: "taxResidency", label: "稅務身分", kind: "select" },
+  { key: "withholdingMethod", label: "扣繳方式", kind: "select" },
+  { key: "exemptionFormReceivedDate", label: "免稅額申報表收件日", kind: "date" },
+];
+const SAL_SPECS: FieldSpec[] = SALARY_ITEMS.map((it) => ({ key: it.key, label: it.label, kind: "money" as const }));
+const PAY_EMP_KEYS = new Set(["hireDate", "status", "leaveDate", "returnDate", "leavePaidRatio", "voluntaryPensionRate", "taxResidency", "withholdingMethod", "exemptionFormReceivedDate"]);
+const LOCK_HINT = "本月已確認結算、此欄已鎖定；請先至「查核與確認」取消確認。";
 
 const blankEmployee = (): Employee => ({
   id: "",
@@ -164,6 +194,64 @@ export function MasterDataView() {
 
   const isLeave = draftEmp.status != null && LEAVE_STATUSES.includes(draftEmp.status); // 留停/停職/暫離
   const policyRatio = isLeave ? leavePolicy[draftEmp.status as "留停" | "停職" | "暫離"] : 0; // 該狀態公司預設比例
+
+  // 原始記錄（編輯模式）：供逐欄比對、標色與還原
+  const origEmp = isNew ? undefined : employees.find((e) => e.id === draftEmp.id);
+  const origSalary = isNew ? undefined : salaries.find((s) => s.employeeId === draftEmp.id);
+  const origDeps = isNew ? [] : dependents.filter((d) => d.employeeId === draftEmp.id);
+  const lockEmp = (k: string) => locked && !isNew && PAY_EMP_KEYS.has(k);
+  const lockSal = locked && !isNew;
+
+  // 送出前變更摘要（純量欄位 + 陣列變更旗標）
+  const empChanges = origEmp ? diffRecord(origEmp as unknown as Record<string, unknown>, draftEmp as unknown as Record<string, unknown>, EMP_SPECS) : [];
+  const salChanges = origSalary ? diffRecord(origSalary as unknown as Record<string, unknown>, draftSalary as unknown as Record<string, unknown>, SAL_SPECS) : [];
+  const caKey = (ca?: { name: string; amount: number }[]) => JSON.stringify((ca ?? []).map((c) => ({ name: c.name, amount: c.amount })));
+  const caChanged = !isNew && caKey(origSalary?.customAllowances) !== caKey(draftSalary.customAllowances);
+  const depKey = (ds: Dependent[]) => JSON.stringify(ds.map((d) => ({ name: d.name, relationship: d.relationship, hi: d.enrolledInHealthInsurance, tax: d.taxDependent })));
+  const depsChanged = !isNew && depKey(origDeps) !== depKey(draftDeps);
+  const changes: Change[] = [...empChanges, ...salChanges];
+  if (caChanged) changes.push({ field: "__ca__", label: "自訂津貼", before: null, after: null, beforeText: `${origSalary?.customAllowances?.length ?? 0} 項`, afterText: `${draftSalary.customAllowances?.length ?? 0} 項` });
+  if (depsChanged) changes.push({ field: "__deps__", label: "眷屬名單", before: null, after: null, beforeText: `${origDeps.length} 人`, afterText: `${draftDeps.length} 人` });
+
+  const revertField = (field: string) => {
+    if (field === "__ca__") { setDraftSalary((s) => ({ ...s, customAllowances: origSalary?.customAllowances?.map((c) => ({ ...c })) })); return; }
+    if (field === "__deps__") { setDraftDeps(origDeps.map((d) => ({ ...d }))); return; }
+    if (SAL_SPECS.some((s) => s.key === field)) { setDraftSalary((s) => ({ ...s, [field]: (origSalary as Record<string, unknown> | undefined)?.[field] ?? 0 })); return; }
+    setDraftEmp((d) => ({ ...d, [field]: (origEmp as Record<string, unknown> | undefined)?.[field] ?? null }));
+  };
+  const revertAll = () => {
+    if (origEmp) setDraftEmp({ ...origEmp });
+    if (origSalary) setDraftSalary({ ...origSalary });
+    setDraftDeps(origDeps.map((d) => ({ ...d })));
+  };
+
+  // 員工欄位（唯讀預設；新增時 alwaysEdit）
+  const empField = (
+    key: keyof Employee,
+    p: { label: string; kind: FieldKind; help?: string; options?: { value: string; label: string }[]; format?: (v: unknown) => string; placeholder?: string; nullable?: boolean },
+  ) => (
+    <EditableField
+      label={p.label} kind={p.kind}
+      value={draftEmp[key] as string | number | boolean | null | undefined}
+      original={origEmp ? (origEmp[key] as string | number | boolean | null | undefined) : undefined}
+      alwaysEdit={isNew} trackChanges={!isNew}
+      disabled={lockEmp(key as string)} lockHint={LOCK_HINT}
+      options={p.options} format={p.format} help={p.help} placeholder={p.placeholder}
+      onChange={(v) => setEmp(key, (p.nullable && v === "" ? null : v) as Employee[typeof key])}
+      onRevert={() => setEmp(key, (origEmp ? origEmp[key] : null) as Employee[typeof key])}
+    />
+  );
+  const salField = (key: SalaryNumKey, label: string, help?: string) => (
+    <EditableField
+      label={label} kind="money"
+      value={draftSalary[key]}
+      original={origSalary ? origSalary[key] : undefined}
+      alwaysEdit={isNew} trackChanges={!isNew}
+      disabled={lockSal} lockHint={LOCK_HINT} help={help}
+      onChange={(v) => setDraftSalary((s) => ({ ...s, [key]: Number(v) || 0 }))}
+      onRevert={() => setDraftSalary((s) => ({ ...s, [key]: origSalary?.[key] ?? 0 }))}
+    />
+  );
 
   // 深連結 ?emp=E001：由查核/名冊等處跳轉時直接開啟該員檔案，免再搜尋
   const [searchParams, setSearchParams] = useSearchParams();
@@ -332,88 +420,36 @@ export function MasterDataView() {
 
           {tab === "basic" && (
             <div className="grid grid-cols-2 gap-3">
-              <Field label="員工編號 *">
-                <Input className="col-input" value={draftEmp.id} disabled={!isNew} onChange={(e) => setEmp("id", e.target.value)} />
-              </Field>
-              <Field label="姓名 *">
-                <Input className="col-input" value={draftEmp.name} onChange={(e) => setEmp("name", e.target.value)} />
-              </Field>
-              <Field label="部門">
-                <Input className="col-input" value={draftEmp.department} onChange={(e) => setEmp("department", e.target.value)} />
-              </Field>
-              <Field label="職稱">
-                <Input className="col-input" value={draftEmp.title} onChange={(e) => setEmp("title", e.target.value)} />
-              </Field>
-              <Field label="到職日" help="用於計算年資與特休天數；到職當月固定薪資按比例（破月）">
-                <Input type="date" className="col-input" value={draftEmp.hireDate} onChange={(e) => setEmp("hireDate", e.target.value)} />
-              </Field>
-              <Field label="任職狀態" help="離職＝終止契約（計至離職日）；留停/停職/暫離＝可復職之非在職區間，依生效日/復職日破月、給薪比例計薪">
-                <Select value={draftEmp.status ?? "在職"} onValueChange={(v) => setEmp("status", v as Employee["status"])}>
-                  <SelectTrigger className="col-input"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s!}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              {draftEmp.status === "離職" && (
-                <Field label="離職日" help="計至此日（含）；當月按在職天數破月、辦理退保">
-                  <Input type="date" className="col-input" value={draftEmp.leaveDate ?? ""} onChange={(e) => setEmp("leaveDate", e.target.value || null)} />
-                </Field>
-              )}
+              <EditableField label="員工編號 *" kind="text" value={draftEmp.id} alwaysEdit={isNew} disabled={!isNew} lockHint="員工編號建立後不可變更" trackChanges={false} onChange={(v) => setEmp("id", String(v))} />
+              {empField("name", { label: "姓名 *", kind: "text" })}
+              {empField("department", { label: "部門", kind: "text" })}
+              {empField("title", { label: "職稱", kind: "text" })}
+              {empField("hireDate", { label: "到職日", kind: "date", help: "用於年資與特休；到職當月固定薪資按比例（破月）" })}
+              {empField("status", { label: "任職狀態", kind: "select", options: STATUS_OPTS, help: "離職＝計至離職日；留停/停職/暫離＝可復職之非在職區間，依給薪比例計薪" })}
+              {draftEmp.status === "離職" && empField("leaveDate", { label: "離職日", kind: "date", nullable: true, help: "計至此日（含）；當月按在職天數破月、辦理退保" })}
               {isLeave && (
                 <>
-                  <Field label={`${draftEmp.status}生效日`} help="區間起日；此日起依給薪比例計薪、辦理停保">
-                    <Input type="date" className="col-input" value={draftEmp.leaveDate ?? ""} onChange={(e) => setEmp("leaveDate", e.target.value || null)} />
-                  </Field>
-                  <Field label="復職日（空＝尚未復職）" help="復職日起恢復全額計薪並辦理復保；填此即閉合區間">
-                    <Input type="date" className="col-input" value={draftEmp.returnDate ?? ""} onChange={(e) => setEmp("returnDate", e.target.value || null)} />
-                  </Field>
-                  <Field label="給薪比例" help={`留白＝沿用公司政策（目前 ${draftEmp.status}：${Math.round(policyRatio * 100)}%）；可逐案覆寫`}>
-                    <Select
-                      value={draftEmp.leavePaidRatio == null ? "policy" : String(draftEmp.leavePaidRatio)}
-                      onValueChange={(v) => setEmp("leavePaidRatio", v === "policy" ? null : Number(v))}
-                    >
-                      <SelectTrigger className="col-input"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="policy">沿用公司政策（{Math.round(policyRatio * 100)}%）</SelectItem>
-                        <SelectItem value="0">無給（0%）</SelectItem>
-                        <SelectItem value="0.5">半薪（50%）</SelectItem>
-                        <SelectItem value="1">全薪（100%）</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
+                  {empField("leaveDate", { label: `${draftEmp.status}生效日`, kind: "date", nullable: true, help: "區間起日；此日起依給薪比例計薪、辦理停保" })}
+                  {empField("returnDate", { label: "復職日（空＝尚未復職）", kind: "date", nullable: true, help: "復職日起恢復全額計薪並辦理復保" })}
+                  <EditableField
+                    label="給薪比例" kind="select"
+                    value={draftEmp.leavePaidRatio == null ? "policy" : String(draftEmp.leavePaidRatio)}
+                    original={!origEmp ? undefined : origEmp.leavePaidRatio == null ? "policy" : String(origEmp.leavePaidRatio)}
+                    alwaysEdit={isNew} trackChanges={!isNew}
+                    disabled={lockEmp("leavePaidRatio")} lockHint={LOCK_HINT}
+                    options={[{ value: "policy", label: `沿用公司政策（${Math.round(policyRatio * 100)}%）` }, { value: "0", label: "無給（0%）" }, { value: "0.5", label: "半薪（50%）" }, { value: "1", label: "全薪（100%）" }]}
+                    format={ratioLabel}
+                    help="留白＝沿用公司政策；可逐案覆寫"
+                    onChange={(v) => setEmp("leavePaidRatio", v === "policy" ? null : Number(v))}
+                    onRevert={() => setEmp("leavePaidRatio", origEmp?.leavePaidRatio ?? null)}
+                  />
                 </>
               )}
-              <Field label="勞退自願提繳率（%）" help="員工自願從薪資提繳 0～6% 到退休金專戶，此金額免稅">
-                <Input
-                  type="number" step="1" min="0" max="6" className="col-input"
-                  value={Math.round(draftEmp.voluntaryPensionRate * 100)}
-                  onChange={(e) => setEmp("voluntaryPensionRate", Math.min(6, Math.max(0, Number(e.target.value))) / 100)}
-                />
-              </Field>
-              <Field label="成本中心（選填）" help="供匯總報表分類">
-                <Input className="col-input" value={draftEmp.costCenter} onChange={(e) => setEmp("costCenter", e.target.value)} />
-              </Field>
-              <Field label="專案別（選填）" help="供匯總報表分類">
-                <Input className="col-input" value={draftEmp.project} onChange={(e) => setEmp("project", e.target.value)} />
-              </Field>
-              <Field label="身分證字號" help="作為薪資條加密 PDF 的開啟密碼；英文字母請大寫">
-                <Input
-                  className="col-input"
-                  value={draftEmp.nationalId}
-                  onChange={(e) => setEmp("nationalId", e.target.value.toUpperCase())}
-                  placeholder="A123456789"
-                />
-              </Field>
-              <Field label="Email" help="薪資條 email 通知的收件人">
-                <Input
-                  type="email"
-                  className="col-input"
-                  value={draftEmp.email}
-                  onChange={(e) => setEmp("email", e.target.value)}
-                  placeholder="name@example.com"
-                />
-              </Field>
+              {empField("voluntaryPensionRate", { label: "勞退自願提繳率", kind: "rate", help: "0～6%，此金額免稅" })}
+              {empField("costCenter", { label: "成本中心（選填）", kind: "text", help: "供匯總報表分類" })}
+              {empField("project", { label: "專案別（選填）", kind: "text", help: "供匯總報表分類" })}
+              {empField("nationalId", { label: "身分證字號", kind: "text", placeholder: "A123456789", help: "薪資條加密 PDF 密碼；英文大寫" })}
+              {empField("email", { label: "Email", kind: "text", placeholder: "name@example.com", help: "薪資條 email 通知收件人" })}
             </div>
           )}
 
@@ -423,15 +459,7 @@ export function MasterDataView() {
                 這裡填「每月固定發放」的項目；年終、三節等一次性獎金不在這裡，請於每月結算或獎金試算時輸入。
               </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {SALARY_ITEMS.map((it) => (
-                  <Field key={it.key} label={it.label} help={it.help}>
-                    <Input
-                      type="number" className="col-input text-right tabular-nums"
-                      value={draftSalary[it.key]}
-                      onChange={(e) => setDraftSalary((s) => ({ ...s, [it.key]: e.target.value === "" ? 0 : Number(e.target.value) }))}
-                    />
-                  </Field>
-                ))}
+                {SALARY_ITEMS.map((it) => <div key={it.key}>{salField(it.key, it.label, it.help)}</div>)}
               </div>
 
               {/* 自訂固定津貼（命名項目，如語言/值班/危險津貼）；計入月薪資總額與級距 */}
@@ -489,33 +517,11 @@ export function MasterDataView() {
           {tab === "family" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Field label="稅務身分" help="該年度在台滿 183 天為居住者">
-                  <Select value={draftEmp.taxResidency} onValueChange={(v) => setEmp("taxResidency", v as Employee["taxResidency"])}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="居住者">居住者</SelectItem>
-                      <SelectItem value="非居住者">非居住者（6%／18%）</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
+                {empField("taxResidency", { label: "稅務身分", kind: "select", options: RESIDENCY_OPTS, help: "該年度在台滿 183 天為居住者" })}
                 {draftEmp.taxResidency === "居住者" && (
                   <>
-                    <Field label="每月扣繳方式" help="由員工在免稅額申報表上勾選">
-                      <Select value={draftEmp.withholdingMethod} onValueChange={(v) => setEmp("withholdingMethod", v as Employee["withholdingMethod"])}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="固定5%">固定 5%</SelectItem>
-                          <SelectItem value="依扣繳稅額表">依扣繳稅額表（查表）</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="免稅額申報表收件日" help="到職時與每年 1 月收件；未收件者依規定按固定 5% 扣繳">
-                      <Input
-                        type="date" className="col-input"
-                        value={draftEmp.exemptionFormReceivedDate ?? ""}
-                        onChange={(e) => setEmp("exemptionFormReceivedDate", e.target.value || null)}
-                      />
-                    </Field>
+                    {empField("withholdingMethod", { label: "每月扣繳方式", kind: "select", options: WITHHOLD_OPTS, help: "由員工在免稅額申報表上勾選" })}
+                    {empField("exemptionFormReceivedDate", { label: "免稅額申報表收件日", kind: "date", nullable: true, help: "未收件者依規定按固定 5% 扣繳" })}
                   </>
                 )}
               </div>
@@ -591,10 +597,16 @@ export function MasterDataView() {
             </div>
           )}
 
+          {!isNew && (
+            <div className="mt-1 space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">送出前確認變更</p>
+              <ChangeSummary changes={changes} onRevertField={revertField} onRevertAll={revertAll} />
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>
             <Button onClick={save} disabled={!draftEmp.id.trim() || !draftEmp.name.trim()}>
-              儲存員工檔案
+              {isNew ? "建立員工" : "儲存變更"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -651,12 +663,3 @@ export function MasterDataView() {
   );
 }
 
-function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      {children}
-      {help && <p className="text-[11px] leading-snug text-muted-foreground">{help}</p>}
-    </div>
-  );
-}
