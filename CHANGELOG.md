@@ -16,6 +16,9 @@
 - 驗證 V8 擴充：復職日早於生效日時報錯。
 - 示範公司擴為 62 人（含停職半薪、復職邊界個案）。
 
+### CI
+- `deploy-pages.yml` 新增 `release` job：發佈到 main 時依 `package.json` 版號自動建立 `vX.Y.Z` tag 與 GitHub Release（已存在則略過）。
+
 ### 文件
 - README 頂部加線上 Demo 連結並更新過時的功能描述；附錄 C／CLAUDE.md 同步更新。
 

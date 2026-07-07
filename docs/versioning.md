@@ -43,9 +43,10 @@ __BUILD_TIME__  = new Date().toISOString()
 ## 發佈流程（每次上線 main 都要有版號）
 
 1. 在開發分支：依變更決定 bump 幅度，改 `package.json` `version`。
-2. 更新 `CHANGELOG.md`（新增一段：版號＋日期＋變更）。
+2. 更新 `CHANGELOG.md`（新增一段：版號＋日期＋變更；標題格式 `## [X.Y.Z] - YYYY-MM-DD`）。
 3. commit、push 開發分支；跑 `tsc -b --force`＋`vitest`＋`build` 全綠。
 4. 取得使用者同意後合併到 `main`、push（觸發 Pages 部署）。
-5. 在該發佈 commit 打 git tag：`git tag v1.1.0 && git push origin v1.1.0`（GitHub Releases 會出現版本列表，便於回溯）。
+5. **tag／Release 自動化**：`deploy-pages.yml` 的 `release` job 會依 `package.json` 版號自動建立 `vX.Y.Z` tag 與 GitHub Release（Release 內容取自 `CHANGELOG.md` 對應段落）；**該版已存在則略過**，所以只有 bump 版號時才會產生新 Release。一般不需手動打 tag。
 
-> CI（`deploy-pages.yml`）的 runner 內建 `GITHUB_SHA`，build 步驟自動取用，不需額外設定。
+> - CI runner 內建 `GITHUB_SHA`，build 步驟自動取用注入版號 SHA；`release` job 用 `github.token`（`contents: write`）建立 tag/Release，不受本地環境限制。
+> - 手動補 tag（需要時）：`git tag -a vX.Y.Z <sha> -m vX.Y.Z && git push origin vX.Y.Z`（若你的環境允許推 tag）。

@@ -58,3 +58,30 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # 依 package.json 版號自動打 tag 並建立 GitHub Release（該版已存在則略過）。
+  # 版號 bump 時才會產生新 Release；發佈流程見 docs/versioning.md。
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tag & Release when version bumped
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="$(sed -nE 's/.*"version" *: *"([^"]+)".*/\1/p' package.json | head -1)"
+          TAG="v$VER"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG 已存在，略過。"
+            exit 0
+          fi
+          NOTES="$(awk -v v="$VER" '/^## \[/{on=($0 ~ ("\\[" v "\\]"))} on' CHANGELOG.md)"
+          [ -z "$NOTES" ] && NOTES="詳見 CHANGELOG.md"
+          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          echo "已建立 Release $TAG（指向 $GITHUB_SHA）"

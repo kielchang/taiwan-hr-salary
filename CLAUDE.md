@@ -21,7 +21,8 @@ storage undefined 時先想到這裡，不要改測試本身。
 - 開發分支：`claude/salary-calculator-react-shadcn-stxjp7`（所有變更先 commit 到這裡並 push）。
 - 上線＝merge 到 `main` push → GitHub Actions `deploy-pages.yml`（跑驗收測試＋build＋Pages 發佈）。
   **merge main 前務必取得使用者同意**（deploy 即正式上線）。線上站：<https://kielchang.github.io/taiwan-hr-salary/>。
-- **版號**（發佈流程見 `docs/versioning.md`）：每次發佈到 main＝bump `package.json` `version`（SemVer；功能→minor、修正→patch）＋補 `CHANGELOG.md` 一段＋打 tag `vX.Y.Z`。
+- **版號**（發佈流程見 `docs/versioning.md`）：每次發佈到 main＝bump `package.json` `version`（SemVer；功能→minor、修正→patch）＋補 `CHANGELOG.md` 一段。
+  tag `vX.Y.Z` 與 GitHub Release 由 `deploy-pages.yml` 的 `release` job **自動建立**（依 package.json 版號、已存在則略過；Release 內容取自 CHANGELOG），一般不用手動打 tag。
   SHA/建置時間由 `vite.config.ts` define 自動注入（CI 用 `GITHUB_SHA`、本地＝`dev`），畫面版號來源＝`src/version.ts`（側邊欄/設定「關於」/列印頁尾共用）。
 - CI 曾因 Pages 佇列逾時而 deploy job 失敗（build 綠）— 平台問題，用 rerun_failed_jobs 重跑即可。
 
