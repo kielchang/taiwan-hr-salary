@@ -24,6 +24,7 @@ import { AnalyticsView } from "@/views/AnalyticsView";
 import { ProjectsView } from "@/views/ProjectsView";
 import { ReportsHubView } from "@/views/ReportsHubView";
 import { DashboardView } from "@/views/DashboardView";
+import { VERSION_LABEL, COMMIT_URL } from "@/version";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
   FileText, FolderKanban, Menu, LayoutDashboard,
@@ -166,6 +167,15 @@ function Layout() {
                 </div>
               </div>
             ))}
+            <a
+              href={COMMIT_URL}
+              target="_blank"
+              rel="noreferrer"
+              title="目前部署版本（點擊查看此版對應的 GitHub commit）；詳細見 系統設定 → 關於"
+              className="mt-2 block px-2 pt-2 text-[10px] tabular-nums text-muted-foreground/70 hover:text-muted-foreground"
+            >
+              {VERSION_LABEL}
+            </a>
           </nav>
         </aside>
 

@@ -22,6 +22,7 @@ import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban } from "lucide-react";
+import { APP_VERSION, GIT_SHA, IS_RELEASE, COMMIT_URL, buildTimeTaipei } from "@/version";
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
   salary: "薪資異動", employee: "員工異動", dependent: "眷屬異動", event: "結算異動", confirm: "月結確認",
@@ -341,7 +342,7 @@ export function SettingsView() {
             variant="outline"
             size="sm"
             onClick={() => {
-              if (confirm("將以示範公司（約 60 名員工，含多月歷史、確認/稽核、加退保與各種狀態）覆蓋目前所有資料，確定？")) resetToSeed();
+              if (confirm("將以示範公司（62 名員工，含多月歷史、確認/稽核、加退保/停復保與各種狀態）覆蓋目前所有資料，確定？")) resetToSeed();
             }}
           >
             <RotateCcw /> 還原為示範公司資料
@@ -367,6 +368,26 @@ export function SettingsView() {
           >
             <Trash2 /> 清空員工資料
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><Info className="size-4 text-primary" /> 關於 / 版本</CardTitle>
+          <CardDescription>目前這台瀏覽器載入的系統版本；核對「線上是哪一版」或回報問題時，附上這些資訊最準。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm">
+          <div>系統版本：<span className="font-medium tabular-nums">v{APP_VERSION}</span></div>
+          <div>
+            版本識別（commit）：{IS_RELEASE
+              ? <a className="font-medium text-primary underline underline-offset-2" href={COMMIT_URL} target="_blank" rel="noreferrer">{GIT_SHA}</a>
+              : <span className="text-muted-foreground">開發模式（dev，未部署）</span>}
+          </div>
+          <div>建置時間：<span className="tabular-nums">{buildTimeTaipei() ? `${buildTimeTaipei()}（台北）` : "—"}</span></div>
+          <div>參數年度：民國 115 年（2026）</div>
+          <div className="pt-1 text-xs text-muted-foreground">
+            線上站：<a className="underline underline-offset-2" href="https://kielchang.github.io/taiwan-hr-salary/" target="_blank" rel="noreferrer">kielchang.github.io/taiwan-hr-salary</a>
+          </div>
         </CardContent>
       </Card>
       </>)}

@@ -8,7 +8,7 @@
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npx vitest run       # 全部測試（目前 188 項，必須全綠）
+npx vitest run       # 全部測試（目前 193 項，必須全綠）
 npm run build        # tsc -b && vite build（CI 同款；tsc 增量快取可能漏抓，改用 npx tsc -b --force 驗證最準）
 ```
 
@@ -21,6 +21,8 @@ storage undefined 時先想到這裡，不要改測試本身。
 - 開發分支：`claude/salary-calculator-react-shadcn-stxjp7`（所有變更先 commit 到這裡並 push）。
 - 上線＝merge 到 `main` push → GitHub Actions `deploy-pages.yml`（跑驗收測試＋build＋Pages 發佈）。
   **merge main 前務必取得使用者同意**（deploy 即正式上線）。線上站：<https://kielchang.github.io/taiwan-hr-salary/>。
+- **版號**（發佈流程見 `docs/versioning.md`）：每次發佈到 main＝bump `package.json` `version`（SemVer；功能→minor、修正→patch）＋補 `CHANGELOG.md` 一段＋打 tag `vX.Y.Z`。
+  SHA/建置時間由 `vite.config.ts` define 自動注入（CI 用 `GITHUB_SHA`、本地＝`dev`），畫面版號來源＝`src/version.ts`（側邊欄/設定「關於」/列印頁尾共用）。
 - CI 曾因 Pages 佇列逾時而 deploy job 失敗（build 綠）— 平台問題，用 rerun_failed_jobs 重跑即可。
 
 ## 鐵律（違反會壞驗收或破壞既有決策）
@@ -57,6 +59,7 @@ src/
 ├── components/ui/     DataTable/ChartCard/Delta/EmptyState/table(zebra/sticky/SortHead)/…
 ├── components/charts/ 零相依 SVG 圖表（StackedBar/Pareto/Heatmap 含圖例/TrendChart/Bullet…）
 ├── content/help.tsx   情境式說明內容（HelpHint ℹ 用；鍵：payroll/master/analytics/projects/reports/settings/attendance）
+├── version.ts         版本資訊單一來源（vite define 注入版號/SHA/建置時間；側邊欄/設定「關於」/列印頁尾共用）
 └── views/
     ├── DashboardView  「本月工作台」＝首頁 /：待辦卡（含停保/復保）＋排程調薪＋深連結（?tab=、?emp=）
     ├── PayrollFlow    每月結算兩步（MonthlyView 輸入異動 → ReviewView 查核確認）
@@ -92,8 +95,10 @@ src/
    勞保費到/離職當月按在職天數（`employmentDaysFactor`）、健保勞退整月；名冊加**停保/復保**（enrollment 4 類）＋工作台待辦；
    V8 擴充（復職日<生效日 error）；主檔狀態欄（生效日/復職日/給薪比例）；SettingsView 加 LeavePolicyCard；
    `customAllowances` **自訂固定津貼**（計入月薪資總額/級距/加班）＋SalaryDefaultsCard **新進預設帶入**＋MonthlyView/help 動線指引。
+8. **系統版號顯示**（使用者拍板，起始 `1.1.0`）：`package.json` 版號＋`GITHUB_SHA`/建置時間由 `vite.config.ts` define 注入 →
+   `src/version.ts`（單一來源）→ 側邊欄常駐版號、系統設定「關於」卡、列印頁尾。發佈流程（bump＋CHANGELOG＋tag）見 `docs/versioning.md`。
 
-最新 commit（開發分支）：見 `git log`（本批＝生命週期＋固定津貼；前批 backlog 清尾＝`cb06cf3`）。測試 18 檔 188 項全綠（Node 22/26 皆驗）。
+最新 commit（開發分支）：見 `git log`（本批＝系統版號；前批＝生命週期＋固定津貼）。測試 19 檔 193 項全綠（Node 22/26 皆驗）。
 
 ## 已知可續作（backlog，未做）
 
@@ -105,7 +110,7 @@ src/
 ## 改動驗證清單（每批必跑）
 
 1. `npx tsc -b --force`（CI 是全新編譯，增量快取會騙人——曾因此炸過一次 CI）。
-2. `npx vitest run` 188 全綠；動到路由/首頁要同步改 `tests/clientmount.test.tsx`，
+2. `npx vitest run` 193 全綠；動到路由/首頁要同步改 `tests/clientmount.test.tsx`，
    動到鎖定/驗證要看 `tests/guards.test.ts`，動到示範資料看 `tests/demoCompany.test.ts`，
    動到破月/保費/津貼看 `tests/proration.test.ts`。
 3. `npm run build`。
