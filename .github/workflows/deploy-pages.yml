@@ -38,6 +38,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # 元件/畫面目錄一併發佈於 /storybook 子路徑（storybook base 為相對路徑）
+      - name: Build Storybook
+        run: npm run build-storybook -- -o dist/storybook
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
