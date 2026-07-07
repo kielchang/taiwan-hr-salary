@@ -13,11 +13,11 @@ export interface EditableFieldOption {
 
 export interface EditableFieldProps {
   label: string;
-  value: string | number | boolean | null | undefined;
+  value: string | number | boolean | string[] | null | undefined;
   /** 原始值（編輯模式傳入）；用於「已變更」標色與還原 */
-  original?: string | number | boolean | null | undefined;
+  original?: string | number | boolean | string[] | null | undefined;
   kind: FieldKind;
-  onChange: (v: string | number | boolean) => void;
+  onChange: (v: string | number | boolean | string[]) => void;
   onRevert?: () => void;
   options?: EditableFieldOption[];
   /** 顯示格式覆寫（如 select 值→標籤） */
@@ -31,6 +31,8 @@ export interface EditableFieldProps {
   trackChanges?: boolean;
   /** 恆為輸入態（新增表單用）：跳過唯讀按鈕、直接可編輯 */
   alwaysEdit?: boolean;
+  /** 單位（英文/符號，如 h）；接於數字後顯示 */
+  unit?: string;
   min?: number;
   step?: number;
   className?: string;
@@ -44,7 +46,7 @@ export interface EditableFieldProps {
  */
 export function EditableField({
   label, value, original, kind, onChange, onRevert, options, format,
-  placeholder, disabled, lockHint, help, trackChanges = true, alwaysEdit, min, step, className,
+  placeholder, disabled, lockHint, help, trackChanges = true, alwaysEdit, unit, min, step, className,
 }: EditableFieldProps) {
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,29 +65,51 @@ export function EditableField({
     </FieldShell>
   );
 
-  const display = fmtValue(value, kind, format);
+  const display = fmtValue(value, kind, format, unit);
   const isEmpty = display === "—";
+  const negMoney = kind === "money" && Number(value) < 0; // 帳務：負值紅字
 
-  // checkbox：點顯示即切換（無獨立輸入態）
+  // checkbox（是/否）：分段切換
   if (kind === "checkbox") {
     return shell(
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && onChange(!value)}
-        title={disabled ? lockHint : undefined}
-        className={cn(fieldBtnCls(changed, !!disabled))}
-      >
-        <span>{value ? "是" : "否"}</span>
-        {disabled && <Lock className="ml-auto size-3.5 opacity-60" />}
-      </button>,
+      <SegGroup
+        options={[{ value: "true", label: "是" }, { value: "false", label: "否" }]}
+        value={value ? "true" : "false"}
+        onPick={(v) => onChange(v === "true")}
+        disabled={disabled} lockHint={lockHint} changed={changed}
+      />,
+    );
+  }
+
+  // radio（單選）：分段按鈕
+  if (kind === "radio") {
+    return shell(
+      <SegGroup
+        options={options ?? []}
+        value={value == null ? "" : String(value)}
+        onPick={(v) => onChange(v)}
+        disabled={disabled} lockHint={lockHint} changed={changed}
+      />,
+    );
+  }
+
+  // multiselect（多選）：可切換標籤片
+  if (kind === "multiselect") {
+    const sel = Array.isArray(value) ? value.map(String) : [];
+    return shell(
+      <Chips
+        options={options ?? []}
+        selected={sel}
+        onToggle={(v) => onChange(sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v])}
+        disabled={disabled} lockHint={lockHint} changed={changed}
+      />,
     );
   }
 
   if (disabled) {
     return shell(
       <div title={lockHint} className={cn(fieldBtnCls(false, true))}>
-        <span className={cn(isEmpty && "text-muted-foreground")}>{display}</span>
+        <span className={cn(isEmpty && "text-muted-foreground", negMoney && "text-rose-600 font-medium")}>{display}</span>
         <Lock className="ml-auto size-3.5 opacity-60" />
       </div>,
     );
@@ -110,7 +134,7 @@ export function EditableField({
     }
     return shell(
       <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
-        <span className={cn(isEmpty && "text-muted-foreground")}>{display}</span>
+        <span className={cn(isEmpty && "text-muted-foreground", negMoney && "text-rose-600 font-medium")}>{display}</span>
       </button>,
     );
   }
@@ -143,7 +167,7 @@ export function EditableField({
   const numeric = kind === "money" || kind === "number" || kind === "rate";
   return shell(
     <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
-      <span className={cn(isEmpty && "text-muted-foreground", numeric && "ml-auto tabular-nums")}>{display}</span>
+      <span className={cn(isEmpty && "text-muted-foreground", numeric && "ml-auto tabular-nums", negMoney && "text-rose-600 font-medium")}>{display}</span>
     </button>,
   );
 }
@@ -183,6 +207,81 @@ function FieldShell({
         )}
       </div>
       {help && <p className="text-[11px] leading-snug text-muted-foreground">{help}</p>}
+    </div>
+  );
+}
+
+/** 分段選擇（是/否、單選 radio）：一列按鈕，選中者高亮 */
+function SegGroup({
+  options, value, onPick, disabled, lockHint, changed,
+}: {
+  options: EditableFieldOption[]; value: string; onPick: (v: string) => void; disabled?: boolean; lockHint?: string; changed: boolean;
+}) {
+  return (
+    <div
+      title={disabled ? lockHint : undefined}
+      className={cn(
+        "inline-flex flex-wrap items-center gap-0.5 rounded-md border p-0.5",
+        changed ? "border-amber-400 bg-amber-50" : "border-input bg-background",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            disabled={disabled}
+            onClick={() => !disabled && onPick(o.value)}
+            className={cn(
+              "rounded px-3 py-1 text-sm transition-colors",
+              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+      {disabled && <Lock className="mx-1 size-3.5 opacity-60" />}
+    </div>
+  );
+}
+
+/** 多選標籤片：每個選項一顆可切換的 chip，選中者填色 */
+function Chips({
+  options, selected, onToggle, disabled, lockHint, changed,
+}: {
+  options: EditableFieldOption[]; selected: string[]; onToggle: (v: string) => void; disabled?: boolean; lockHint?: string; changed: boolean;
+}) {
+  return (
+    <div
+      title={disabled ? lockHint : undefined}
+      className={cn(
+        "flex flex-wrap items-center gap-1.5 rounded-md border p-1.5",
+        changed ? "border-amber-400 bg-amber-50" : "border-input bg-background",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      {options.map((o) => {
+        const on = selected.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            disabled={disabled}
+            onClick={() => !disabled && onToggle(o.value)}
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+              on ? "border-primary bg-primary/10 font-medium text-primary" : "border-input text-muted-foreground hover:bg-accent",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+      {options.length === 0 && <span className="px-1 text-xs text-muted-foreground">（無選項）</span>}
+      {disabled && <Lock className="size-3.5 opacity-60" />}
     </div>
   );
 }

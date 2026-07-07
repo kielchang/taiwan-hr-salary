@@ -33,7 +33,19 @@ export const 下拉: Story = {
     ]} />
   ),
 };
-export const 勾選: Story = { render: () => <Demo label="依附健保" kind="checkbox" value={true} original={true} /> };
+export const 是否_分段: Story = { render: () => <Demo label="依附健保" kind="checkbox" value={true} original={true} /> };
+export const 單選_Radio: Story = {
+  render: () => <Demo label="每月扣繳方式" kind="radio" value="固定5%" original="固定5%" options={[
+    { value: "固定5%", label: "固定 5%" }, { value: "依扣繳稅額表", label: "依扣繳稅額表" },
+  ]} />,
+};
+export const 多選_MultiSelect: Story = {
+  render: () => <Demo label="本月請假別" kind="multiselect" value={["特休", "病假"]} original={["特休"]} options={[
+    { value: "特休", label: "特休" }, { value: "病假", label: "病假" }, { value: "事假", label: "事假" }, { value: "婚假", label: "婚假" }, { value: "喪假", label: "喪假" },
+  ]} />,
+};
+export const 負金額_帳務: Story = { render: () => <Demo label="其他扣款" kind="money" value={-2000} original={-2000} help="負值以括號＋紅字呈現（帳務）" /> };
+export const 數字帶單位: Story = { render: () => <Demo label="本月工時" kind="number" value={168.5} original={168.5} unit="h" /> };
 export const 日期: Story = { render: () => <Demo label="到職日" kind="date" value="2020-01-01" original="2020-01-01" /> };
 export const 鎖定: Story = { render: () => <Demo label="員工編號" kind="text" value="E001" disabled lockHint="本月已確認結算、此欄已鎖定" /> };
 export const 新增模式: Story = { render: () => <Demo label="姓名" kind="text" value="" alwaysEdit trackChanges={false} placeholder="輸入姓名" /> };

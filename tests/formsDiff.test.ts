@@ -18,15 +18,33 @@ describe("eqValue 欄位等值", () => {
     expect(eqValue(true, false)).toBe(false);
     expect(eqValue("在職", "離職")).toBe(false);
   });
+  it("陣列以集合比較（順序無關）", () => {
+    expect(eqValue(["a", "b"], ["b", "a"])).toBe(true);
+    expect(eqValue(["a"], ["a", "b"])).toBe(false);
+  });
 });
 
 describe("fmtValue 顯示格式", () => {
-  it("空值→—、金額千分位、比率百分比、布林是否", () => {
+  it("空值→—、金額$千分位、比率%、布林是否", () => {
     expect(fmtValue("", "text")).toBe("—");
-    expect(fmtValue(45800, "money")).toBe("45,800");
-    expect(fmtValue(0.06, "rate")).toBe("6.0%");
+    expect(fmtValue(45800, "money")).toBe("$45,800");
+    expect(fmtValue(0.06, "rate")).toBe("6%");
     expect(fmtValue(true, "checkbox")).toBe("是");
     expect(fmtValue(false, "checkbox")).toBe("否");
+  });
+  it("不四捨五入（顯示實際小數）", () => {
+    expect(fmtValue(45000.5, "money")).toBe("$45,000.5");
+    expect(fmtValue(168.25, "number")).toBe("168.25");
+  });
+  it("負金額以帳務括號呈現", () => {
+    expect(fmtValue(-2000, "money")).toBe("($2,000)");
+  });
+  it("number 可帶單位", () => {
+    expect(fmtValue(168, "number", undefined, "h")).toBe("168 h");
+  });
+  it("多選陣列以、連接", () => {
+    expect(fmtValue(["特休", "病假"], "multiselect")).toBe("特休、病假");
+    expect(fmtValue([], "multiselect")).toBe("—");
   });
   it("format 覆寫優先", () => {
     expect(fmtValue("A", "select", (v) => (v === "A" ? "在職" : "其他"))).toBe("在職");
@@ -46,8 +64,8 @@ describe("diffRecord 變更清單", () => {
     const changes = diffRecord(orig, draft, specs);
     expect(changes.map((c) => c.field)).toEqual(["name", "rate", "on"]);
     const rate = changes.find((c) => c.field === "rate")!;
-    expect(rate.beforeText).toBe("0.0%");
-    expect(rate.afterText).toBe("6.0%");
+    expect(rate.beforeText).toBe("0%");
+    expect(rate.afterText).toBe("6%");
   });
   it("無原始物件（新增）時所有非空欄位皆為變更", () => {
     const draft = { name: "新人", base: 30000, rate: 0, on: false };
