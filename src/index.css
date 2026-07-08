@@ -39,6 +39,21 @@
     --edit: 43 96% 56%;                /* ≈ amber-400（邊框） */
     --edit-foreground: 23 78% 26%;     /* ≈ amber-900（文字） */
     --edit-bg: 48 100% 96%;            /* ≈ amber-50（底色） */
+
+    /* 圖表分類色票（8 色，供 charts/index.tsx 的 PALETTE／AXIS／GRID／TEXT 讀取）。
+       值＝原色 hex（非 HSL 三元組）：SVG fill/stroke 直接吃 var()，不經 hsl() 包裝。
+       來源＝dataviz 技能驗證器實測通過的「Cobalt」參考色票（取代原本未過 CVD 分離／彩度/對比檢查的舊色）。 */
+    --chart-1: #2a78d6; /* 藍 */
+    --chart-2: #1baf7a; /* 青綠 */
+    --chart-3: #eda100; /* 金黃 */
+    --chart-4: #008300; /* 綠 */
+    --chart-5: #4a3aa7; /* 紫 */
+    --chart-6: #e34948; /* 紅 */
+    --chart-7: #e87ba4; /* 洋紅 */
+    --chart-8: #eb6834; /* 橙 */
+    --chart-axis: #cbd5e1;
+    --chart-grid: #e2e8f0;
+    --chart-text: #475569;
   }
 
   .dark {
@@ -70,6 +85,19 @@
     --edit: 43 90% 60%;
     --edit-foreground: 43 96% 76%;
     --edit-bg: 26 60% 14%;
+
+    /* 圖表分類色票——深色版（Cobalt 深色步階，已驗證通過深色亮度帶/彩度/對比） */
+    --chart-1: #3987e5;
+    --chart-2: #199e70;
+    --chart-3: #c98500;
+    --chart-4: #008300;
+    --chart-5: #9085e9;
+    --chart-6: #e66767;
+    --chart-7: #d55181;
+    --chart-8: #d95926;
+    --chart-axis: #3a465c;
+    --chart-grid: #131c2b;
+    --chart-text: #94a3b8;
   }
 }
 

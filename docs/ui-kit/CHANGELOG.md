@@ -3,6 +3,13 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.9.0] - 2026-07-08
+
+### 變更（圖表色票 token 化＋改用「Cobalt」驗證色票）
+- **`charts/index.tsx` 的 `PALETTE`／`AXIS`／`GRID`／`TEXT`** 由硬編 hex 改讀 `index.css` 的 `--chart-1..8`／`--chart-axis/grid/text`（SVG `fill`/`stroke` 可直接吃 `var()`）；深色步階已備於 `.dark`，未來啟用主題切換零元件改動。
+- **色票內容同時更新為「Cobalt」**：以 dataviz 技能的 `validate_palette.js` 驗證器實測——原本的舊色票其實**未通過**檢查（slate 彩度不足、洋紅↔青綠 CVD 混色 ΔE 6.0、深色模式 4 色亮度超出可用帶）。新色票（`#2a78d6` 藍／`#1baf7a` 青綠／`#eda100` 金黃／`#008300` 綠／`#4a3aa7` 紫／`#e34948` 紅／`#e87ba4` 洋紅／`#eb6834` 橙）淺、深色模式皆通過亮度帶／彩度/CVD 分離/對比四項檢查。
+- Storybook「設計 Tokens」型錄同步更新色票說明。
+
 ## [0.8.0] - 2026-07-08
 
 ### 新增（統一設計語言：語意色彩 token）

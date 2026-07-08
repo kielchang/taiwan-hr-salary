@@ -5,11 +5,17 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { ntd } from "@/lib/utils";
 
-export const PALETTE = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#64748b", "#14b8a6", "#ec4899"];
+// 色票讀取 index.css 的 --chart-1..8／--chart-axis/grid/text（Cobalt，經 dataviz 技能驗證器
+// 驗證通過 CVD 分離／彩度/對比；深色步階已備於 .dark，切換未啟用時 var() 直接吃 :root 值）。
+// SVG 的 fill/stroke 屬性可直接解析 var()，故色票只需在 CSS 單一來源改一次即可全站同步。
+export const PALETTE = [
+  "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)",
+  "var(--chart-5)", "var(--chart-6)", "var(--chart-7)", "var(--chart-8)",
+];
 
-const AXIS = "#cbd5e1";
-const GRID = "#e2e8f0";
-const TEXT = "#475569";
+const AXIS = "var(--chart-axis)";
+const GRID = "var(--chart-grid)";
+const TEXT = "var(--chart-text)";
 
 /* ───────────── 互動共用 ───────────── */
 
