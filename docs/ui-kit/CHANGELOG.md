@@ -3,6 +3,12 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.11.0] - 2026-07-08
+
+### 新增（Callout 狀態提示框）
+- **`Callout`**（`src/components/ui/callout.tsx`）：統一的良好/警示/提醒/危險提示框（圖示＋可選標籤＋標題＋內文），走語意 token（`success`/`warning`/`info`/`danger`）。取代各畫面（`AnalyticsView`／`AttendanceView`／`SettingsView`／`FilingView`…）各自手刻、逐字重複的 `border-*-200 bg-*-50 text-*-900` 色塊——這是階段 5「views 硬編色換 token」批次遷移的第一步：先立元件、Storybook 驗證，再逐檔遷移。
+- Storybook「元件 / 基礎」新增「狀態提示框 Callout」＋互動 Playground。
+
 ## [0.10.0] - 2026-07-08
 
 ### 變更（圖表色票定案：Cobalt → Gem 寶石色票）

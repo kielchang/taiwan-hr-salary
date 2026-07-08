@@ -14,6 +14,7 @@ export { UI_KIT } from "./version";
 // 基礎 UI 原子（shadcn 風格）
 export * from "./ui/badge";
 export * from "./ui/button";
+export * from "./ui/callout";
 export * from "./ui/card";
 export * from "./ui/checkbox";
 export * from "./ui/delta";

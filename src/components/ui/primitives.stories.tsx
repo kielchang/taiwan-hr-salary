@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Button } from "./button";
 import { Badge } from "./badge";
+import { Callout } from "./callout";
 import { Delta } from "./delta";
 import { EmptyState } from "./empty-state";
 import { Input } from "./input";
@@ -38,6 +39,19 @@ export const 差異_互動: StoryObj<{ 數值: number; 格式: "數字" | "百�
     const fmt = a.格式 === "百分比" ? (n: number) => `${n}%` : a.格式 === "金額" ? (n: number) => `$${n.toLocaleString()}` : undefined;
     return <Delta value={a.數值} format={fmt} posLabel={a.增標籤} negLabel={a.減標籤} />;
   },
+};
+
+export const 狀態提示框_互動: StoryObj<{ 樣式: "success" | "warning" | "info" | "danger"; 標籤: string; 標題: string; 內文: string }> = {
+  args: { 樣式: "success", 標籤: "良好", 標題: "加班成本低、工時穩定", 內文: "加班佔比很低，人力配置與工時看來穩定。" },
+  argTypes: {
+    樣式: { control: "inline-radio", options: ["success", "warning", "info", "danger"] },
+    標籤: { control: "text" }, 標題: { control: "text" }, 內文: { control: "text" },
+  },
+  render: (a) => (
+    <div className="w-96">
+      <Callout variant={a.樣式} tag={a.標籤} title={a.標題}>{a.內文}</Callout>
+    </div>
+  ),
 };
 
 export const 空狀態_互動: StoryObj<{ 標題: string; 提示: string; 有動作: boolean; 精簡: boolean }> = {
@@ -89,6 +103,17 @@ export const 差異_Delta: S = {
       <Delta value={12000} posLabel="增加" negLabel="減少" />
       <Delta value={-8000} posLabel="增加" negLabel="減少" />
       <Delta value={0} />
+    </div>
+  ),
+};
+
+export const 狀態提示框_Callout: S = {
+  render: () => (
+    <div className="w-96 space-y-2">
+      <Callout variant="success" tag="良好" title="加班成本低、工時穩定">加班佔比很低，人力配置與工時看來穩定。佐證：加班費佔總成本 0.76%</Callout>
+      <Callout variant="info" tag="提醒" title="別忘了雇主法定負擔">薪資之外，公司還要負擔勞健保、勞退、職災等法定成本，編預算時要連同計入。</Callout>
+      <Callout variant="warning" tag="需注意" title="獎金/變動占比偏高">獎金/變動占比過高或加班費偏大，常是結構檢討重點。</Callout>
+      <Callout variant="danger" tag="異常" title="本月實發為負值">請檢查扣項是否超過應發總額，確認後才能確認本期。</Callout>
     </div>
   ),
 };
