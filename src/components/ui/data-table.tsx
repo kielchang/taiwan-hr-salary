@@ -108,6 +108,18 @@ export function DataTable<T>({
     setColFilters((m) => ({ ...m, [key]: { ...getFilter(key), ...patch } }));
   const clearFilter = (key: string) => setColFilters((m) => { const { [key]: _drop, ...rest } = m; return rest; });
   const clearAllFilters = () => setColFilters({});
+  /** 單一條件的可讀標籤（供條件標籤列顯示）。 */
+  const filterLabel = (c: Column<T>) => {
+    const f = getFilter(c.key);
+    const head = typeof c.header === "string" ? c.header : c.key;
+    if (filterKind(c) === "range") {
+      const parts: string[] = [];
+      if (f.min !== "") parts.push(`≥ ${f.min}`);
+      if (f.max !== "") parts.push(`≤ ${f.max}`);
+      return `${head}：${parts.join("、")}`;
+    }
+    return `${head}：含「${f.text.trim()}」`;
+  };
 
   // 篩選：全域關鍵字 ＋ 單欄篩選（文字包含／數值範圍）
   const filtered = useMemo(() => {
@@ -201,15 +213,33 @@ export function DataTable<T>({
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} className="h-8 w-48 pl-7" />
             </div>
           )}
-          {activeFilterCount > 0 && (
-            <Button variant="outline" size="sm" className="h-8" onClick={clearAllFilters}>
-              <X /> 清除 {activeFilterCount} 個欄位篩選
-            </Button>
-          )}
           {toolbar}
           <div className="ml-auto flex items-center gap-2">
             {csv && <Button variant="outline" size="sm" onClick={exportCsv}><Download /> 匯出 CSV</Button>}
           </div>
+        </div>
+      )}
+
+      {/* 篩選條件列：每個條件一個獨立標籤，可個別移除；避免只能一次全清 */}
+      {activeFilterCount > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 print:hidden">
+          <span className="text-xs text-muted-foreground">篩選條件：</span>
+          {columns.filter(isFilterActive).map((c) => (
+            <span key={c.key} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2.5 pr-1 text-xs text-primary">
+              {filterLabel(c)}
+              <button
+                type="button"
+                aria-label={`移除「${typeof c.header === "string" ? c.header : c.key}」篩選`}
+                onClick={() => clearFilter(c.key)}
+                className="tap-target inline-flex items-center justify-center rounded-full p-0.5 hover:bg-primary/15"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+          {activeFilterCount > 1 && (
+            <button type="button" onClick={clearAllFilters} className="ml-1 text-xs text-muted-foreground underline-offset-2 hover:underline">全部清除</button>
+          )}
         </div>
       )}
 
