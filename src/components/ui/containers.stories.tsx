@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
 import { Button } from "./button";
 import { Badge } from "./badge";
-import { StackedBar, PALETTE } from "@/components/charts";
+import { StackedBar, BarChart, Pareto, PALETTE } from "@/components/charts";
 import { ntd } from "@/lib/utils";
 
 const meta: Meta = { title: "元件/容器", parameters: { layout: "padded" } };
@@ -125,6 +125,38 @@ export const 圖表卡_ChartCard: S = {
       </ChartCard>
     </div>
   ),
+};
+
+/** 互動 Playground：右側 Controls 調整標題/說明/圖表類型。 */
+export const 圖表卡_互動: StoryObj<{ 標題: string; 說明: string; 圖表: "堆疊" | "長條" | "柏拉圖" }> = {
+  args: { 標題: "人事成本組成", 說明: "依項目分段", 圖表: "堆疊" },
+  argTypes: { 標題: { control: "text" }, 說明: { control: "text" }, 圖表: { control: "inline-radio", options: ["堆疊", "長條", "柏拉圖"] } },
+  render: (a) => {
+    const bars = [{ label: "研發", value: 1200000 }, { label: "業務", value: 860000 }, { label: "行銷", value: 540000 }];
+    return (
+      <div className="max-w-lg">
+        <ChartCard title={a.標題} description={a.說明} legend={a.圖表 === "堆疊" ? [{ label: "本薪", color: PALETTE[0] }, { label: "雇主負擔", color: PALETTE[1] }] : undefined}>
+          {a.圖表 === "堆疊" ? <StackedBar rows={[{ label: "全公司", segments: [{ label: "本薪", value: 4200000, color: PALETTE[0] }, { label: "雇主負擔", value: 900000, color: PALETTE[1] }] }]} />
+            : a.圖表 === "長條" ? <BarChart data={bars} showValues /> : <Pareto data={bars} />}
+        </ChartCard>
+      </div>
+    );
+  },
+};
+
+/** 互動 Playground：右側 Controls 調整分頁數量。 */
+export const 分頁_互動: StoryObj<{ 分頁數: number }> = {
+  args: { 分頁數: 3 },
+  argTypes: { 分頁數: { control: { type: "range", min: 2, max: 6, step: 1 } } },
+  render: (a) => {
+    const keys = Array.from({ length: a.分頁數 }, (_, i) => String(i));
+    return (
+      <Tabs defaultValue="0" className="w-[460px]">
+        <TabsList>{keys.map((k, i) => <TabsTrigger key={k} value={k}>分頁 {i + 1}</TabsTrigger>)}</TabsList>
+        {keys.map((k, i) => <TabsContent key={k} value={k} className="pt-3 text-sm">分頁 {i + 1} 的內容</TabsContent>)}
+      </Tabs>
+    );
+  },
 };
 
 export const 對話框_Dialog: S = {

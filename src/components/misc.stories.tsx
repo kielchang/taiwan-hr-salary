@@ -30,6 +30,22 @@ export const 數字輸入_NumberInput: S = {
   },
 };
 
+/** 互動 Playground：右側 Controls 調整初始值/步進/最小值/停用。 */
+export const 數字輸入_互動: StoryObj<{ 初始值: number; 步進: number; 最小值: number; 停用: boolean }> = {
+  args: { 初始值: 45000, 步進: 1000, 最小值: 0, 停用: false },
+  argTypes: {
+    初始值: { control: "number" }, 步進: { control: { type: "range", min: 1, max: 5000, step: 1 } },
+    最小值: { control: "number" }, 停用: { control: "boolean" },
+  },
+  render: (a) => {
+    const Demo = () => {
+      const [v, setV] = useState(a.初始值);
+      return <div className="w-44"><NumberInput value={v} onChange={setV} step={a.步進} min={a.最小值} disabled={a.停用} /></div>;
+    };
+    return <Demo key={`${a.初始值}`} />;
+  },
+};
+
 export const 列印頁首頁尾_PrintHeader: S = {
   render: () => (
     <div className="rounded border p-4">
