@@ -24,7 +24,10 @@ storage undefined 時先想到這裡，不要改測試本身。
   顯示 STAGE/DEV 徽章（PROD 不顯示）。`deploy-pages.yml`：**推哪個分支就只重建並只更新該環境**
   （peaceiris/actions-gh-pages＋`keep_files`，其餘子目錄不動；main 才跑驗收測試＋打版號）。
   **Pages 來源需設「Deploy from a branch：gh-pages / root」**。
-  URL：正式 <https://kielchang.github.io/taiwan-hr-salary/>、預覽 `…/stage/`、開發 `…/dev/`（各含 `/storybook`）。
+  URL：正式 <https://kielchang.github.io/taiwan-hr-salary/>、預覽 `…/stage/`、開發 `…/dev/`。
+  **Storybook 僅 dev 發佈**（`…/dev/storybook/`）：Storybook 是開發/設計工具、非終端使用者面向，且鐵律 10
+  已保證元件在 dev 階段驗畢才接畫面，故 stage/main 不發佈（`deploy-pages.yml` 的 build-storybook 步驟
+  `if: app_env == 'dev'`；省 build 時間、不對外供應開發工具）。
 - 上線＝merge 到 `main` push → `deploy-pages.yml`（跑驗收測試＋build＋Pages 發佈）。
   **merge main 前務必取得使用者同意**（deploy 即正式上線）。
 - **版號**（發佈流程見 `docs/versioning.md`）：每次發佈到 main＝bump `package.json` `version`（SemVer；功能→minor、修正→patch）＋補 `CHANGELOG.md` 一段。

@@ -55,7 +55,11 @@ jobs:
         env:
           APP_ENV: ${{ steps.env.outputs.app_env }}
 
-      - name: Build Storybook（發佈於各環境 /storybook）
+      # Storybook 是開發/設計工具、非終端使用者面向，且鐵律 10「Storybook-first」已保證元件在
+      # dev 階段就驗證過才接到畫面 → 僅 dev 發佈 /dev/storybook；stage/main 跳過（省 build 時間、
+      # 不對外供應開發工具）。停止發佈後舊的 /storybook、/stage/storybook 因 keep_files 殘留，已一次性清除。
+      - name: Build Storybook（僅 dev 發佈 /dev/storybook）
+        if: steps.env.outputs.app_env == 'dev'
         run: npm run build-storybook -- -o dist/storybook
 
       # 只把本環境的 dist 發佈到 gh-pages 的對應子目錄；keep_files 保留其他環境內容。
