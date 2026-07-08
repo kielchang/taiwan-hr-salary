@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ChangeSummary } from "@/components/form/ChangeSummary";
+import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { calculatePayroll } from "@/lib/calc";
 import { monthWorkedHours } from "@/lib/attendance";
@@ -116,6 +118,28 @@ export function MonthlyView({
   const workedHours = editingEmp ? monthWorkedHours(attendance, currentPeriod, punches).get(editingEmp.id) : undefined;
 
   const patchDraft = (p: Partial<MonthlyEvent>) => setDraft((d) => (d ? { ...d, ...p } : d));
+
+  // 本次異動變更摘要：與已儲存事件比對（編輯期間 store 未變，getEvent 即原始值）。
+  // 保留即時輸入體驗，另於送出前列出「舊→新」讓 HR 覆核本月動了什麼。
+  const savedEvent = editing ? getEvent(editing) : null;
+  const EVENT_SPECS: FieldSpec[] = [
+    { key: "overtimeWeekday1", label: "平日加班(前2h)", kind: "number", unit: "h" },
+    { key: "overtimeWeekday2", label: "平日加班(3–4h)", kind: "number", unit: "h" },
+    { key: "overtimeRestday1", label: "休息日(前2h)", kind: "number", unit: "h" },
+    { key: "overtimeRestday2", label: "休息日(3h起)", kind: "number", unit: "h" },
+    { key: "overtimeHoliday", label: "國定假日出勤", kind: "number", unit: "h" },
+    { key: "personalLeaveHours", label: "事假", kind: "number", unit: "h" },
+    { key: "sickLeaveHours", label: "病假", kind: "number", unit: "h" },
+    { key: "monthlyBonus", label: "本月獎金", kind: "money" },
+    { key: "cumulativeBonus", label: "累計獎金", kind: "money" },
+    { key: "otherAddition", label: "其他加項", kind: "money" },
+    { key: "otherDeduction", label: "其他扣款", kind: "money" },
+    { key: "withheldTax", label: "代扣稅", kind: "money" },
+  ];
+  const eventChanges = savedEvent && draft
+    ? diffRecord(savedEvent as unknown as Record<string, unknown>, draft as unknown as Record<string, unknown>, EVENT_SPECS)
+    : [];
+  const revertEventField = (k: string) => { if (savedEvent) patchDraft({ [k]: savedEvent[k as keyof MonthlyEvent] } as Partial<MonthlyEvent>); };
 
   return (
     <div className="space-y-4">
@@ -348,6 +372,14 @@ export function MonthlyView({
                   <span>代扣 <b className="tabular-nums">−{ntd(liveResult.totalDeductions)}</b></span>
                   <span>實發 <b className="tabular-nums text-base">{ntd(liveResult.netPay)}</b> 元</span>
                 </div>
+
+                {/* 本次異動變更摘要（與已儲存事件比對，送出前覆核） */}
+                {eventChanges.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">本次異動變更（送出前確認）</p>
+                    <ChangeSummary changes={eventChanges} onRevertField={revertEventField} onRevertAll={() => savedEvent && setDraft({ ...savedEvent })} />
+                  </div>
+                )}
               </div>
 
               <DialogFooter className="flex-wrap gap-1.5 sm:justify-between">

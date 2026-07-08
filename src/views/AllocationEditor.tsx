@@ -2,6 +2,8 @@
 //  - 逐員逐月記「投入各專案」的比例：mode＝pct（百分比合計 ≤100%）或 hours（時數 ≤可用工時）；
 //    超額由 V11 驗證警示（成本占比/稼動率會失真）。可「沿用上月」快速帶入。
 //  - 只記分攤權重、不算錢；金額分攤由 projectCost 依此權重把全載成本拆到各專案。
+//  - 互動：**刻意維持即時輸入**（不套唯讀逐欄編輯）——動態新增/刪除分攤列＋即時「已分攤／未分攤／
+//    超出上限」回饋，是設定當月權重的工作流；唯讀-點擊-送出反而增加來回。屬 F3 明示例外。
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

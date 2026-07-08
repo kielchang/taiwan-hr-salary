@@ -15,7 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { EditableField } from "@/components/form/EditableField";
+import { ChangeSummary } from "@/components/form/ChangeSummary";
+import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
@@ -410,6 +412,30 @@ export function ProjectMasterCard() {
   const blank = (): Project => ({ id: `PJ${Date.now()}`, code: "", name: "", manager: "", client: "", budget: 0, startDate: "", endDate: "", status: "進行中" });
   const set = <K extends keyof Project>(k: K, v: Project[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
 
+  // 唯讀逐欄編輯：原始值＝store 內既有專案（新增模式＝無 original）
+  const original = draft ? projects.find((p) => p.id === draft.id) : undefined;
+  const isNew = !!draft && !original;
+  const PJ_SPECS: FieldSpec[] = [
+    { key: "code", label: "專案代號", kind: "text" }, { key: "name", label: "名稱", kind: "text" },
+    { key: "manager", label: "PM", kind: "text" }, { key: "client", label: "客戶", kind: "text" },
+    { key: "budget", label: "預算", kind: "money" }, { key: "status", label: "狀態", kind: "text" },
+    { key: "startDate", label: "起始日", kind: "date" }, { key: "endDate", label: "結束日", kind: "date" },
+    { key: "percentComplete", label: "完成度", kind: "rate" },
+  ];
+  const changes = draft && original ? diffRecord(original as unknown as Record<string, unknown>, draft as unknown as Record<string, unknown>, PJ_SPECS) : [];
+  const revert = (k: string) => { if (original) set(k as keyof Project, original[k as keyof Project]); };
+  const pjField = (key: keyof Project, kind: FieldSpec["kind"], label: string, extra?: { options?: { value: string; label: string }[]; help?: string; placeholder?: string }) => (
+    <EditableField
+      label={label} kind={kind}
+      value={draft ? (draft[key] as string | number | undefined) ?? "" : ""}
+      original={original ? (original[key] as string | number | undefined) ?? "" : ""}
+      options={extra?.options} help={extra?.help} placeholder={extra?.placeholder}
+      alwaysEdit={isNew} trackChanges={!isNew}
+      onChange={(v) => set(key, v as Project[typeof key])}
+      onRevert={() => revert(key as string)}
+    />
+  );
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between pb-3">
@@ -444,28 +470,32 @@ export function ProjectMasterCard() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{draft && projects.some((p) => p.id === draft.id) ? "編輯專案" : "新增專案"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{isNew ? "新增專案" : `編輯專案${draft ? `：${draft.name}` : ""}`}</DialogTitle></DialogHeader>
           {draft && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-xs">專案代號 *</Label><Input className="col-input" value={draft.code} onChange={(e) => set("code", e.target.value)} placeholder="PJ-2026A" /></div>
-              <div className="space-y-1"><Label className="text-xs">名稱 *</Label><Input className="col-input" value={draft.name} onChange={(e) => set("name", e.target.value)} /></div>
-              <div className="space-y-1"><Label className="text-xs">PM</Label><Input className="col-input" value={draft.manager} onChange={(e) => set("manager", e.target.value)} /></div>
-              <div className="space-y-1"><Label className="text-xs">客戶</Label><Input className="col-input" value={draft.client} onChange={(e) => set("client", e.target.value)} /></div>
-              <div className="space-y-1"><Label className="text-xs">預算（整案，雇主總成本）</Label><Input type="number" className="col-input" value={draft.budget} onChange={(e) => set("budget", Number(e.target.value) || 0)} /></div>
-              <div className="space-y-1"><Label className="text-xs">狀態</Label>
-                <Select value={draft.status} onValueChange={(v) => set("status", v as ProjectStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{(["進行中", "結案", "暫停"] as ProjectStatus[]).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+            <div className="space-y-4">
+              {!isNew && <p className="text-xs text-muted-foreground">點欄位進入編輯；改值後於下方確認變更再儲存。</p>}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {pjField("code", "text", "專案代號 *", { placeholder: "PJ-2026A" })}
+                {pjField("name", "text", "名稱 *")}
+                {pjField("manager", "text", "PM")}
+                {pjField("client", "text", "客戶")}
+                {pjField("budget", "money", "預算（整案，雇主總成本）")}
+                {pjField("status", "select", "狀態", { options: (["進行中", "結案", "暫停"] as ProjectStatus[]).map((s) => ({ value: s, label: s })) })}
+                {pjField("startDate", "date", "起始日")}
+                {pjField("endDate", "date", "結束日")}
+                {pjField("percentComplete", "rate", "完成度（EVM 用，選填）", { help: "未填＝僅燃燒率推估", placeholder: "0" })}
               </div>
-              <div className="space-y-1"><Label className="text-xs">起始日</Label><Input type="date" className="col-input" value={draft.startDate} onChange={(e) => set("startDate", e.target.value)} /></div>
-              <div className="space-y-1"><Label className="text-xs">結束日</Label><Input type="date" className="col-input" value={draft.endDate} onChange={(e) => set("endDate", e.target.value)} /></div>
-              <div className="space-y-1"><Label className="text-xs">完成度 %（EVM 用，選填）</Label><Input type="number" min="0" max="100" className="col-input" value={draft.percentComplete != null ? Math.round(draft.percentComplete * 100) : ""} placeholder="未填＝僅燃燒率推估" onChange={(e) => set("percentComplete", e.target.value === "" ? undefined : Math.min(100, Math.max(0, Number(e.target.value) || 0)) / 100)} /></div>
+              {!isNew && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">送出前確認變更</p>
+                  <ChangeSummary changes={changes} onRevertField={revert} onRevertAll={() => original && setDraft({ ...original })} />
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>
-            <Button disabled={!draft?.code.trim() || !draft?.name.trim()} onClick={() => { if (draft) upsertProject(draft); setOpen(false); }}>儲存</Button>
+            <Button disabled={!draft?.code.trim() || !draft?.name.trim() || (!isNew && changes.length === 0)} onClick={() => { if (draft) upsertProject(draft); setOpen(false); }}>儲存</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
