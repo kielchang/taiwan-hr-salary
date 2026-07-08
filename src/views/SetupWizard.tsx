@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { usePayrollStore } from "@/store/usePayrollStore";
+import { Stepper } from "@/components/Stepper";
 import type { Employee } from "@/lib/types";
-import { cn, ntd } from "@/lib/utils";
+import { ntd } from "@/lib/utils";
 import {
   Building2,
   Users,
@@ -111,24 +112,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-2xl">
         <CardContent className="p-6 sm:p-8">
-          {/* 步驟指示 */}
-          <div className="mb-6 flex items-center justify-center gap-1">
-            {STEPS.map((s, i) => (
-              <div key={s} className="flex items-center gap-1">
-                <div
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
-                    i < step && "bg-emerald-100 text-emerald-700",
-                    i === step && "bg-primary text-primary-foreground",
-                    i > step && "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {i < step ? <Check className="size-3" /> : <span>{i + 1}</span>}
-                  {s}
-                </div>
-                {i < STEPS.length - 1 && <ChevronRight className="size-3 text-muted-foreground" />}
-              </div>
-            ))}
+          {/* 步驟指示（共用 Stepper 元件；已完成步驟可點擊回上一步） */}
+          <div className="mb-6">
+            <Stepper
+              steps={STEPS.map((label, i) => ({ key: String(i), label }))}
+              current={String(step)}
+              completed={Object.fromEntries(STEPS.map((_, i) => [String(i), i < step]))}
+              onStep={(k) => { const n = Number(k); if (n < step) setStep(n); }}
+            />
           </div>
 
           {step === 0 && (
