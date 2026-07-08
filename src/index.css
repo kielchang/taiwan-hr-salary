@@ -59,6 +59,18 @@
   }
 }
 
+/* 觸控目標（WCAG 2.5.5）：粗指標（手機/平板）裝置放大互動目標至 ≥44px；
+   桌機（精細指標）維持精簡尺寸。套用於分段鈕/標籤片/undo·redo/摘要還原/分頁鈕等。 */
+@media (pointer: coarse) {
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .tap-target-y {
+    min-height: 44px;
+  }
+}
+
 /* 顏色語意（對齊附錄B §B3.7）：橘＝輸入欄、深藍＝公式欄、黃＝公司自訂假設 */
 .col-input {
   @apply bg-orange-50;

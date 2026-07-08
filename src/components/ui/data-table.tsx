@@ -155,8 +155,11 @@ export function DataTable<T>({
             {paged.map((row, i) => (
               <TableRow
                 key={getRowKey(row, i)}
-                className={cn(rowClassName?.(row), onRowClick && "cursor-pointer")}
+                className={cn(rowClassName?.(row), onRowClick && "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring")}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                role={onRowClick ? "button" : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                onKeyDown={onRowClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRowClick(row); } } : undefined}
               >
                 {columns.map((c) => {
                   const cls = typeof c.cellClassName === "function" ? c.cellClassName(row) : c.cellClassName;
@@ -167,7 +170,7 @@ export function DataTable<T>({
                       className={cn(c.numeric && "text-right tabular-nums", c.freeze && cn(freezeFirst, "font-medium"), dense && "py-1", cls)}
                     >
                       {c.truncate ? (
-                        <Tooltip content={c.filterText?.(row)} className="w-full">
+                        <Tooltip content={c.filterText?.(row)} className="w-full" focusable>
                           <span className="block truncate">{c.cell(row)}</span>
                         </Tooltip>
                       ) : c.cell(row)}
@@ -201,11 +204,11 @@ export function DataTable<T>({
               <SelectTrigger className="h-7 w-24"><SelectValue /></SelectTrigger>
               <SelectContent>{pageSizeOptions.map((n) => <SelectItem key={n} value={String(n)}>每頁 {n}</SelectItem>)}</SelectContent>
             </Select>
-            <Button variant="outline" size="sm" className="h-7" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+            <Button variant="outline" size="sm" className="tap-target h-7" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
               <ChevronLeft /> 上一頁
             </Button>
             <span>{page + 1} / {pageCount}</span>
-            <Button variant="outline" size="sm" className="h-7" disabled={page >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>
+            <Button variant="outline" size="sm" className="tap-target h-7" disabled={page >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>
               下一頁 <ChevronRight />
             </Button>
           </div>

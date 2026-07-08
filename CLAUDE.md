@@ -98,8 +98,14 @@ src/
    `customAllowances` **自訂固定津貼**（計入月薪資總額/級距/加班）＋SalaryDefaultsCard **新進預設帶入**＋MonthlyView/help 動線指引。
 8. **系統版號顯示**（使用者拍板，起始 `1.1.0`）：`package.json` 版號＋`GITHUB_SHA`/建置時間由 `vite.config.ts` define 注入 →
    `src/version.ts`（單一來源）→ 側邊欄常駐版號、系統設定「關於」卡、列印頁尾。發佈流程（bump＋CHANGELOG＋tag）見 `docs/versioning.md`。
+9. **元件 UX 大改（v1.3–v1.6）**：`EditableField` 唯讀逐欄編輯（點擊才輸入、變更標色 amber、undo/redo 皆先確認舊→新）；
+   數字格式化（`lib/forms/diff.ts`：金額 $ 千分位、比率 %、單位、**不四捨五入**顯示、負值帳務括號紅字）；
+   radio→分段 `SegGroup`、multiselect→`Chips`（皆收合顯示目前值、點擊展開）；`Tooltip`（hover/鍵盤聚焦/長壓＋邊緣防溢）。
+   **v1.6.0 無障礙/跨裝置**：SegGroup=`radiogroup`、Chips=checkbox 群（方向鍵/Space/Esc、選中打勾 ✓、進編輯自動聚焦）；
+   觸控目標 `@media(pointer:coarse)` ≥44px（`.tap-target`/`.tap-target-y`）；唯讀欄鉛筆可發現性；鎖定欄可聚焦＋aria；
+   `ChangeSummary` 還原先確認；`MasterDataView` 表單 grid 響應式（手機單欄）。**唯讀逐欄編輯目前只套 MasterDataView（範本）**，其餘表單 backlog（見 F3–F7 task）。
 
-最新 commit（開發分支）：見 `git log`（本批＝系統版號；前批＝生命週期＋固定津貼）。測試 19 檔 193 項全綠（Node 22/26 皆驗）。
+最新 commit（開發分支）：見 `git log`（本批＝元件 UX 無障礙/跨裝置 v1.6.0；前批＝提示泡泡/截斷 v1.5.0）。測試 21 檔 211 項全綠（Node 22 驗）。
 
 ## 已知可續作（backlog，未做）
 

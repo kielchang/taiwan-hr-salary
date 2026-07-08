@@ -419,7 +419,7 @@ export function MasterDataView() {
           </div>
 
           {tab === "basic" && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <EditableField label="員工編號 *" kind="text" value={draftEmp.id} alwaysEdit={isNew} disabled={!isNew} lockHint="員工編號建立後不可變更" trackChanges={false} onChange={(v) => setEmp("id", String(v))} />
               {empField("name", { label: "姓名 *", kind: "text" })}
               {empField("department", { label: "部門", kind: "text" })}
@@ -458,7 +458,7 @@ export function MasterDataView() {
               <p className="text-xs text-muted-foreground">
                 這裡填「每月固定發放」的項目；年終、三節等一次性獎金不在這裡，請於每月結算或獎金試算時輸入。
               </p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {SALARY_ITEMS.map((it) => <div key={it.key}>{salField(it.key, it.label, it.help)}</div>)}
               </div>
 
@@ -516,7 +516,7 @@ export function MasterDataView() {
 
           {tab === "family" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {empField("taxResidency", { label: "稅務身分", kind: "radio", options: RESIDENCY_OPTS, help: "該年度在台滿 183 天為居住者" })}
                 {draftEmp.taxResidency === "居住者" && (
                   <>

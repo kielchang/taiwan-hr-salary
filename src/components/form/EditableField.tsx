@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { eqValue, fmtValue, type FieldKind } from "@/lib/forms/diff";
 import { Tooltip, TruncatedText } from "@/components/ui/tooltip";
-import { Undo2, Redo2, Lock, ArrowRight } from "lucide-react";
+import { Undo2, Redo2, Lock, ArrowRight, Check, Pencil } from "lucide-react";
 
 export interface EditableFieldOption {
   value: string;
@@ -115,17 +115,30 @@ export function EditableField({
     <TruncatedText text={display} numeric={numeric} className={cn(isEmpty && "text-muted-foreground", negMoney && "font-medium text-rose-600")} />
   );
   const collapsed = (
-    <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      aria-label={`${label}，目前 ${display}，按 Enter 編輯`}
+      className={cn(fieldBtnCls(changed, false), "group")}
+    >
       {valueEl}
+      {!changed && <EditPencil />}
     </button>
   );
 
-  // 鎖定：所有型態統一顯示唯讀值＋鎖頭
+  // 鎖定：所有型態統一顯示唯讀值＋鎖頭（可聚焦讓螢幕閱讀器讀到鎖定原因）
   if (disabled) {
     return shell(
-      <div title={lockHint} className={cn(fieldBtnCls(false, true))}>
+      <div
+        role="group"
+        tabIndex={0}
+        aria-disabled
+        aria-label={`${label}，${display}${lockHint ? `（已鎖定：${lockHint}）` : "（已鎖定）"}`}
+        title={lockHint}
+        className={cn(fieldBtnCls(false, true))}
+      >
         {valueEl}
-        <Lock className="ml-1 size-3.5 shrink-0 opacity-60" />
+        <Lock aria-hidden className="ml-1 size-3.5 shrink-0 opacity-60" />
       </div>,
     );
   }
@@ -135,9 +148,12 @@ export function EditableField({
     if (!showInput) return shell(collapsed);
     return shell(
       <SegGroup
+        label={label}
         options={[{ value: "true", label: "是" }, { value: "false", label: "否" }]}
         value={value ? "true" : "false"}
         onPick={(v) => { onChange(v === "true"); exit(); }}
+        autoFocus={editing && !alwaysEdit}
+        onEscape={exit}
         changed={changed}
       />,
     );
@@ -148,9 +164,12 @@ export function EditableField({
     if (!showInput) return shell(collapsed);
     return shell(
       <SegGroup
+        label={label}
         options={options ?? []}
         value={value == null ? "" : String(value)}
         onPick={(v) => { onChange(v); exit(); }}
+        autoFocus={editing && !alwaysEdit}
+        onEscape={exit}
         changed={changed}
       />,
     );
@@ -163,7 +182,12 @@ export function EditableField({
       const preview = sel.slice(0, 2);
       const rest = sel.length - preview.length;
       return shell(
-        <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false), "gap-1")}>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label={`${label}，目前 ${display}，按 Enter 編輯`}
+          className={cn(fieldBtnCls(changed, false), "group gap-1")}
+        >
           {sel.length === 0 && <span className="text-muted-foreground">—</span>}
           {preview.map((v) => (
             <Tooltip key={v} content={optLabel(v)}>
@@ -171,19 +195,23 @@ export function EditableField({
             </Tooltip>
           ))}
           {rest > 0 && <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">其他 {rest} 項</span>}
+          {!changed && <EditPencil />}
         </button>,
       );
     }
     return shell(
       <div className="space-y-1.5">
         <Chips
+          label={label}
           options={options ?? []}
           selected={sel}
           onToggle={(v) => onChange(sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v])}
+          autoFocus={editing && !alwaysEdit}
+          onEscape={exit}
           changed={changed}
         />
         {!alwaysEdit && (
-          <button type="button" onClick={exit} className="rounded border border-input bg-background px-2.5 py-0.5 text-xs hover:bg-accent">完成</button>
+          <button type="button" onClick={exit} className="tap-target-y rounded border border-input bg-background px-2.5 py-0.5 text-xs hover:bg-accent">完成</button>
         )}
       </div>,
     );
@@ -227,7 +255,7 @@ export function EditableField({
         placeholder={placeholder}
         onChange={(e) => commit(e.target.value)}
         onBlur={exit}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); exit(); } }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); exit(); } }}
       />,
     );
   }
@@ -257,12 +285,12 @@ function FieldShell({
       <div className="flex items-center gap-1">
         <div className="min-w-0 flex-1">{children}</div>
         {onUndo && (
-          <button type="button" onClick={onUndo} title="還原為原始值（會先確認）" aria-label="還原" className="shrink-0 rounded-md p-1.5 text-amber-600 hover:bg-amber-100">
+          <button type="button" onClick={onUndo} title="還原為原始值（會先確認）" aria-label="還原" className="tap-target flex shrink-0 items-center justify-center rounded-md p-1.5 text-amber-600 hover:bg-amber-100">
             <Undo2 className="size-4" />
           </button>
         )}
         {onRedo && (
-          <button type="button" onClick={onRedo} title="重做（回到修改後的值，會先確認）" aria-label="重做" className="shrink-0 rounded-md p-1.5 text-sky-600 hover:bg-sky-100">
+          <button type="button" onClick={onRedo} title="重做（回到修改後的值，會先確認）" aria-label="重做" className="tap-target flex shrink-0 items-center justify-center rounded-md p-1.5 text-sky-600 hover:bg-sky-100">
             <Redo2 className="size-4" />
           </button>
         )}
@@ -292,14 +320,52 @@ function ConfirmBar({
   );
 }
 
-/** 分段選擇（是/否、單選 radio）：一列按鈕，選中者高亮 */
+/** 唯讀欄位右側的低調鉛筆：暗示可編輯（桌機 hover 加深、觸控恆微顯）。 */
+function EditPencil() {
+  return (
+    <Pencil
+      aria-hidden
+      className="ml-auto size-3.5 shrink-0 text-muted-foreground/30 transition-colors group-hover:text-muted-foreground [@media(pointer:coarse)]:text-muted-foreground/50"
+    />
+  );
+}
+
+/**
+ * 分段選擇（是/否、單選 radio）：WAI-ARIA radiogroup。
+ * 方向鍵於選項間移動焦點、Space/Enter 選定該項、Esc 取消；選中者高亮＋打勾（不只顏色）。
+ */
 function SegGroup({
-  options, value, onPick, disabled, lockHint, changed,
+  label, options, value, onPick, autoFocus, onEscape, disabled, lockHint, changed,
 }: {
-  options: EditableFieldOption[]; value: string; onPick: (v: string) => void; disabled?: boolean; lockHint?: string; changed: boolean;
+  label?: string; options: EditableFieldOption[]; value: string; onPick: (v: string) => void;
+  autoFocus?: boolean; onEscape?: () => void; disabled?: boolean; lockHint?: string; changed: boolean;
 }) {
+  const btns = useRef<(HTMLButtonElement | null)[]>([]);
+  const activeIdx = options.findIndex((o) => o.value === value);
+  const focusIdx = activeIdx >= 0 ? activeIdx : 0;
+
+  useEffect(() => {
+    if (autoFocus) btns.current[focusIdx]?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFocus]);
+
+  const move = (from: number, dir: number) => {
+    const n = options.length;
+    if (!n) return;
+    btns.current[(from + dir + n) % n]?.focus();
+  };
+  const onKey = (e: React.KeyboardEvent, idx: number) => {
+    if (disabled) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(idx, 1); }
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(idx, -1); }
+    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); onPick(options[idx].value); }
+    else if (e.key === "Escape") { e.preventDefault(); onEscape?.(); }
+  };
+
   return (
     <div
+      role="radiogroup"
+      aria-label={label}
       title={disabled ? lockHint : undefined}
       className={cn(
         "inline-flex flex-wrap items-center gap-0.5 rounded-md border p-0.5",
@@ -307,19 +373,25 @@ function SegGroup({
         disabled && "cursor-not-allowed opacity-60",
       )}
     >
-      {options.map((o) => {
+      {options.map((o, idx) => {
         const active = value === o.value;
         return (
           <button
             key={o.value}
+            ref={(el) => { btns.current[idx] = el; }}
             type="button"
+            role="radio"
+            aria-checked={active}
+            tabIndex={disabled ? -1 : idx === focusIdx ? 0 : -1}
             disabled={disabled}
             onClick={() => !disabled && onPick(o.value)}
+            onKeyDown={(e) => onKey(e, idx)}
             className={cn(
-              "rounded px-3 py-1 text-sm transition-colors",
+              "tap-target-y inline-flex items-center justify-center gap-1 rounded px-3 py-1 text-sm transition-colors",
               active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
             )}
           >
+            {active && <Check aria-hidden className="size-3.5 shrink-0" />}
             {o.label}
           </button>
         );
@@ -329,14 +401,40 @@ function SegGroup({
   );
 }
 
-/** 多選標籤片：每個選項一顆可切換的 chip，選中者填色 */
+/**
+ * 多選標籤片：一組 checkbox（`role="group"`）。方向鍵移焦點、Space/Enter 切換、Esc 收合；
+ * 選中者填色＋打勾（不只顏色）。
+ */
 function Chips({
-  options, selected, onToggle, disabled, lockHint, changed,
+  label, options, selected, onToggle, autoFocus, onEscape, disabled, lockHint, changed,
 }: {
-  options: EditableFieldOption[]; selected: string[]; onToggle: (v: string) => void; disabled?: boolean; lockHint?: string; changed: boolean;
+  label?: string; options: EditableFieldOption[]; selected: string[]; onToggle: (v: string) => void;
+  autoFocus?: boolean; onEscape?: () => void; disabled?: boolean; lockHint?: string; changed: boolean;
 }) {
+  const btns = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useEffect(() => {
+    if (autoFocus) btns.current[0]?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFocus]);
+
+  const move = (from: number, dir: number) => {
+    const n = options.length;
+    if (!n) return;
+    btns.current[(from + dir + n) % n]?.focus();
+  };
+  const onKey = (e: React.KeyboardEvent, idx: number) => {
+    if (disabled) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(idx, 1); }
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(idx, -1); }
+    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); onToggle(options[idx].value); }
+    else if (e.key === "Escape") { e.preventDefault(); onEscape?.(); }
+  };
+
   return (
     <div
+      role="group"
+      aria-label={label}
       title={disabled ? lockHint : undefined}
       className={cn(
         "flex flex-wrap items-center gap-1.5 rounded-md border p-1.5",
@@ -344,19 +442,25 @@ function Chips({
         disabled && "cursor-not-allowed opacity-60",
       )}
     >
-      {options.map((o) => {
+      {options.map((o, idx) => {
         const on = selected.includes(o.value);
         return (
           <button
             key={o.value}
+            ref={(el) => { btns.current[idx] = el; }}
             type="button"
+            role="checkbox"
+            aria-checked={on}
+            tabIndex={disabled ? -1 : idx === 0 ? 0 : -1}
             disabled={disabled}
             onClick={() => !disabled && onToggle(o.value)}
+            onKeyDown={(e) => onKey(e, idx)}
             className={cn(
-              "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+              "tap-target-y inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
               on ? "border-primary bg-primary/10 font-medium text-primary" : "border-input text-muted-foreground hover:bg-accent",
             )}
           >
+            {on && <Check aria-hidden className="size-3 shrink-0" />}
             {o.label}
           </button>
         );
