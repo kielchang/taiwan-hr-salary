@@ -8,6 +8,8 @@ import { ntd } from "@/lib/utils";
 // 色票讀取 index.css 的 --chart-1..8／--chart-axis/grid/text（Gem 寶石色票，經 dataviz 技能
 // 驗證器驗證通過 CVD 分離／彩度/對比；深色步階已備於 .dark，切換未啟用時 var() 直接吃 :root 值）。
 // SVG 的 fill/stroke 屬性可直接解析 var()，故色票只需在 CSS 單一來源改一次即可全站同步。
+// 鐵律：PALETTE[N] 只能代表「類別身分」（本薪/加給/部門…），不可拿來表示好壞/超標等狀態語意——
+// 換色票主題或改排序時色相會變，狀態意義不能跟著漂移。狀態一律走 --success/--warning/--info/--danger。
 export const PALETTE = [
   "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)",
   "var(--chart-5)", "var(--chart-6)", "var(--chart-7)", "var(--chart-8)",
@@ -350,7 +352,8 @@ export function Scatter({
   );
 }
 
-/** 子彈圖：實際 vs 目標 */
+/** 子彈圖：實際 vs 目標。超支/未達是「好壞」語意，走 --danger/--success 狀態 token（非 PALETTE
+ * 分類色）——分類色票換主題或重排時色相會變，狀態色的好壞意義不能跟著漂移。 */
 export function Bullet({ value, target, label, height = 34 }: { value: number; target: number; label?: string; height?: number }) {
   const max = Math.max(value, target, 1) * 1.1;
   const W = 320;
@@ -362,7 +365,7 @@ export function Bullet({ value, target, label, height = 34 }: { value: number; t
       {label && <p className="text-xs text-muted-foreground">{label}</p>}
       <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="h-7 w-full" role="img">
         <rect x={0} y={height * 0.25} width={W} height={height * 0.5} fill={GRID} rx={2} />
-        <rect x={0} y={height * 0.3} width={Math.max(0, vW)} height={height * 0.4} fill={over ? PALETTE[4] : PALETTE[1]} rx={2}>
+        <rect x={0} y={height * 0.3} width={Math.max(0, vW)} height={height * 0.4} fill={over ? "hsl(var(--danger))" : "hsl(var(--success))"} rx={2}>
           <title>{`實際 ${ntd(value)}`}</title>
         </rect>
         {target > 0 && <line x1={tX} y1={height * 0.15} x2={tX} y2={height * 0.85} stroke="#0f172a" strokeWidth={1.5}><title>{`目標 ${ntd(target)}`}</title></line>}
