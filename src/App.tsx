@@ -154,7 +154,7 @@ function Layout() {
                 title={`目前為 ${ENV_BADGE.label} 環境（非正式站）`}
                 className={cn(
                   "ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide",
-                  ENV_BADGE.tone === "stage" ? "bg-amber-500 text-white" : "bg-sky-600 text-white",
+                  ENV_BADGE.tone === "stage" ? "bg-warning text-warning-foreground" : "bg-info text-info-foreground",
                 )}
               >
                 {ENV_BADGE.label}
@@ -214,7 +214,7 @@ function Layout() {
                         <m.icon className="size-4 shrink-0" />
                         <span className="flex-1">{m.label}</span>
                         {m.tag && (
-                          <span className={cn("rounded px-1 py-0.5 text-[9px]", m.tag === "例行" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700")}>{m.tag}</span>
+                          <span className={cn("rounded px-1 py-0.5 text-[9px]", m.tag === "例行" ? "bg-success/15 text-success" : "bg-info/15 text-info")}>{m.tag}</span>
                         )}
                       </NavLink>
                     );

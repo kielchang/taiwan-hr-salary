@@ -427,14 +427,14 @@ function PayslipReport() {
       </div>
 
       {batchMsg && (
-        <div className="flex items-start gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900 print:hidden">
+        <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-2.5 text-xs text-success print:hidden">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
           <p>{batchMsg}</p>
         </div>
       )}
 
       {(!hasId || !hasEmail || pdfError) && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 print:hidden">
+        <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning print:hidden">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div className="space-y-0.5">
             {!hasId && <p>此員工尚未填「身分證字號」，無法產生加密 PDF（密碼即身分證字號）。請至「基本資料」補填。</p>}

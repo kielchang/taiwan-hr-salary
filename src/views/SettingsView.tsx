@@ -196,7 +196,7 @@ export function SettingsView() {
       </div>
 
       {locked && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
           <Info className="mt-0.5 size-4 shrink-0" />
           <p><span className="font-medium">本月已確認結算，法定參數與級距已鎖定。</span>如需調整，請先至「查核與確認」取消本月確認。</p>
         </div>
@@ -222,7 +222,7 @@ export function SettingsView() {
       {secTab === "company" && <SalaryDefaultsCard locked={locked} />}
 
       {secTab === "legal" && (<>
-      <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+      <div className="rounded-md border border-info/30 bg-info/10 p-3 text-xs text-info">
         <Info className="mr-1 inline size-3.5" />
         <span className="font-medium">年度更新提醒：</span>
         每年 1 月政府會公告新年度的最低工資、費率與級距表，屆時只要更新下面的數值即可，計算方式不需要改。
@@ -396,7 +396,7 @@ export function SettingsView() {
       {!locked && paramChanges.length > 0 && (
         <div className="sticky bottom-0 z-30 -mx-4 border-t bg-background/95 px-4 py-2.5 backdrop-blur print:hidden">
           <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2">
-            <span className="text-sm text-amber-900">
+            <span className="text-sm text-warning">
               <b className="tabular-nums">{paramChanges.length}</b> 項參數已修改、尚未套用
               <span className="ml-2 text-xs text-muted-foreground">（{paramChanges.slice(0, 3).map((c) => c.label).join("、")}{paramChanges.length > 3 ? "…" : ""}）</span>
             </span>
@@ -698,7 +698,7 @@ function AttendanceSettings() {
             <div className="space-y-1">
               <Label className="text-xs">公司對外 IP 允許清單（一行一個，或逗號分隔）</Label>
               <textarea
-                className="h-20 w-full rounded-md border border-input bg-orange-50 p-2 text-sm"
+                className="col-input h-20 w-full rounded-md border border-input p-2 text-sm"
                 value={ipText}
                 onChange={(e) => setIpText(e.target.value)}
                 onBlur={() => setAttendance({ allowedIps: parseIpList(ipText) })}

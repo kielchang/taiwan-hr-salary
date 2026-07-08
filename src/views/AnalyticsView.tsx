@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Callout, type CalloutVariant } from "@/components/ui/callout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,12 +42,12 @@ import { computeProjectCost, projectDeptMatrix, chargeOutVariance, UNALLOCATED_I
 import { projectCostByPeriod, projectEac } from "@/lib/reports/projectTrend";
 import { downloadNodeAsPdf } from "@/lib/reportPdf";
 import { HelpHint } from "@/components/HelpHint";
-import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, AlertTriangle, Lightbulb, Save, TrendingUp, FlaskConical } from "lucide-react";
+import { BarChart3, Plus, Trash2, Download, Info, FileDown, Printer, CheckCircle2, Lightbulb, Save, TrendingUp, FlaskConical } from "lucide-react";
 
 /** 規劃試算沙盒提示：明示「不寫回薪資」（除非另行核定），避免誤把規劃數字當實際。 */
 function SandboxNotice({ applyHint = false }: { applyHint?: boolean }) {
   return (
-    <div className="flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-900 print:hidden">
+    <div className="flex items-start gap-2 rounded-md border border-info/30 bg-info/10 p-2.5 text-xs text-info print:hidden">
       <FlaskConical className="mt-0.5 size-4 shrink-0" />
       <p>
         <span className="font-medium">規劃試算沙盒</span>
@@ -131,7 +132,7 @@ export function AnalyticsView() {
         {GROUPS.map((g) => (
           <div key={g.title}>
             <p className="mb-0.5 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {g.title}{g.tag && <span className={cn("ml-1 rounded px-1 py-0.5 text-[9px]", g.tag === "例行" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700")}>{g.tag}</span>}
+              {g.title}{g.tag && <span className={cn("ml-1 rounded px-1 py-0.5 text-[9px]", g.tag === "例行" ? "bg-success/15 text-success" : "bg-info/15 text-info")}>{g.tag}</span>}
             </p>
             <TabPills tabs={g.tabs.map((k) => ({ key: k, label: TAB_LABEL[k] }))} value={tab} onChange={(k) => setTab(k as typeof tab)} />
           </div>
@@ -490,7 +491,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
       </Card>
 
       {!hasGrades && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+        <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning">
           <Info className="mt-0.5 size-4 shrink-0" />未設定薪資級距，compa-ratio／區間滲透率顯示「—」。請先新增級距並指派員工。
         </div>
       )}
@@ -516,7 +517,7 @@ function GradeTab({ rows }: { rows: PayrollRow[] }) {
                 </Select>
               ) },
               { key: "compa", header: "compa-ratio", numeric: true, sortValue: (b) => b.compaRatio ?? -1, cell: (b) => (b.compaRatio == null ? "—" : ratioPct(b.compaRatio)) },
-              { key: "mcompa", header: "市場 compa", numeric: true, sortValue: (b) => b.marketCompaRatio ?? -1, cell: (b) => <span className={cn(b.marketCompaRatio != null && b.marketCompaRatio < 0.9 && "text-amber-600 font-medium")}>{b.marketCompaRatio == null ? "—" : ratioPct(b.marketCompaRatio)}</span> },
+              { key: "mcompa", header: "市場 compa", numeric: true, sortValue: (b) => b.marketCompaRatio ?? -1, cell: (b) => <span className={cn(b.marketCompaRatio != null && b.marketCompaRatio < 0.9 && "text-warning font-medium")}>{b.marketCompaRatio == null ? "—" : ratioPct(b.marketCompaRatio)}</span> },
               { key: "pen", header: "區間滲透率", numeric: true, sortValue: (b) => b.rangePenetration ?? -1, cell: (b) => (b.rangePenetration == null ? "—" : pctOf(b.rangePenetration, 0)) },
             ]}
           />
@@ -713,7 +714,7 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
     <div className="space-y-4">
       <SandboxNotice applyHint />
       {applyMsg && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2.5 text-sm text-emerald-900">
+        <div className="flex items-center justify-between gap-2 rounded-md border border-success/30 bg-success/10 p-2.5 text-sm text-success">
           <span className="flex items-center gap-2"><CheckCircle2 className="size-4 shrink-0" />{applyMsg}</span>
           <span className="flex shrink-0 gap-2">
             <Button variant="outline" size="sm" onClick={() => navigate("/master")}>前往基本資料查看</Button>
@@ -843,7 +844,7 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
               { key: "mi", header: "月增額合計", numeric: true, sortValue: (c) => c.totalMonthlyIncrease, cell: (c) => ntd(c.totalMonthlyIncrease) },
               { key: "ac", header: "年化成本增額", numeric: true, sortValue: (c) => c.totalAnnualizedCostDelta, cell: (c) => ntd(c.totalAnnualizedCostDelta) },
               { key: "avg", header: "平均調幅", numeric: true, sortValue: (c) => c.avgRaisePct, cell: (c) => `${c.avgRaisePct.toFixed(1)}%` },
-              { key: "gini", header: "調後 Gini", numeric: true, sortValue: (c) => c.giniAfter, cell: (c) => <span className={cn(c.giniAfter === bestFair && "font-bold text-emerald-600")}>{c.giniAfter.toFixed(3)}</span> },
+              { key: "gini", header: "調後 Gini", numeric: true, sortValue: (c) => c.giniAfter, cell: (c) => <span className={cn(c.giniAfter === bestFair && "font-bold text-success")}>{c.giniAfter.toFixed(3)}</span> },
               ...(rs.targetBudget > 0 ? [{ key: "var", header: "預算差異", numeric: true, sortValue: (c: (typeof compare)[number]) => c.variance, cell: (c: (typeof compare)[number]) => <Delta value={c.variance} goodWhen="negative" posLabel="超 " negLabel="餘 " /> }] : []),
             ]}
           />
@@ -857,7 +858,7 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
             <DialogTitle>核定並套用調薪方案</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+            <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning">
               <Info className="mt-0.5 size-4 shrink-0" />
               此操作會把 {changedRows.length} 人的調後月薪<strong>寫回薪資結構（差額套在本薪）</strong>，並留下稽核紀錄。
               生效月份為<strong>未來月份</strong>時先存為排程，到期後於「工作台」一鍵套用；為當月時立即寫回。
@@ -1126,7 +1127,7 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
             <CardDescription>
               「實際累計」為當年各月已確認月結快照之加總（缺快照月份以目前資料回推、標示估算）；
               「模擬全年」＝當年已實際 ＋ 剩餘月以本月 run-rate 外推。
-              {estimatedCount > 0 && <span className="text-amber-700">　含 {estimatedCount} 個估算月份（建議於各月結算後確認以留存快照）。</span>}
+              {estimatedCount > 0 && <span className="text-warning">　含 {estimatedCount} 個估算月份（建議於各月結算後確認以留存快照）。</span>}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" className="shrink-0 print:hidden" disabled={aMonths.length === 0} onClick={exportAnnualCsv}>
@@ -1348,11 +1349,11 @@ function GlossaryTab() {
 }
 
 /* ───────── 口語化意見回饋 ───────── */
-const INSIGHT_STYLE = {
-  good: { wrap: "border-emerald-200 bg-emerald-50", icon: CheckCircle2, iconColor: "text-emerald-600", title: "text-emerald-900", tag: "良好" },
-  info: { wrap: "border-sky-200 bg-sky-50", icon: Lightbulb, iconColor: "text-sky-600", title: "text-sky-900", tag: "提醒" },
-  warn: { wrap: "border-amber-300 bg-amber-50", icon: AlertTriangle, iconColor: "text-amber-600", title: "text-amber-900", tag: "需注意" },
-} as const;
+const INSIGHT_VARIANT: Record<Insight["level"], { variant: CalloutVariant; tag: string }> = {
+  good: { variant: "success", tag: "良好" },
+  info: { variant: "info", tag: "提醒" },
+  warn: { variant: "warning", tag: "需注意" },
+};
 
 function InsightList({ insights }: { insights: Insight[] }) {
   if (insights.length === 0) return null;
@@ -1364,20 +1365,12 @@ function InsightList({ insights }: { insights: Insight[] }) {
       </CardHeader>
       <CardContent className="space-y-2">
         {insights.map((it, i) => {
-          const s = INSIGHT_STYLE[it.level];
-          const Icon = s.icon;
+          const s = INSIGHT_VARIANT[it.level];
           return (
-            <div key={i} className={cn("flex items-start gap-2.5 rounded-md border p-3", s.wrap)}>
-              <Icon className={cn("mt-0.5 size-4 shrink-0", s.iconColor)} />
-              <div className="min-w-0 flex-1">
-                <p className={cn("text-sm font-semibold", s.title)}>
-                  <span className="mr-1.5 rounded bg-white/70 px-1 py-0.5 text-[10px] font-medium align-middle">{s.tag}</span>
-                  {it.title}
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{it.detail}</p>
-                {it.evidence && <p className="mt-1 text-[11px] text-muted-foreground/80">佐證：{it.evidence}</p>}
-              </div>
-            </div>
+            <Callout key={i} variant={s.variant} tag={s.tag} title={it.title}>
+              {it.detail}
+              {it.evidence && <p className="mt-1 text-[11px] text-muted-foreground/80">佐證：{it.evidence}</p>}
+            </Callout>
           );
         })}
       </CardContent>

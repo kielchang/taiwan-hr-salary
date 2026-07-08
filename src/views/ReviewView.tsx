@@ -135,7 +135,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
       </div>
 
       {(errors.length > 0 || pendingTax.length > 0) && !confirmed && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
           <AlertTriangle className="mr-1 inline size-4" />
           確認前請先處理：
           {errors.length > 0 && <span className="ml-1">{errors.length} 項資料錯誤（見「統計查核」）</span>}
@@ -237,7 +237,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
             </CardHeader>
             <CardContent>
               {issues.length === 0 ? (
-                <p className="flex items-center gap-2 text-sm text-emerald-600">
+                <p className="flex items-center gap-2 text-sm text-success">
                   <CheckCircle2 className="size-4" /> 全部通過，沒有需要處理的項目。
                 </p>
               ) : (
@@ -245,7 +245,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
                   {issues.map((i, idx) => (
                     <li key={idx} className="flex items-start gap-2 rounded-md border p-2 text-sm">
                       <AlertTriangle
-                        className={cn("mt-0.5 size-4 shrink-0", i.severity === "error" ? "text-destructive" : "text-amber-500")}
+                        className={cn("mt-0.5 size-4 shrink-0", i.severity === "error" ? "text-destructive" : "text-warning")}
                       />
                       <span className="flex-1">{i.message}</span>
                       {i.employeeId && (

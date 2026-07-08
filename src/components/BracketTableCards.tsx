@@ -70,7 +70,7 @@ export function BracketTableCards({ brackets }: { brackets: InsuranceBrackets })
                 href={t.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex w-fit items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                className="inline-flex w-fit items-center gap-1 rounded-md bg-info/10 px-2 py-1 text-xs font-medium text-info hover:bg-info/20"
               >
                 <BookOpen className="size-3.5" />
                 {t.org}分級表

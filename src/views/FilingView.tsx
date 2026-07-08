@@ -164,8 +164,8 @@ function BracketTab() {
       <span>{ntd(current)}</span>
       {declared != null && (
         <>
-          <ArrowRight className={cn("size-3", current !== declared ? "text-amber-600" : "text-muted-foreground/50")} />
-          <span className={cn(current !== declared && "font-medium text-amber-700")}>{ntd(declared)}</span>
+          <ArrowRight className={cn("size-3", current !== declared ? "text-warning" : "text-muted-foreground/50")} />
+          <span className={cn(current !== declared && "font-medium text-warning")}>{ntd(declared)}</span>
         </>
       )}
     </span>
@@ -196,7 +196,7 @@ function BracketTab() {
           columns={columns}
           getRowKey={(w) => w.employeeId}
           searchPlaceholder="搜尋員工…"
-          rowClassName={(w) => cn(w.changed && hasBaseline && "bg-amber-50")}
+          rowClassName={(w) => cn(w.changed && hasBaseline && "bg-edit-bg")}
           toolbar={<Button variant="outline" size="sm" onClick={setBaseline}>以目前為申報基準</Button>}
           csv={{
             headers: ["員工編號", "姓名", "目前勞保", "申報勞保", "目前健保", "申報健保", "目前勞退", "申報勞退", "需調整"],
@@ -247,16 +247,16 @@ function EnrollmentTab() {
   );
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      {card(<UserPlus className="size-4 text-emerald-600" />, "本月應加保（新進）", newHires, "success",
+      {card(<UserPlus className="size-4 text-success" />, "本月應加保（新進）", newHires, "success",
         `到職日落在 ${formatPeriod(currentPeriod)} 者，請於到職當日辦理加保。`, "本月無新進",
         (e) => <Badge variant="success">加保・{e.hireDate}</Badge>)}
-      {card(<UserMinus className="size-4 text-amber-600" />, "本月應退保（離職）", leavers, "warning",
+      {card(<UserMinus className="size-4 text-warning" />, "本月應退保（離職）", leavers, "warning",
         `離職生效日落在 ${formatPeriod(currentPeriod)} 者，請於離職當日辦理退保。`, "本月無退保",
         (e) => <Badge variant="warning">退保・{e.leaveDate}</Badge>)}
-      {card(<PauseCircle className="size-4 text-amber-600" />, "本月應停保（留停/停職/暫離）", suspends, "warning",
+      {card(<PauseCircle className="size-4 text-warning" />, "本月應停保（留停/停職/暫離）", suspends, "warning",
         `生效日落在 ${formatPeriod(currentPeriod)} 者，依規定辦理停保（健保得續保自費）。`, "本月無停保",
         (e) => <Badge variant="warning">{e.status}停保・{e.leaveDate}</Badge>)}
-      {card(<PlayCircle className="size-4 text-emerald-600" />, "本月應復保（復職）", returns, "success",
+      {card(<PlayCircle className="size-4 text-success" />, "本月應復保（復職）", returns, "success",
         `復職日落在 ${formatPeriod(currentPeriod)} 者，請辦理復保並恢復計薪。`, "本月無復保",
         (e) => <Badge variant="success">復保・{e.returnDate}</Badge>)}
     </div>

@@ -37,7 +37,7 @@ export const PayslipCard = forwardRef<HTMLDivElement, { emp: Employee; r: Payrol
               title="應發項目"
               rows={[["固定薪資合計", r.salaryTotal], ["加班費", r.overtimePay], ["獎金與其他加項", monthlyBonus]]}
               total={["應發合計", r.grossPay]}
-              totalClass="text-emerald-700"
+              totalClass="text-success"
             />
             <Section
               title="代扣項目"
@@ -50,7 +50,7 @@ export const PayslipCard = forwardRef<HTMLDivElement, { emp: Employee; r: Payrol
                 ["代扣所得稅", r.withheldTax],
               ]}
               total={["代扣合計", r.totalDeductions]}
-              totalClass="text-rose-700"
+              totalClass="text-danger"
             />
           </div>
 

@@ -169,7 +169,7 @@ export function MonthlyView({
       </div>
 
       {locked && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
           <Info className="mt-0.5 size-4 shrink-0" />
           <p>
             <span className="font-medium">{formatPeriod(currentPeriod)} 已確認結算，資料已鎖定。</span>
@@ -205,7 +205,7 @@ export function MonthlyView({
                 } },
                 { key: "gross", header: "應發", numeric: true, sortValue: ({ r }) => r.grossPay, cell: ({ r }) => ntd(r.grossPay), total: (rs) => ntd(rs.reduce((a, { r }) => a + r.grossPay, 0)) },
                 { key: "ded", header: "代扣合計", numeric: true, sortValue: ({ r }) => r.totalDeductions, cell: ({ r }) => <span className="text-muted-foreground">−{ntd(r.totalDeductions)}</span>, total: (rs) => `−${ntd(rs.reduce((a, { r }) => a + r.totalDeductions, 0))}` },
-                { key: "net", header: "實發", numeric: true, sortValue: ({ r }) => r.netPay, cell: ({ r }) => <span className={cn("font-semibold", r.netPay < 0 && "text-rose-600")}>{r.netPay < 0 ? `(${ntd(-r.netPay)})` : ntd(r.netPay)}</span>, total: (rs) => { const t = rs.reduce((a, { r }) => a + r.netPay, 0); return <span className={cn("font-bold", t < 0 && "text-rose-600")}>{t < 0 ? `(${ntd(-t)})` : ntd(t)}</span>; } },
+                { key: "net", header: "實發", numeric: true, sortValue: ({ r }) => r.netPay, cell: ({ r }) => <span className={cn("font-semibold", r.netPay < 0 && "text-danger")}>{r.netPay < 0 ? `(${ntd(-r.netPay)})` : ntd(r.netPay)}</span>, total: (rs) => { const t = rs.reduce((a, { r }) => a + r.netPay, 0); return <span className={cn("font-bold", t < 0 && "text-danger")}>{t < 0 ? `(${ntd(-t)})` : ntd(t)}</span>; } },
                 { key: "ops", header: "", headerClassName: "w-24", cell: ({ emp }) => <Button variant="outline" size="sm" disabled={locked} title={locked ? "本月已確認鎖定" : undefined} onClick={() => openEdit(emp.id)}><Pencil className="size-3.5" /> 編輯</Button> },
               ]}
             />
@@ -357,7 +357,7 @@ export function MonthlyView({
                         </Button>
                       </div>
                     ) : (
-                      <p className="max-w-sm text-xs text-amber-700">
+                      <p className="max-w-sm text-xs text-warning">
                         <Info className="mr-1 inline size-3.5" />
                         此員工選「依扣繳稅額表」且薪資已達起扣點（約 {ntd(liveResult.estimatedTaxThreshold ?? 0)} 元）：
                         請至財政部「薪資所得扣繳稅額表」依扶養 {liveResult.dependents.taxDependents} 人欄查出金額後填入。

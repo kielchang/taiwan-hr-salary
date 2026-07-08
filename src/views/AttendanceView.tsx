@@ -168,7 +168,7 @@ export function AttendanceView() {
       </div>
 
       {/* 誠實標示：純前端不可強制執行 */}
-      <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+      <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning">
         <ShieldAlert className="mt-0.5 size-4 shrink-0" />
         <p>
           前端 GPS／IP 僅供<strong>輔助與稽核</strong>，可能被竄改（模擬定位、VPN），<strong>非強制防弊</strong>；
@@ -213,7 +213,7 @@ export function AttendanceView() {
               {result && (
                 <div
                   className={`flex items-start gap-2 rounded-md border p-2.5 text-sm ${
-                    result.ok ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-rose-300 bg-rose-50 text-rose-900"
+                    result.ok ? "border-success/30 bg-success/10 text-success" : "border-danger/30 bg-danger/10 text-danger"
                   }`}
                 >
                   {result.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}
@@ -233,7 +233,7 @@ export function AttendanceView() {
             </CardTitle>
             <input
               type="date"
-              className="h-8 rounded-md border border-input bg-orange-50 px-2 text-sm"
+              className="h-8 rounded-md border border-input bg-background px-2 text-sm"
               value={summaryDate}
               onChange={(e) => e.target.value && setSummaryDate(e.target.value)}
             />

@@ -139,7 +139,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                   onClick={() => chooseMode("sample")}
                   className="rounded-lg border-2 p-4 text-left transition-colors hover:border-primary hover:bg-accent"
                 >
-                  <Sparkles className="mb-2 size-5 text-amber-500" />
+                  <Sparkles className="mb-2 size-5 text-warning" />
                   <p className="font-medium">載入範例公司體驗</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     內含 8 名範例員工與完整薪資情境，適合先熟悉操作，之後可隨時清空改填自己的資料。
@@ -149,7 +149,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                   onClick={() => chooseMode("blank")}
                   className="rounded-lg border-2 p-4 text-left transition-colors hover:border-primary hover:bg-accent"
                 >
-                  <FilePlus2 className="mb-2 size-5 text-sky-500" />
+                  <FilePlus2 className="mb-2 size-5 text-info" />
                   <p className="font-medium">從空白開始建立</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     直接輸入貴公司的員工與薪資資料，引導完成後即可開始當月結算。
@@ -290,7 +290,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
           {step === 3 && (
             <div className="space-y-5 text-center">
-              <Check className="mx-auto size-12 rounded-full bg-emerald-100 p-2 text-emerald-600" />
+              <Check className="mx-auto size-12 rounded-full bg-success/15 p-2 text-success" />
               <div>
                 <h2 className="text-lg font-bold">設定完成！</h2>
                 <p className="mt-1 text-sm text-muted-foreground">每個月從「工作台」出發，照待辦提示進行：</p>

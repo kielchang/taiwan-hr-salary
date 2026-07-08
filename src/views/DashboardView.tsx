@@ -30,10 +30,10 @@ function TodoCard({
   const navigate = useNavigate();
   const clear = count === 0;
   return (
-    <Card className={clear ? "" : tone === "error" ? "border-red-300" : "border-amber-300"}>
+    <Card className={clear ? "" : tone === "error" ? "border-danger/40" : "border-warning/40"}>
       <CardContent className="flex h-full flex-col gap-2 p-4">
         <div className="flex items-center gap-2 text-sm font-medium">
-          <span className={clear ? "text-emerald-600" : tone === "error" ? "text-red-600" : "text-amber-600"}>{icon}</span>
+          <span className={clear ? "text-success" : tone === "error" ? "text-danger" : "text-warning"}>{icon}</span>
           {title}
         </div>
         <p className="text-2xl font-bold tabular-nums">
@@ -181,7 +181,7 @@ export function DashboardView() {
 
       {/* 排程調薪 */}
       {(dueRaises.length > 0 || futureRaises.length > 0) && (
-        <Card className={dueRaises.length > 0 ? "border-sky-300" : undefined}>
+        <Card className={dueRaises.length > 0 ? "border-info/40" : undefined}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">排程調薪</CardTitle>
             <CardDescription>

@@ -49,6 +49,10 @@ export default {
         info: { DEFAULT: "hsl(var(--info))", foreground: "hsl(var(--info-foreground))" },
         danger: { DEFAULT: "hsl(var(--danger))", foreground: "hsl(var(--danger-foreground))" },
         edit: { DEFAULT: "hsl(var(--edit))", foreground: "hsl(var(--edit-foreground))", bg: "hsl(var(--edit-bg))" },
+        // 表格欄位色彩語意（對齊附錄B §B3.7；橘＝輸入欄、深藍＝公式欄、黃＝公司自訂假設）
+        "col-input": { DEFAULT: "hsl(var(--col-input))", foreground: "hsl(var(--col-input-foreground))" },
+        "col-formula": { DEFAULT: "hsl(var(--col-formula))", foreground: "hsl(var(--col-formula-foreground))" },
+        "col-assumption": { DEFAULT: "hsl(var(--col-assumption))", foreground: "hsl(var(--col-assumption-foreground))" },
       },
       borderRadius: {
         lg: "var(--radius)",
