@@ -1,7 +1,7 @@
 {
   "name": "taiwan-hr-salary",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.5.0",
   "type": "module",
   "description": "台灣合規薪資計算系統（115 年）— React + shadcn 參考實作，依 README 規格與附錄 A/B 公式對照",
   "scripts": {

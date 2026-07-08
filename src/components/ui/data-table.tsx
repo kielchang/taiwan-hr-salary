@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useSort, type SortState } from "@/lib/useSort";
 import { csvSerialize } from "@/lib/csv";
 import { saveBlob } from "@/lib/payslipPdf";
@@ -30,6 +31,8 @@ export type Column<T> = {
   freeze?: boolean;
   headerClassName?: string;
   cellClassName?: string | ((row: T) => string);
+  /** 最大寬度(px)：超出以 … 截斷，hover/長壓顯示完整（提示文字取 filterText） */
+  truncate?: number;
 };
 
 export type DataTableProps<T> = {
@@ -160,9 +163,14 @@ export function DataTable<T>({
                   return (
                     <TableCell
                       key={c.key}
+                      style={c.truncate ? { maxWidth: c.truncate } : undefined}
                       className={cn(c.numeric && "text-right tabular-nums", c.freeze && cn(freezeFirst, "font-medium"), dense && "py-1", cls)}
                     >
-                      {c.cell(row)}
+                      {c.truncate ? (
+                        <Tooltip content={c.filterText?.(row)} className="w-full">
+                          <span className="block truncate">{c.cell(row)}</span>
+                        </Tooltip>
+                      ) : c.cell(row)}
                     </TableCell>
                   );
                 })}

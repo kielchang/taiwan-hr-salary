@@ -43,7 +43,7 @@ export const 資料表_多欄超寬: S = {
       columns={[
         { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, cell: (r) => <span className="font-medium">{r.name}</span> },
         { key: "dept", header: "部門", cell: (r) => r.dept },
-        { key: "note", header: "備註（長）", cell: (r) => r.note },
+        { key: "note", header: "備註（長）", truncate: 160, filterText: (r) => r.note, cell: (r) => r.note },
         { key: "a", header: "應發", numeric: true, cell: (r) => ntd(r.a) },
         { key: "b", header: "加班費", numeric: true, cell: (r) => ntd(r.b) },
         { key: "c", header: "投保", numeric: true, cell: (r) => ntd(r.c) },

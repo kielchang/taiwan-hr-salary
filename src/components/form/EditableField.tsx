@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { eqValue, fmtValue, type FieldKind } from "@/lib/forms/diff";
+import { Tooltip, TruncatedText } from "@/components/ui/tooltip";
 import { Undo2, Redo2, Lock, ArrowRight } from "lucide-react";
 
 export interface EditableFieldOption {
@@ -109,21 +110,21 @@ export function EditableField({
   const numeric = kind === "money" || kind === "number" || kind === "rate";
   const negMoney = kind === "money" && Number(value) < 0; // 帳務：負值紅字
 
-  // 唯讀值（過長截斷、hover 顯示完整）
-  const valueSpan = (
-    <span title={isEmpty ? undefined : display} className={cn("min-w-0 truncate", isEmpty && "text-muted-foreground", numeric && "ml-auto tabular-nums", negMoney && "font-medium text-rose-600")}>{display}</span>
+  // 唯讀值（過長截斷；hover/長壓顯示完整泡泡）
+  const valueEl = (
+    <TruncatedText text={display} numeric={numeric} className={cn(isEmpty && "text-muted-foreground", negMoney && "font-medium text-rose-600")} />
   );
   const collapsed = (
-    <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false), "overflow-hidden")}>
-      {valueSpan}
+    <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
+      {valueEl}
     </button>
   );
 
   // 鎖定：所有型態統一顯示唯讀值＋鎖頭
   if (disabled) {
     return shell(
-      <div title={lockHint} className={cn(fieldBtnCls(false, true), "overflow-hidden")}>
-        {valueSpan}
+      <div title={lockHint} className={cn(fieldBtnCls(false, true))}>
+        {valueEl}
         <Lock className="ml-1 size-3.5 shrink-0 opacity-60" />
       </div>,
     );
@@ -155,10 +156,24 @@ export function EditableField({
     );
   }
 
-  // multiselect（多選）：唯讀顯示 → 點擊展開標籤片，「完成」收合
+  // multiselect（多選）：唯讀顯示前幾項＋「其他 N 項」→ 點擊展開標籤片，「完成」收合
   if (kind === "multiselect") {
-    if (!showInput) return shell(collapsed);
     const sel = Array.isArray(value) ? value.map(String) : [];
+    if (!showInput) {
+      const preview = sel.slice(0, 2);
+      const rest = sel.length - preview.length;
+      return shell(
+        <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false), "gap-1")}>
+          {sel.length === 0 && <span className="text-muted-foreground">—</span>}
+          {preview.map((v) => (
+            <Tooltip key={v} content={optLabel(v)}>
+              <span className="block max-w-[88px] truncate rounded-full border border-input bg-muted px-2 py-0.5 text-xs">{optLabel(v)}</span>
+            </Tooltip>
+          ))}
+          {rest > 0 && <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">其他 {rest} 項</span>}
+        </button>,
+      );
+    }
     return shell(
       <div className="space-y-1.5">
         <Chips

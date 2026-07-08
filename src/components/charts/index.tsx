@@ -125,9 +125,19 @@ export function Legend({ items }: { items: { label: string; color: string }[] })
 
 export interface BarDatum { label: string; value: number; id?: string }
 
+/** 類別過多時只保留前 max-1 名，其餘彙總為「其他（N 項）」，避免標籤糊成一團。 */
+export function capItems(data: BarDatum[], max: number): BarDatum[] {
+  if (!max || data.length <= max) return data;
+  const sorted = [...data].sort((a, b) => b.value - a.value);
+  const head = sorted.slice(0, max - 1);
+  const restCount = data.length - head.length;
+  const restSum = sorted.slice(max - 1).reduce((a, d) => a + d.value, 0);
+  return [...head, { label: `其他（${restCount} 項）`, value: restSum, id: "__other__" }];
+}
+
 /** 垂直長條圖（直方圖、部門中位、調幅%）。hover 高亮＋提示；可 onSelect 鑽取。 */
 export function BarChart({
-  data, height = 160, color = PALETTE[0], valueFmt = ntd, onSelect, selectedIndex = null, showValues = false,
+  data, height = 160, color = PALETTE[0], valueFmt = ntd, onSelect, selectedIndex = null, showValues = false, maxItems = 12,
 }: {
   data: BarDatum[];
   height?: number;
@@ -136,18 +146,20 @@ export function BarChart({
   onSelect?: (item: BarDatum, index: number) => void;
   selectedIndex?: number | null;
   showValues?: boolean; // 於長條頂端標數值（列印/觸控不靠 hover 也能讀）
+  maxItems?: number; // 類別過多時只顯示前 N，其餘彙總「其他」
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   if (data.length === 0) return <Empty />;
+  const shown = capItems(data, maxItems);
   const W = 320, H = height;
   const pad = { l: 8, r: 8, t: 10, b: 28 };
-  const max = Math.max(1, ...data.map((d) => d.value));
-  const bw = (W - pad.l - pad.r) / data.length;
+  const max = Math.max(1, ...shown.map((d) => d.value));
+  const bw = (W - pad.l - pad.r) / shown.length;
   const activeI = idx ?? selectedIndex;
   return (
     <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
-        {data.map((d, i) => {
+        {shown.map((d, i) => {
           const h = ((H - pad.t - pad.b) * d.value) / max;
           const x = pad.l + i * bw;
           const y = H - pad.b - h;
@@ -176,8 +188,8 @@ export function BarChart({
       <ChartTip pos={pos} show={idx !== null}>
         {idx !== null && (
           <>
-            <div className="font-medium">{data[idx].label}</div>
-            <div className="tabular-nums">{valueFmt(data[idx].value)}</div>
+            <div className="font-medium">{shown[idx].label}</div>
+            <div className="tabular-nums">{valueFmt(shown[idx].value)}</div>
             {selectHint(!!onSelect)}
           </>
         )}
@@ -222,15 +234,16 @@ export function LineChart({
 
 /** Pareto：長條（由大到小）＋累積百分比折線。hover 提示佔比；可 onSelect 鑽取。 */
 export function Pareto({
-  data, height = 180, onSelect,
+  data, height = 180, onSelect, maxItems = 12,
 }: {
   data: BarDatum[];
   height?: number;
   onSelect?: (item: BarDatum, index: number) => void;
+  maxItems?: number; // 類別過多時只顯示前 N，其餘彙總「其他」
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   if (data.length === 0) return <Empty />;
-  const sorted = [...data].sort((a, b) => b.value - a.value);
+  const sorted = capItems(data, maxItems).sort((a, b) => b.value - a.value);
   const total = sorted.reduce((a, d) => a + d.value, 0) || 1;
   const W = 320, H = height;
   const pad = { l: 8, r: 8, t: 10, b: 24 };
