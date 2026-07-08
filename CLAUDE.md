@@ -54,6 +54,10 @@ storage undefined 時先想到這裡，不要改測試本身。
    與彼此，**禁止** import `@/store`／`@/data`／`@/views`／`@/content`／`@/version`／`@/lib/types`／`@/lib/calc`… 等 app 模組。
    由 `tests/uiKit.test.ts` 守衛（新增元件請加進 barrel `src/components/index.ts`）。元件庫**版號獨立於 app**
    （`src/components/version.ts` `UI_KIT`；改元件→bump＋補 `docs/ui-kit/CHANGELOG.md`）。`HelpHint`/`PrintHeader`/`BracketTables`＝app glue，刻意**不入** barrel。
+10. **Storybook-first 工作流（使用者拍板，鐵律）**：任何介面/元件的視覺或互動更新，**先在 Storybook 改元件＋story、確認，再接到實際畫面**；
+    畫面（views）只負責「組裝」已在 Storybook 驗證過的元件，不在 view 裡各自長出新互動。否則元件庫與介面會脫鉤、Storybook 失去意義。
+    ⇒ 改/加元件的 SOP：①改 `src/components/*` 元件＋更新該元件 `*.stories.tsx`（涵蓋新狀態）→ ②`build-storybook` 綠、於 Storybook 確認 →
+    ③bump `UI_KIT`＋補 `docs/ui-kit/CHANGELOG.md` → ④views 才改用。純 view 內容（非共用元件的互動）不受此限。
 
 ## 架構地圖
 

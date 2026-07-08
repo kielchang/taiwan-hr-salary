@@ -19,7 +19,42 @@ const people = [
   { id: "E003", name: "陳大文", dept: "行銷部", total: 47000 },
 ];
 
+// 較大資料集：足以展示分頁（5/15/30/50）、數值範圍篩選、十字對準
+const DEPTS = ["研發部", "業務部", "行銷部", "財務部", "客服部", "品保部"];
+const TITLES = ["工程師", "資深工程師", "業務代表", "專員", "經理", "助理"];
+const big = Array.from({ length: 42 }, (_, i) => ({
+  id: `E${String(i + 1).padStart(3, "0")}`,
+  name: `員工${i + 1}`,
+  dept: DEPTS[i % DEPTS.length],
+  title: TITLES[i % TITLES.length],
+  total: 30000 + ((i * 3700) % 180000),
+  tenure: (i * 7) % 130,
+}));
+
 export const 資料表_DataTable: S = {
+  render: () => (
+    <div className="max-w-3xl space-y-2">
+      <p className="text-xs text-muted-foreground">
+        互動：指向儲存格看**十字對準**；點欄位表頭漏斗做**單欄篩選**（文字＝包含、數字＝範圍）；下方切換**每頁 5/15/30/50**。
+      </p>
+      <DataTable
+        rows={big}
+        getRowKey={(r) => r.id}
+        searchPlaceholder="搜尋姓名／部門…"
+        columns={[
+          { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => `${r.name} ${r.id}`, cell: (r) => <><span className="font-medium">{r.name}</span><span className="ml-1.5 text-xs text-muted-foreground">{r.id}</span></> },
+          { key: "dept", header: "部門", sortValue: (r) => r.dept, cell: (r) => r.dept },
+          { key: "title", header: "職稱", sortValue: (r) => r.title, cell: (r) => r.title },
+          { key: "tenure", header: "年資（月）", numeric: true, sortValue: (r) => r.tenure, cell: (r) => `${r.tenure} 月` },
+          { key: "total", header: "月薪總額", numeric: true, sortValue: (r) => r.total, cell: (r) => ntd(r.total), total: (rs) => ntd(rs.reduce((a, r) => a + r.total, 0)) },
+        ]}
+      />
+    </div>
+  ),
+};
+
+/** 小資料集（無分頁）：純示範欄位設定與合計列 */
+export const 資料表_精簡: S = {
   render: () => (
     <div className="max-w-2xl">
       <DataTable
