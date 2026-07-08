@@ -60,10 +60,12 @@ export const 設計Tokens: S = {
       </section>
 
       <section>
-        <p className={SECTION}>圖表類別色票（PALETTE，8 色，Cobalt）</p>
+        <p className={SECTION}>圖表類別色票（PALETTE，8 色，Gem）</p>
         <p className="mb-2 text-xs text-muted-foreground">
           與其餘 token 同源：<code>--chart-1..8</code>／<code>--chart-axis/grid/text</code>（<code>index.css</code>）。
-          經 dataviz 技能驗證器實測通過 CVD 分離／彩度/對比檢查（取代原本未過檢的舊色）；深色步階已備於 <code>.dark</code>。
+          藍寶石／祖母綠／石榴石／黃玉／紫水晶／粉晶／紅玉髓／海藍寶石——綜合 6 個 Figma 寶石色票研究後設計，
+          經 dataviz 技能驗證器實測通過 CVD 分離／彩度/對比檢查；深色步階已備於 <code>.dark</code>（見{" "}
+          <code>ChartThemes.stories.tsx</code> 完整比較過程）。
         </p>
         <div className="flex flex-wrap gap-2">
           {PALETTE.map((c, i) => (

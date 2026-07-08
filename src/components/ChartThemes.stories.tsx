@@ -3,10 +3,13 @@ import type { CSSProperties } from "react";
 import { StackedBar, Legend } from "@/components/charts";
 
 // 圖表色票「風格選項」比較＋切換器（決策用，非上線功能）：
-// 目前上線色票＝index.css 的 --chart-1..8（Cobalt，見 charts/index.tsx）。這裡另外準備幾種
-// 不同風格的候選色票，讓使用者在 Storybook 直接切換／並排比較，選定後才把結果寫回 index.css。
+// 目前上線色票＝index.css 的 --chart-1..8（Gem，見 charts/index.tsx）。這裡另外保留幾種
+// 不同風格的候選色票供未來比較，選定新色票時把結果寫回 index.css。
 // 色彩檢查（亮度帶/彩度/CVD 分離/對比）皆用 dataviz 技能的 validate_palette.js 對「本站實際
-// 淺色 #ffffff／深色 #020817 版面」實測，不是目測；下方 checksLight/checksDark 為其結果摘要。
+// 淺色 #ffffff／深色 #101319 版面」實測，不是目測；下方 checksLight/checksDark 為其結果摘要。
+// 注意：深色背景 #101319 是暗黑模式色彩系統設計（表面抬升層次）之後的值；Gem 已對此重新驗證，
+// 其餘 6 組候選（Cobalt/Vivid/Deep/Pastel/Aqua/Bold）的 checksDark 仍是背景改版前（舊值 #020817）
+// 的驗證結果，僅供風格參考，若要重新啟用需先對 #101319 重跑驗證器。
 //
 // Aqua／Gem 取材自 figma.com/color-palettes 的調查（該站對自動化擷取回 403，改以搜尋結果核對）：
 // Aqua＝「dashboard／專業」類命名色票的共通方向（cyan/藍灰組合）；「信任感」方向（cool gray+深綠+棕）
@@ -31,7 +34,7 @@ interface ThemeDef {
 
 const THEMES: Record<string, ThemeDef> = {
   cobalt: {
-    name: "Cobalt（目前上線）",
+    name: "Cobalt（先前上線）",
     mood: "藍色主導、專業感；dataviz 技能內建的驗證色票。",
     light: ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948", "#e87ba4", "#eb6834"],
     dark: ["#3987e5", "#199e70", "#c98500", "#008300", "#9085e9", "#e66767", "#d55181", "#d95926"],
@@ -79,14 +82,14 @@ const THEMES: Record<string, ThemeDef> = {
     checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 16.2"], ["對比", "pass"]],
   },
   gem: {
-    name: "Gem（推薦：綜合 6 個 Figma 寶石色票研究）",
+    name: "Gem（目前上線）",
     mood: "取材自使用者提供的 6 個 Figma 命名色票（Mermaid Garnet Symphony／Copper Aquamarine Dream／" +
       "Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz Afternoon／Emerald Sand Dusk）共通的" +
       "寶石色調方向，抽出 8 個各自獨立的寶石色相組成一套分類色票：藍寶石／祖母綠／石榴石／黃玉／紫水晶／" +
       "粉晶／紅玉髓／海藍寶石。黃玉／紅玉髓原本色相只差 11°、容易讀成同一種棕色，已分別推向金黃(H45°)／" +
       "紅橙(H14°)拉開到 31° 差距，更貼近寶石本名色澤。淺／深色模式四項檢查皆零警示全過，與 Bold 並列最乾淨。",
     light: ["#1d4ed8", "#0e8a5f", "#a3123a", "#b88d0a", "#7e3af2", "#db5a79", "#cf4217", "#0e9488"],
-    dark: ["#2251e0", "#0e8a5f", "#c11f4a", "#b88d0a", "#7e3af2", "#db5a79", "#cf4217", "#0e9488"],
+    dark: ["#2a5ae5", "#0e8a5f", "#c11f4a", "#b88d0a", "#7e3af2", "#db5a79", "#cf4217", "#0e9488"],
     checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 15.7"], ["對比", "pass"]],
     checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 13.8"], ["對比", "pass"]],
   },
@@ -105,7 +108,7 @@ const LINE_SERIES = [
 
 const SURFACE = {
   light: { bg: "#ffffff", axis: "#cbd5e1", grid: "#eef2f6", text: "#475569", ink: "#0f172a" },
-  dark: { bg: "#020817", axis: "#3a465c", grid: "#131c2b", text: "#94a3b8", ink: "#f1f5f9" },
+  dark: { bg: "#101319", axis: "#3a465c", grid: "#131c2b", text: "#94a3b8", ink: "#f1f5f9" },
 } as const;
 
 function MiniMultiLine({ colors, axis, grid }: { colors: string[]; axis: string; grid: string }) {
@@ -155,7 +158,7 @@ function ThemePreview({ theme, surfaceMode }: { theme: ThemeDef; surfaceMode: "l
   return (
     <div style={panelStyle}>
       <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: s.text }}>
-        {surfaceMode === "light" ? "淺色版面 #ffffff" : "深色版面 #020817"}
+        {surfaceMode === "light" ? "淺色版面 #ffffff" : "深色版面 #101319"}
       </p>
       <StackedBar
         rows={CATS.map((label, i) => ({ label, segments: [{ label, value: HEADCOUNT[i], color: colors[i] }] }))}

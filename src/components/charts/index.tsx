@@ -5,8 +5,8 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { ntd } from "@/lib/utils";
 
-// 色票讀取 index.css 的 --chart-1..8／--chart-axis/grid/text（Cobalt，經 dataviz 技能驗證器
-// 驗證通過 CVD 分離／彩度/對比；深色步階已備於 .dark，切換未啟用時 var() 直接吃 :root 值）。
+// 色票讀取 index.css 的 --chart-1..8／--chart-axis/grid/text（Gem 寶石色票，經 dataviz 技能
+// 驗證器驗證通過 CVD 分離／彩度/對比；深色步階已備於 .dark，切換未啟用時 var() 直接吃 :root 值）。
 // SVG 的 fill/stroke 屬性可直接解析 var()，故色票只需在 CSS 單一來源改一次即可全站同步。
 export const PALETTE = [
   "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)",

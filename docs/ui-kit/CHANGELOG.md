@@ -3,6 +3,18 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.10.0] - 2026-07-08
+
+### 變更（圖表色票定案：Cobalt → Gem 寶石色票）
+- **`--chart-1..8`（`index.css`）改為「Gem」**：綜合使用者指定的 6 個 Figma 命名色票（Mermaid Garnet
+  Symphony／Copper Aquamarine Dream／Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz
+  Afternoon／Emerald Sand Dusk）研究後，抽出 8 個彼此獨立的寶石色相：藍寶石 `#1d4ed8`／祖母綠
+  `#0e8a5f`／石榴石 `#a3123a`／黃玉 `#b88d0a`／紫水晶 `#7e3af2`／粉晶 `#db5a79`／紅玉髓 `#cf4217`／
+  海藍寶石 `#0e9488`。淺、深色模式皆通過亮度帶／彩度/CVD 分離/對比四項檢查、零警示（深色藍寶石另配
+  較亮的 `#2a5ae5` 步階，以通過暗黑模式改版後的新背景 `#101319`）。完整研究/比較過程見
+  `src/components/ChartThemes.stories.tsx`（保留 Cobalt/Vivid/Deep/Pastel/Aqua/Bold 供未來參考）。
+- 黃玉／紅玉髓原本色相只差 11°、容易讀成同一種棕色，已拉開到 31° 差距（更貼近寶石本名色澤）。
+
 ## [0.9.0] - 2026-07-08
 
 ### 變更（圖表色票 token 化＋改用「Cobalt」驗證色票）

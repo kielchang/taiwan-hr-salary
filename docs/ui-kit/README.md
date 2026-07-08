@@ -33,7 +33,7 @@ app 內部可漸進改用 `import { Button, DataTable } from "@/components"`。
 - **基礎角色**（shadcn）：`background/foreground`・`primary`・`secondary`・`muted`・`accent`・`destructive`・`border`・`input`・`ring`・`popover`・`card`。
 - **狀態色**：`success`（良好/正差異）・`warning`（警示）・`info`（提示/參考）・`danger`（負值/錯誤）— 各含 `-foreground`。
 - **已變更態** `edit`：`edit`（邊框）・`edit-foreground`（文字）・`edit-bg`（底色）——唯讀逐欄編輯的 amber 標色。
-- **圖表**：`charts/index.tsx` 的 `PALETTE`（8 色類別型，「Cobalt」）＋ `--chart-axis/grid/text`，定義於 `index.css`（SVG `fill`/`stroke` 直接吃 `var()`，不經 `hsl()`）；經色票驗證器實測通過亮度帶/彩度/CVD 分離/對比四項檢查（原色票未過，已於 0.9.0 換掉）。深色步階已備於 `.dark`。
+- **圖表**：`charts/index.tsx` 的 `PALETTE`（8 色類別型，「Gem」寶石色票：藍寶石/祖母綠/石榴石/黃玉/紫水晶/粉晶/紅玉髓/海藍寶石）＋ `--chart-axis/grid/text`，定義於 `index.css`（SVG `fill`/`stroke` 直接吃 `var()`，不經 `hsl()`）；經色票驗證器實測通過亮度帶/彩度/CVD 分離/對比四項檢查、零警示（0.10.0）。深色步階已備於 `.dark`。研究/比較過程與其餘候選色票見 Storybook「元件庫 / 圖表色票主題（比較用）」。
 - **深色**：`.dark` 值經過刻意的 UI/UX 色彩設計（非機械式反轉）——沿用品牌冷靛藍色相、飽和度由 84%
   降到 16–22%，並建立 5 級表面抬升層次（background < card < popover < muted/secondary/accent < border/input）；
   語意狀態色/圖表色皆用 dataviz 技能 `validate_palette.js` 的 `contrast()` 重新對新背景驗證過（WCAG，非目測）。
