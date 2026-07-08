@@ -19,10 +19,11 @@ storage undefined 時先想到這裡，不要改測試本身。
 ## 分支與部署慣例
 
 - 開發分支：`claude/salary-calculator-react-shadcn-stxjp7`（所有變更先 commit 到這裡並 push）。
-- **三環境（同一 Pages 站、子路徑區分）**：main→`/`（PROD 正式站）、`stage`→`/stage/`（STAGE 預覽）、
-  開發分支→`/dev/`（DEV）。因 `base:"./"`＋HashRouter，同一 build 可掛任一子路徑。畫面右上依 `APP_ENV`
-  顯示 STAGE/DEV 徽章（PROD 不顯示）。`deploy-pages.yml` 於任一分支 push 時**重組三環境整站發佈**
-  （官方 Pages＝單一 artifact；stage/dev build 失敗不擋正式站）。
+- **三環境（gh-pages 分支、每環境獨立、子路徑區分）**：main→根（PROD 正式站）、`stage`→`/stage`（STAGE 預覽）、
+  開發分支→`/dev`（DEV）。因 `base:"./"`＋HashRouter，同一 build 可掛任一子路徑。畫面右上依 `APP_ENV`
+  顯示 STAGE/DEV 徽章（PROD 不顯示）。`deploy-pages.yml`：**推哪個分支就只重建並只更新該環境**
+  （peaceiris/actions-gh-pages＋`keep_files`，其餘子目錄不動；main 才跑驗收測試＋打版號）。
+  **Pages 來源需設「Deploy from a branch：gh-pages / root」**。
   URL：正式 <https://kielchang.github.io/taiwan-hr-salary/>、預覽 `…/stage/`、開發 `…/dev/`（各含 `/storybook`）。
 - 上線＝merge 到 `main` push → `deploy-pages.yml`（跑驗收測試＋build＋Pages 發佈）。
   **merge main 前務必取得使用者同意**（deploy 即正式上線）。

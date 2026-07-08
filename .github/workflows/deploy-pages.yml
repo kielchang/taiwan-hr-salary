@@ -1,11 +1,13 @@
 name: Deploy to GitHub Pages
 
-# 多環境部署（同一 Pages 站、以子路徑區分）：
-#   main  → /            （正式站 · PROD）
-#   stage → /stage/      （預覽 · STAGE）
-#   dev   → /dev/        （開發 · DEV，對應 claude/salary-calculator-react-shadcn-stxjp7）
+# 多環境部署（gh-pages 分支、每環境獨立、以子路徑區分）：
+#   main  → gh-pages 根目錄 → /            （正式站 · PROD）
+#   stage → gh-pages /stage  → /stage/      （預覽 · STAGE）
+#   dev   → gh-pages /dev    → /dev/        （開發 · DEV，claude/salary-calculator-react-shadcn-stxjp7）
+#
+# 設計：推哪個分支就「只重建並只更新那個環境」，其餘子目錄以 keep_files 保留、完全不動。
 # 因 Vite base 為相對路徑（"./"）＋ HashRouter，同一份 build 可掛任一子路徑，免逐環境改 base。
-# 每次任一分支有 push 都會重新組裝三個環境後整站發佈（官方 Pages 部署為單一 artifact＝整站）。
+# Pages 來源需設為「Deploy from a branch：gh-pages / root」。
 on:
   push:
     branches:
@@ -14,115 +16,70 @@ on:
       - claude/salary-calculator-react-shadcn-stxjp7
   workflow_dispatch:
 
+# gh-pages 部署以 git push 寫入 gh-pages 分支，需 contents: write
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# 同時間僅允許一個部署，不取消進行中的正式部署
+# 序列化對 gh-pages 分支的寫入，避免同時 push 衝突
 concurrency:
-  group: pages
+  group: gh-pages-deploy
   cancel-in-progress: false
 
 jobs:
-  # 正式環境（main）：跑驗收測試把關，注入 APP_ENV=prod（畫面不顯示徽章）。
-  build-prod:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { ref: main }
+
+      - name: Resolve environment（依分支決定 APP_ENV 與 gh-pages 子目錄）
+        id: env
+        run: |
+          case "${{ github.ref_name }}" in
+            main)  echo "app_env=prod"  >> "$GITHUB_OUTPUT"; echo "dest=."     >> "$GITHUB_OUTPUT" ;;
+            stage) echo "app_env=stage" >> "$GITHUB_OUTPUT"; echo "dest=stage" >> "$GITHUB_OUTPUT" ;;
+            *)     echo "app_env=dev"   >> "$GITHUB_OUTPUT"; echo "dest=dev"   >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "已解析：分支=${{ github.ref_name }} → app_env / dest 如上"
+
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
       - run: npm ci
+
+      # 僅正式站（main）跑驗收測試把關；預覽環境求快，build 過即可。
       - name: Run acceptance tests (README §9)
+        if: github.ref_name == 'main'
         run: npm test
-      - name: Build (prod)
-        run: npm run build
-        env: { APP_ENV: prod }
-      - name: Build Storybook
-        run: npm run build-storybook -- -o dist/storybook
-      - uses: actions/upload-artifact@v4
-        with: { name: site-prod, path: dist, retention-days: 1 }
 
-  # 預覽環境（stage）：build 失敗不擋正式站（continue-on-error）；分支不存在時此 job 失敗即略過該預覽。
-  build-stage:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-        with: { ref: stage }
-      - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
-      - run: npm ci
-      - name: Build (stage)
+      - name: Build（注入 APP_ENV）
         run: npm run build
-        env: { APP_ENV: stage }
-      - name: Build Storybook
-        run: npm run build-storybook -- -o dist/storybook
-      - uses: actions/upload-artifact@v4
-        with: { name: site-stage, path: dist, retention-days: 1 }
+        env:
+          APP_ENV: ${{ steps.env.outputs.app_env }}
 
-  # 開發環境（dev）：同上，對應 claude 開發分支。
-  build-dev:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-        with: { ref: claude/salary-calculator-react-shadcn-stxjp7 }
-      - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
-      - run: npm ci
-      - name: Build (dev)
-        run: npm run build
-        env: { APP_ENV: dev }
-      - name: Build Storybook
+      - name: Build Storybook（發佈於各環境 /storybook）
         run: npm run build-storybook -- -o dist/storybook
-      - uses: actions/upload-artifact@v4
-        with: { name: site-dev, path: dist, retention-days: 1 }
 
-  # 組裝三環境為單一 Pages artifact（prod 置根、stage/dev 置子目錄）後部署。
-  # 僅要求 prod 成功；stage/dev 缺任一（build 失敗或分支不存在）則該子路徑本次不更新。
-  assemble-deploy:
-    needs: [build-prod, build-stage, build-dev]
-    if: ${{ !cancelled() && needs.build-prod.result == 'success' }}
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Download prod (root)
-        uses: actions/download-artifact@v4
-        with: { name: site-prod, path: site }
-      - name: Download stage (/stage)
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with: { name: site-stage, path: site/stage }
-      - name: Download dev (/dev)
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with: { name: site-dev, path: site/dev }
-      - name: Show assembled layout
-        run: find site -maxdepth 2 -type d | sort
-      - uses: actions/configure-pages@v5
-        with: { enablement: true }
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # 只把本環境的 dist 發佈到 gh-pages 的對應子目錄；keep_files 保留其他環境內容。
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: ${{ steps.env.outputs.dest }}
+          keep_files: true
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_message: "deploy ${{ steps.env.outputs.app_env }} @ ${{ github.sha }}"
 
   # 依 package.json 版號自動打 tag 並建立 GitHub Release（僅 main 推送、該版已存在則略過）。
-  # 版號 bump 時才會產生新 Release；發佈流程見 docs/versioning.md。
   release:
-    needs: build-prod
-    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: deploy
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with: { ref: main }
-
       - name: Tag & Release when version bumped
         env:
           GH_TOKEN: ${{ github.token }}
@@ -136,5 +93,5 @@ jobs:
           NOTES="$(awk -v v="$VER" '/^## \[/{on=($0 ~ ("\\[" v "\\]"))} on' CHANGELOG.md)"
           [ -z "$NOTES" ] && NOTES="詳見 CHANGELOG.md"
           printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
-          gh release create "$TAG" --target "$(git rev-parse HEAD)" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
           echo "已建立 Release $TAG"
