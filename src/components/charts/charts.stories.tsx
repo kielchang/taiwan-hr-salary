@@ -14,6 +14,26 @@ const bars = [
 ];
 const trend = ["1月", "2月", "3月", "4月", "5月", "6月"].map((label, i) => ({ label, value: 4_800_000 + i * 120_000 }));
 
+/** 互動 Playground：右側 Controls 調整**類別數／期數**與圖表類型，即時看不同資料量下的呈現。 */
+export const 互動: StoryObj<{ 圖表: "長條圖" | "柏拉圖" | "趨勢圖"; 資料點數: number; 顯示數值: boolean }> = {
+  args: { 圖表: "長條圖", 資料點數: 5, 顯示數值: true },
+  argTypes: {
+    圖表: { control: "inline-radio", options: ["長條圖", "柏拉圖", "趨勢圖"] },
+    資料點數: { control: { type: "range", min: 1, max: 24, step: 1 } },
+    顯示數值: { control: "boolean" },
+  },
+  render: (a) => {
+    const data = Array.from({ length: a.資料點數 }, (_, i) => ({ label: a.圖表 === "趨勢圖" ? `${i + 1}月` : `類別${i + 1}`, value: Math.round(1_200_000 / (i + 1)) + (i % 3) * 50_000 }));
+    return (
+      <div className="w-[460px]">
+        {a.圖表 === "長條圖" && <BarChart data={data} showValues={a.顯示數值} />}
+        {a.圖表 === "柏拉圖" && <Pareto data={data} />}
+        {a.圖表 === "趨勢圖" && <TrendChart data={data} />}
+      </div>
+    );
+  },
+};
+
 export const 堆疊長條_StackedBar: S = {
   render: () => (
     <div className="w-[420px]">

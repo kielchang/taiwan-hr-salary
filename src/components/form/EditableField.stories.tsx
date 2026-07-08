@@ -19,6 +19,40 @@ function Demo(props: EditableFieldProps) {
   );
 }
 
+/** 互動 Playground：右側 Controls 即時切換型態（text/money/rate/select/radio/multiselect…）、
+ *  改值/原值看變更態、切鎖定，快速驗證各種狀況。 */
+export const 互動: StoryObj<{ label: string; kind: EditableFieldProps["kind"]; value: string; original: string; disabled: boolean; help: string; unit: string }> = {
+  args: { label: "欄位名稱", kind: "text", value: "示例值", original: "示例值", disabled: false, help: "", unit: "" },
+  argTypes: {
+    kind: { control: "select", options: ["text", "number", "money", "rate", "date", "select", "checkbox", "radio", "multiselect"] },
+    disabled: { control: "boolean" },
+    label: { control: "text" }, value: { control: "text" }, original: { control: "text" }, help: { control: "text" }, unit: { control: "text" },
+  },
+  render: (a) => <PlayField key={`${a.kind}|${a.value}|${a.original}`} {...a} />,
+};
+
+function PlayField(a: { label: string; kind: EditableFieldProps["kind"]; value: string; original: string; disabled: boolean; help: string; unit: string }) {
+  const opts = [{ value: "甲", label: "甲" }, { value: "乙", label: "乙" }, { value: "丙", label: "丙" }];
+  const coerce = (v: string): EditableFieldProps["value"] => {
+    switch (a.kind) {
+      case "money": case "number": case "rate": return Number(v) || 0;
+      case "checkbox": return v === "true" || v === "是";
+      case "multiselect": return String(v).split(/[、,]/).map((s) => s.trim()).filter(Boolean);
+      default: return v;
+    }
+  };
+  const [val, setVal] = useState<EditableFieldProps["value"]>(() => coerce(a.value));
+  return (
+    <div className="w-72">
+      <EditableField
+        label={a.label} kind={a.kind} value={val} original={coerce(a.original)} options={opts}
+        disabled={a.disabled} help={a.help || undefined} unit={a.unit || undefined}
+        onChange={setVal} onRevert={() => setVal(coerce(a.original))}
+      />
+    </div>
+  );
+}
+
 export const 唯讀文字: Story = { render: () => <Demo label="部門" kind="text" value="行銷部" original="行銷部" /> };
 export const 已變更_文字: Story = { render: () => <Demo label="部門" kind="text" value="測試部" original="行銷部" /> };
 export const 金額: Story = { render: () => <Demo label="本薪" kind="money" value={45000} original={45000} /> };

@@ -54,6 +54,51 @@ export const 資料表_DataTable: S = {
   ),
 };
 
+/**
+ * 互動 Playground：用右側 Controls 即時調整**資料筆數**與各項開關（分頁/斑馬紋/緊湊/十字對準/
+ * 可調欄寬/搜尋），快速驗證多種狀況——不用改程式碼。
+ */
+export const 互動測試: StoryObj<{
+  資料筆數: number; 每頁筆數: number; 搜尋: boolean; 斑馬紋: boolean; 緊湊: boolean; 十字對準: boolean; 可調欄寬: boolean;
+}> = {
+  args: { 資料筆數: 42, 每頁筆數: 15, 搜尋: true, 斑馬紋: true, 緊湊: false, 十字對準: true, 可調欄寬: true },
+  argTypes: {
+    資料筆數: { control: { type: "range", min: 0, max: 200, step: 1 } },
+    每頁筆數: { control: { type: "inline-radio" }, options: [5, 15, 30, 50] },
+    搜尋: { control: "boolean" }, 斑馬紋: { control: "boolean" }, 緊湊: { control: "boolean" },
+    十字對準: { control: "boolean" }, 可調欄寬: { control: "boolean" },
+  },
+  render: (a) => {
+    const data = Array.from({ length: a.資料筆數 }, (_, i) => ({
+      id: `E${String(i + 1).padStart(3, "0")}`, name: `員工${i + 1}`,
+      dept: DEPTS[i % DEPTS.length], title: TITLES[i % TITLES.length],
+      total: 30000 + ((i * 3700) % 180000), tenure: (i * 7) % 130,
+    }));
+    return (
+      <div className="max-w-3xl">
+        <DataTable
+          rows={data}
+          getRowKey={(r) => r.id}
+          pageSize={a.每頁筆數}
+          searchable={a.搜尋}
+          zebra={a.斑馬紋}
+          dense={a.緊湊}
+          crosshair={a.十字對準}
+          resizable={a.可調欄寬}
+          empty={{ title: "資料筆數＝0（拉右側 Controls 調整）" }}
+          columns={[
+            { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => `${r.name} ${r.id}`, cell: (r) => <><span className="font-medium">{r.name}</span><span className="ml-1.5 text-xs text-muted-foreground">{r.id}</span></> },
+            { key: "dept", header: "部門", sortValue: (r) => r.dept, filter: "select", cell: (r) => r.dept },
+            { key: "title", header: "職稱", sortValue: (r) => r.title, filter: "select", cell: (r) => r.title },
+            { key: "tenure", header: "年資（月）", numeric: true, sortValue: (r) => r.tenure, cell: (r) => `${r.tenure} 月` },
+            { key: "total", header: "月薪總額", numeric: true, sortValue: (r) => r.total, cell: (r) => ntd(r.total), total: (rs) => ntd(rs.reduce((x, r) => x + r.total, 0)) },
+          ]}
+        />
+      </div>
+    );
+  },
+};
+
 /** 小資料集（無分頁）：純示範欄位設定與合計列 */
 export const 資料表_精簡: S = {
   render: () => (
