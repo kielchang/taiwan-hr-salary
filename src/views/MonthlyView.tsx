@@ -1,3 +1,9 @@
+// 當月異動輸入（每月結算第 ① 步）。設計原理：
+//  - 只填「當月變動」：加班/請假時數、獎金（＋累計）、其他加減項、代扣稅；固定薪資與津貼
+//    在基本資料設定（此頁提示可直達 ?emp=），避免每月重填。
+//  - 效率動線：帶入上月異動（**不帶獎金與代扣稅**，防誤重發）、儲存並下一位、全部帶入；
+//    累計獎金由 ytdBonusBefore 自動帶入（餵二代健保 4× 門檻）。
+//  - 已確認月＝硬鎖定，異動不可改（store 守衛＋UI 預先提示）。
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";

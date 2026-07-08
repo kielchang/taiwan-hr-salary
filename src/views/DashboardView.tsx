@@ -1,3 +1,8 @@
+// 本月工作台（首頁 /）＝待辦聚合儀表板。設計原理：
+//  - 把散在各頁的「本月該做什麼」集中成待辦卡：待處理驗證、未確認結算、加/退/停/復保、
+//    級距調整、排程調薪到期…每張卡＝數字＋說明＋一鍵直達（?tab=/?emp= 深連結）。
+//  - 資料全部由既有純函數即時導出（validateAll／enrollmentWorklist／bracketWorklist…），
+//    工作台不持有自己的狀態，只做聚合與導引；0 待辦時以綠色「無待辦」呈現，給明確完成感。
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

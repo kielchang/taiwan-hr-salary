@@ -1,3 +1,7 @@
+// 專案之家（/projects）＝專案主檔 ＋ 工時分攤 ＋ 成本/EAC 分析的整合入口。設計原理：
+//  - 主檔（ProjectMasterCard）維護專案基本資料/預算/起訖；分攤（AllocationEditor）記每人每月
+//    投入各專案的工時或百分比；成本頁以 projectCost/projectTrend 純函數算專案別全載成本與 EAC。
+//  - 未投入專案的殘量歸「未分攤/間接」桶，確保 Σ專案成本＝Σ全公司雇主總成本（勾稽恆等）。
 import { useState } from "react";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows } from "@/store/selectors";

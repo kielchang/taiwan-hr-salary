@@ -1,3 +1,10 @@
+// 薪酬分析（/analytics）＝規劃與試算中心（「試算」徽章，與 actual 報表分流）。設計原理：
+//  - 三層內容：月報（成本結構/分布公平/等級/市場 compa）、規劃試算沙盒（獎金池/調薪方案/
+//    預算試算）、年報（累計＋以 simulateAnnual 補估未來月）。
+//  - **沙盒即時輸入、不寫回薪資**（刻意例外：唯讀-送出會破壞試算體驗）；唯一會寫回的是
+//    RaiseTab 核定套用（呼叫 store.applyRaise／scheduleRaises，並記稽核）。
+//  - 判讀文字全部委給純函數 insights（analyzeXxx），本頁只組裝圖表卡（ChartCard）與表格
+//    （DataTable）＋輸入控制；計算量大者用既有 selectors 逐期重算。
 import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

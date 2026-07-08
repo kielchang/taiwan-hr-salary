@@ -1,3 +1,9 @@
+// 報表與申報中心（/reports）＝所有「對外（員工／主管機關）實際報表」的**單一出口**。
+// 設計原理：
+//  - 兩大群組：月結報表（ReportsView：薪資條/匯總/代扣稅）與年度申報名冊（FilingView：扣繳
+//    憑單/繳費清單/級距申報/加退保）。規劃試算類報表刻意放「規劃與分析」，與 actual 分流。
+//  - 報表沿用全域月份，但在此醒目顯示並可直接切換（避免印錯月份）；未確認月標「暫定」。
+//  - 支援 ?tab= 深連結（工作台待辦一鍵跳到對應報表），消化後即清除參數避免殘留。
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn, formatPeriod } from "@/lib/utils";

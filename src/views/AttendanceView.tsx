@@ -1,3 +1,7 @@
+// 出勤打卡（/attendance）＝打卡紀錄與工時參考。設計原理：
+//  - 打卡/匯入產生 PunchRecord，彙整每人當月工時供「當月異動」加班填寫時**參考**。
+//  - 刻意**不自動回填**加班分級（平日/休息日/國定的倍率判定涉規則與例外，使用者要求人工確認）；
+//    此頁只呈現參考工時，不直接寫回薪資事件。
 import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";

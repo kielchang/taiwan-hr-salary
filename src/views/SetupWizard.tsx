@@ -1,3 +1,7 @@
+// 初始設定引導（/setup，首次使用時 App 守門導向）。設計原理：
+//  - 四步：歡迎 → 公司設定 → 員工資料 → 完成；完成時設 setupCompleted＝true，之後不再進入。
+//  - 兩條入門路徑：「載入範例公司」（demo 資料，快速體驗）或「從空白開始」（自行建檔）。
+//  - 只收最少必要資訊即可上路；細節（津貼/眷屬/政策）留待進入後於主檔/設定補齊。
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

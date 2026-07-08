@@ -1,3 +1,7 @@
+// 工時分攤編輯（專案之家內）。設計原理：
+//  - 逐員逐月記「投入各專案」的比例：mode＝pct（百分比合計 ≤100%）或 hours（時數 ≤可用工時）；
+//    超額由 V11 驗證警示（成本占比/稼動率會失真）。可「沿用上月」快速帶入。
+//  - 只記分攤權重、不算錢；金額分攤由 projectCost 依此權重把全載成本拆到各專案。
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

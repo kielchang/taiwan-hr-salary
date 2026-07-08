@@ -1,3 +1,11 @@
+// 基本資料（員工主檔，/master）＝每位員工單一檔案：基本／固定薪資項目／眷屬與扣繳三分頁。
+// 設計原理：
+//  - 編輯採**唯讀逐欄編輯範本**（EditableField）：預設唯讀、點欄才輸入、變更標色＋undo/redo、
+//    送出前 ChangeSummary 列「舊→新」。新增為直接可輸入；當期已確認時薪資相關欄位顯示鎖定
+//    （吃 store 硬鎖定 PAY_KEYS）。此頁是全站表單互動的示範樣板。
+//  - 生命週期：狀態 5 種（在職/離職/留停/停職/暫離）＋生效日/復職日/逐案給薪比例；固定薪資
+//    含 8 標準欄＋自訂津貼，公司預設（salaryDefaults）於新增時帶入。
+//  - 支援 ?emp= 深連結（工作台/每月作業跳轉直接開啟該員）。
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";

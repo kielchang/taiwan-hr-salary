@@ -1,3 +1,7 @@
+// 每月薪資作業＝兩步驟精靈：① MonthlyView 輸入當月異動（加班/請假/獎金）→ ② ReviewView
+// 查核與確認。目前步驟由父層（App 的 /payroll/:step 路由）以網址控制、透過 onStep 切換。
+// 設計：發薪月份與步驟列在此統一顯示，子頁不重複；確認後 review 步驟標為完成，並引導往
+// 「報表與申報」（actual 單一出口）。報表已不在此流程內（見 App.tsx 動線決策）。
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

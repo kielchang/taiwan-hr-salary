@@ -1,3 +1,7 @@
+// 年度申報與名冊（ReportsHub 的 filing 群組）。設計原理：
+//  - 四類申報/名冊：年度扣繳憑單彙整、勞健退繳費清單、投保級距申報調整、加退保作業
+//    （加保/退保/停保/復保 4 類，依生命週期日期）。皆由 lib/reports/* 純函數導出、DataTable 呈現。
+//  - 名冊為**提醒性質**：列出應辦項目供人工至各機關辦理，系統不自動改保費（如健保續保自費依規定）。
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";

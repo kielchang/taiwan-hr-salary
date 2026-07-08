@@ -1,3 +1,9 @@
+// 系統設定（/settings）＝法定參數、公司政策、投保級距、資料維運、稽核、關於。設計原理：
+//  - 法定費率/門檻（parameters）與投保級距（brackets）可調但受硬鎖定守衛（當期已確認即不可改）。
+//  - 公司政策卡：LeavePolicyCard（非在職狀態給薪比例預設）、SalaryDefaultsCard（新進固定薪資
+//    /津貼預設，供主檔新增帶入）。投保級距主檔（BracketTables）刻意**唯讀檢視**（年度更新流程待議）。
+//  - 資料維運：整檔備份/還原（JSON envelope）、清空；稽核軌跡以 DataTable 呈現；關於卡顯示
+//    app 版號/commit/建置時間（對回部署版本）。敏感異動皆入稽核。
 import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";

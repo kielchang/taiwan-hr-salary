@@ -1,3 +1,9 @@
+// 查核與確認（每月結算第 ② 步，也是資料凍結點）。設計原理：
+//  - 呈現全公司當月試算總覽 ＋ 系統檢查（validateAll／allocationIssues），讓錯誤在確認前浮現。
+//  - 確認 doConfirm＝**先留存當月實際快照（buildSnapshot）再 confirmPeriod 凍結**：快照供年報
+//    累計與趨勢/環比（不必回頭重算歷史）；confirmPeriod 後該期進入硬鎖定（見 store）。
+//  - 可「取消確認」（unconfirmPeriod）→ store 會一併刪除該期快照，重新確認時以最新資料重建，
+//    避免趨勢讀到失真快照。
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

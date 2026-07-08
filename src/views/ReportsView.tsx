@@ -1,3 +1,7 @@
+// 月結報表（ReportsHub 的 monthly 群組）。設計原理：
+//  - 三分頁：薪資條（可逐張列印/批次匯出加密 PDF，身分證為開啟密碼）、匯總（部門/成本中心/
+//    專案）、代扣所得稅。資料沿用當期 selectors 結算列，與畫面數字一致。
+//  - 列印靠 @media print＋PrintHeader/頁尾版號；批次 PDF/ZIP 以動態 import 延遲載入 jspdf。
 import { useState, useRef, createElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
