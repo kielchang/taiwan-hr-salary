@@ -6,10 +6,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
+import { STORAGE_KEY } from "@/store/usePayrollStore";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const KEY = "taiwan-hr-salary:v1";
+// 儲存鍵依環境分隔（測試環境 APP_ENV 預設 dev → 後綴 :dev）；由 store 匯出以保持一致。
+const KEY = STORAGE_KEY;
 
 async function mountAt(path: string) {
   vi.resetModules(); // 讓 store 以目前 localStorage 重新水合

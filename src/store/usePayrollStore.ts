@@ -33,6 +33,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { APP_ENV } from "@/version";
 import { DEFAULT_PARAMETERS, type Parameters } from "@/config/parameters";
 import { DEFAULT_BRACKETS, type InsuranceBrackets } from "@/config/brackets";
 import type {
@@ -71,7 +72,10 @@ import { buildDemoCompany } from "@/data/demoCompany";
 // persist 水合後若已有本機資料則覆蓋此預設；僅新安裝/還原/清空後套用。
 const DEMO = buildDemoCompany();
 
-const STORAGE_KEY = "taiwan-hr-salary:v1"; // localStorage 鍵
+// localStorage 鍵：**依環境分隔**。三環境（prod/stage/dev）同 origin（kielchang.github.io，
+// 僅路徑不同），localStorage 依 origin 共用；若不分鍵，在 /dev 動資料會污染正式站與 /stage。
+// 正式站保留原鍵（不改＝既有使用者資料不流失）；stage/dev 各自加後綴，資料互不干擾。
+export const STORAGE_KEY = `taiwan-hr-salary:v1${APP_ENV === "stage" ? ":stage" : APP_ENV === "dev" ? ":dev" : ""}`;
 export const STORE_VERSION = 2; // 資料結構版本（v2：新增專案主檔與工時分攤）
 
 const DEFAULT_ATTENDANCE: AttendanceConfig = {
