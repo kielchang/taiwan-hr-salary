@@ -4,7 +4,7 @@
 //    /津貼預設，供主檔新增帶入）。投保級距主檔（BracketTables）刻意**唯讀檢視**（年度更新流程待議）。
 //  - 資料維運：整檔備份/還原（JSON envelope）、清空；稽核軌跡以 DataTable 呈現；關於卡顯示
 //    app 版號/commit/建置時間（對回部署版本）。敏感異動皆入稽核。
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { SALARY_ITEMS, type SalaryNumKey } from "@/views/MasterDataView";
@@ -151,35 +151,33 @@ export function SettingsView() {
   const [showBrackets, setShowBrackets] = useState(false);
   const [secTab, setSecTab] = useState<SecTab>("legal");
 
-  const renderField = (f: Field, tone: "company" | "legal") => {
-    const raw = parameters[f.key];
-    const display = f.kind === "rate" ? String(Math.round((raw as number) * 10000) / 100) : String(raw);
-    const onChange = (v: string) => {
-      if (f.kind === "date") return setParameters({ [f.key]: v } as Partial<Parameters>);
-      const num = v === "" ? 0 : Number(v);
-      setParameters({ [f.key]: f.kind === "rate" ? num / 100 : num } as Partial<Parameters>);
-    };
-    return (
-      <div key={f.key} className="space-y-1">
-        <Label className="text-xs">{f.label}</Label>
-        <div className="flex items-center gap-1.5">
-          <Input
-            type={f.kind === "date" ? "date" : "number"}
-            step={f.kind === "rate" ? "0.01" : undefined}
-            className={`h-8 ${tone === "company" ? "col-assumption" : "col-input"}`}
-            value={display}
-            disabled={locked}
-            title={locked ? "本月已確認結算，參數已鎖定" : undefined}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          <span className="w-5 shrink-0 text-xs text-muted-foreground">
-            {f.kind === "rate" ? "%" : f.kind === "money" ? "元" : ""}
-          </span>
-        </div>
-        {f.help && <p className="text-[11px] leading-snug text-muted-foreground">{f.help}</p>}
-      </div>
-    );
+  // 參數改「唯讀逐欄編輯＋送出」：本地草稿，改值標黃、底部黏著列一次套用（取代逐鍵即時寫入，
+  // 亦避免每次按鍵都寫一筆稽核）。外部變更（重置/還原）時以 effect 重新同步草稿。
+  const [paramDraft, setParamDraft] = useState<Parameters>(parameters);
+  useEffect(() => setParamDraft(parameters), [parameters]);
+  const efKind = (k: Field["kind"]): FieldSpec["kind"] => (k === "int" ? "number" : k);
+  const PARAM_SPECS: FieldSpec[] = [...COMPANY_FIELDS, ...LEGAL_GROUPS.flatMap((g) => g.fields)].map((f) => ({ key: f.key as string, label: f.label, kind: efKind(f.kind) }));
+  const paramChanges = diffRecord(parameters as unknown as Record<string, unknown>, paramDraft as unknown as Record<string, unknown>, PARAM_SPECS);
+  const applyParams = () => {
+    const patch: Partial<Parameters> = {};
+    for (const c of paramChanges) (patch as Record<string, unknown>)[c.field] = (paramDraft as unknown as Record<string, unknown>)[c.field];
+    setParameters(patch);
   };
+
+  const renderField = (f: Field) => (
+    <EditableField
+      key={f.key}
+      label={f.label}
+      kind={efKind(f.kind)}
+      value={paramDraft[f.key] as string | number}
+      original={parameters[f.key] as string | number}
+      help={f.help}
+      disabled={locked}
+      lockHint="本月已確認結算，參數已鎖定（先取消確認才能修改）"
+      onChange={(v) => setParamDraft((d) => ({ ...d, [f.key]: v }))}
+      onRevert={() => setParamDraft((d) => ({ ...d, [f.key]: parameters[f.key] }))}
+    />
+  );
 
   return (
     <div className="space-y-4">
@@ -220,7 +218,7 @@ export function SettingsView() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2">
-            {COMPANY_FIELDS.map((f) => renderField(f, "company"))}
+            {COMPANY_FIELDS.map((f) => renderField(f))}
           </div>
         </CardContent>
       </Card>
@@ -248,7 +246,7 @@ export function SettingsView() {
                 {g.note && <Badge variant="warning">{g.note}</Badge>}
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {g.fields.map((f) => renderField(f, "legal"))}
+                {g.fields.map((f) => renderField(f))}
               </div>
             </div>
           ))}
@@ -399,6 +397,22 @@ export function SettingsView() {
         </CardContent>
       </Card>
       </>)}
+
+      {/* 參數變更黏著送出列：跨分頁（法定/公司）彙整未套用的參數變更，一次套用或全部還原。 */}
+      {!locked && paramChanges.length > 0 && (
+        <div className="sticky bottom-0 z-30 -mx-4 border-t bg-background/95 px-4 py-2.5 backdrop-blur print:hidden">
+          <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2">
+            <span className="text-sm text-amber-900">
+              <b className="tabular-nums">{paramChanges.length}</b> 項參數已修改、尚未套用
+              <span className="ml-2 text-xs text-muted-foreground">（{paramChanges.slice(0, 3).map((c) => c.label).join("、")}{paramChanges.length > 3 ? "…" : ""}）</span>
+            </span>
+            <span className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setParamDraft(parameters)}>全部還原</Button>
+              <Button size="sm" onClick={applyParams}>套用變更（{paramChanges.length}）</Button>
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -507,26 +521,34 @@ export function ProjectMasterCard() {
 function LeavePolicyCard({ locked }: { locked: boolean }) {
   const { leavePolicy, setLeavePolicy } = usePayrollStore();
   const STATUSES: ("留停" | "停職" | "暫離")[] = ["留停", "停職", "暫離"];
+  // 唯讀逐欄編輯＋送出：本地草稿、改值標黃、套用才寫入（外部變更以 effect 同步）
+  const [draft, setDraft] = useState(leavePolicy);
+  useEffect(() => setDraft(leavePolicy), [leavePolicy]);
+  const SPECS: FieldSpec[] = STATUSES.map((s) => ({ key: s, label: `${s}給薪比例`, kind: "rate" }));
+  const changes = diffRecord(leavePolicy as unknown as Record<string, unknown>, draft as unknown as Record<string, unknown>, SPECS);
+  const apply = () => { const patch: Record<string, number> = {}; changes.forEach((c) => (patch[c.field] = draft[c.field as keyof typeof draft])); setLeavePolicy(patch); };
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">非在職狀態給薪比例</CardTitle>
-        <CardDescription>留停／停職／暫離期間的公司預設給薪比例（0＝無給、50＝半薪、100＝全薪）；員工檔案可逐案覆寫。</CardDescription>
+        <CardDescription>留停／停職／暫離期間的公司預設給薪比例（0＝無給、50＝半薪、100＝全薪）；員工檔案可逐案覆寫。點欄位編輯，改完按套用。</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <div className="grid gap-4 sm:grid-cols-3">
           {STATUSES.map((s) => (
-            <div key={s} className="space-y-1">
-              <Label className="text-xs">{s}給薪比例</Label>
-              <div className="flex items-center gap-1.5">
-                <Input type="number" min="0" max="100" step="10" className="h-8 col-assumption" disabled={locked}
-                  value={Math.round(leavePolicy[s] * 100)}
-                  onChange={(e) => setLeavePolicy({ [s]: Math.min(100, Math.max(0, Number(e.target.value))) / 100 })} />
-                <span className="w-4 shrink-0 text-xs text-muted-foreground">%</span>
-              </div>
-            </div>
+            <EditableField key={s} label={`${s}給薪比例`} kind="rate"
+              value={draft[s]} original={leavePolicy[s]} disabled={locked}
+              lockHint="本月已確認結算、已鎖定（先取消確認才能修改）"
+              onChange={(v) => setDraft((d) => ({ ...d, [s]: v as number }))}
+              onRevert={() => setDraft((d) => ({ ...d, [s]: leavePolicy[s] }))} />
           ))}
         </div>
+        {!locked && changes.length > 0 && (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDraft(leavePolicy)}>還原</Button>
+            <Button size="sm" onClick={apply}>套用變更（{changes.length}）</Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -535,25 +557,30 @@ function LeavePolicyCard({ locked }: { locked: boolean }) {
 /** 新進員工預設固定薪資/津貼範本（openNew 帶入） */
 function SalaryDefaultsCard({ locked }: { locked: boolean }) {
   const { salaryDefaults, setSalaryDefaults } = usePayrollStore();
-  const std = salaryDefaults.standard;
-  const custom = salaryDefaults.custom;
-  const setStd = (k: SalaryNumKey, v: number | undefined) => setSalaryDefaults({ ...salaryDefaults, standard: { ...std, [k]: v } });
-  const setCustom = (c: { name: string; amount: number }[]) => setSalaryDefaults({ ...salaryDefaults, custom: c });
+  // 唯讀逐欄編輯＋送出：整卡（標準項＋自訂津貼）用本地草稿，套用才寫入。
+  const [draft, setDraft] = useState(salaryDefaults);
+  useEffect(() => setDraft(salaryDefaults), [salaryDefaults]);
+  const std = draft.standard;
+  const custom = draft.custom;
+  const setStd = (k: SalaryNumKey, v: number | undefined) => setDraft((d) => ({ ...d, standard: { ...d.standard, [k]: v } }));
+  const setCustom = (c: { name: string; amount: number }[]) => setDraft((d) => ({ ...d, custom: c }));
+  const STD_SPECS: FieldSpec[] = SALARY_ITEMS.map((it) => ({ key: it.key, label: it.label, kind: "money" }));
+  const stdChanges = diffRecord(salaryDefaults.standard as unknown as Record<string, unknown>, std as unknown as Record<string, unknown>, STD_SPECS);
+  const dirty = stdChanges.length > 0 || JSON.stringify(custom) !== JSON.stringify(salaryDefaults.custom);
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">新進員工預設固定薪資／津貼</CardTitle>
-        <CardDescription>設定後，於「基本資料 → 新增員工」時自動帶入（可再逐人調整）；留空＝0。</CardDescription>
+        <CardDescription>設定後，於「基本資料 → 新增員工」時自動帶入（可再逐人調整）；留空＝0。點欄位編輯，改完按套用。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">
           {SALARY_ITEMS.map((it) => (
-            <div key={it.key} className="space-y-1">
-              <Label className="text-xs">{it.label}</Label>
-              <Input type="number" className="h-8 col-assumption text-right tabular-nums" disabled={locked} placeholder="0"
-                value={std[it.key] ?? ""}
-                onChange={(e) => setStd(it.key, e.target.value === "" ? undefined : Number(e.target.value))} />
-            </div>
+            <EditableField key={it.key} label={it.label} kind="money"
+              value={std[it.key] ?? ""} original={salaryDefaults.standard[it.key] ?? ""} disabled={locked}
+              lockHint="本月已確認結算、已鎖定"
+              onChange={(v) => setStd(it.key, v === "" || v == null ? undefined : Number(v))}
+              onRevert={() => setStd(it.key, salaryDefaults.standard[it.key])} />
           ))}
         </div>
         <div>
@@ -578,6 +605,12 @@ function SalaryDefaultsCard({ locked }: { locked: boolean }) {
             </div>
           )}
         </div>
+        {!locked && dirty && (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDraft(salaryDefaults)}>還原</Button>
+            <Button size="sm" onClick={() => setSalaryDefaults(draft)}>套用變更</Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
