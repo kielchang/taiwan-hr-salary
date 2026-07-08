@@ -83,9 +83,10 @@ const THEMES: Record<string, ThemeDef> = {
     mood: "取材自使用者提供的 6 個 Figma 命名色票（Mermaid Garnet Symphony／Copper Aquamarine Dream／" +
       "Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz Afternoon／Emerald Sand Dusk）共通的" +
       "寶石色調方向，抽出 8 個各自獨立的寶石色相組成一套分類色票：藍寶石／祖母綠／石榴石／黃玉／紫水晶／" +
-      "粉晶／紅玉髓／海藍寶石。淺／深色模式四項檢查皆零警示全過，本次候選中與 Bold 並列最乾淨。",
-    light: ["#1d4ed8", "#0e8a5f", "#a3123a", "#a16207", "#7e3af2", "#db5a79", "#c2570d", "#0e9488"],
-    dark: ["#2251e0", "#0e8a5f", "#c11f4a", "#a16207", "#7e3af2", "#db5a79", "#c2570d", "#0e9488"],
+      "粉晶／紅玉髓／海藍寶石。黃玉／紅玉髓原本色相只差 11°、容易讀成同一種棕色，已分別推向金黃(H45°)／" +
+      "紅橙(H14°)拉開到 31° 差距，更貼近寶石本名色澤。淺／深色模式四項檢查皆零警示全過，與 Bold 並列最乾淨。",
+    light: ["#1d4ed8", "#0e8a5f", "#a3123a", "#b88d0a", "#7e3af2", "#db5a79", "#cf4217", "#0e9488"],
+    dark: ["#2251e0", "#0e8a5f", "#c11f4a", "#b88d0a", "#7e3af2", "#db5a79", "#cf4217", "#0e9488"],
     checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 15.7"], ["對比", "pass"]],
     checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 13.8"], ["對比", "pass"]],
   },
