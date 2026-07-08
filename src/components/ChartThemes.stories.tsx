@@ -7,6 +7,11 @@ import { StackedBar, Legend } from "@/components/charts";
 // 不同風格的候選色票，讓使用者在 Storybook 直接切換／並排比較，選定後才把結果寫回 index.css。
 // 色彩檢查（亮度帶/彩度/CVD 分離/對比）皆用 dataviz 技能的 validate_palette.js 對「本站實際
 // 淺色 #ffffff／深色 #020817 版面」實測，不是目測；下方 checksLight/checksDark 為其結果摘要。
+//
+// Aqua 取材自 figma.com/color-palettes 的調查（該站對自動化擷取回 403，改以搜尋結果核對）：
+// Figma 上的「dashboard／專業」類命名色票多為 4–6 色的品牌情緒板（例如 cyan/藍灰組合、
+// cool gray + 深綠 + 棕的「信任感」組合），色數與 CVD 安全性皆未針對 8 色分類圖表設計，不能直接套用；
+// 「信任感」方向修正後會收斂到與 Deep 幾乎相同的色相，因此只新增 Aqua 代表 dashboard 類的青綠/藍灰方向。
 const meta: Meta = { title: "元件庫 / 圖表色票主題（比較用）", parameters: { layout: "padded" } };
 export default meta;
 
@@ -52,6 +57,14 @@ const THEMES: Record<string, ThemeDef> = {
     dark: ["#0284c7", "#059669", "#d97706", "#7c3aed", "#e11d48", "#0d9488", "#4f46e5", "#ea580c"],
     checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 12.2"], ["對比", "warn", "8 色皆需標籤/表格"]],
     checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 21.7"], ["對比", "pass"]],
+  },
+  aqua: {
+    name: "Aqua",
+    mood: "青綠/藍主導、偏 tech-dashboard 感——取材自 Figma 色票庫的 dashboard 類範例（青綠＋藍灰主色調）；原始 4–6 色的品牌情緒板不足以做 8 色分類，經 snap-to-passing 調整彩度/亮度後才通過驗證。",
+    light: ["#06b6d4", "#d97706", "#0d9488", "#f43f5e", "#4f46e5", "#059669", "#0284c7", "#7e22ce"],
+    dark: ["#0891b2", "#d97706", "#0d9488", "#f43f5e", "#4f46e5", "#059669", "#0284c7", "#7e22ce"],
+    checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 13.8"], ["對比", "warn", "1 色需標籤/表格"]],
+    checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 13.8"], ["對比", "warn", "1 色需標籤/表格"]],
   },
   bold: {
     name: "Bold",
