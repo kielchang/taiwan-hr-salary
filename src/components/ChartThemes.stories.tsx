@@ -8,10 +8,14 @@ import { StackedBar, Legend } from "@/components/charts";
 // 色彩檢查（亮度帶/彩度/CVD 分離/對比）皆用 dataviz 技能的 validate_palette.js 對「本站實際
 // 淺色 #ffffff／深色 #020817 版面」實測，不是目測；下方 checksLight/checksDark 為其結果摘要。
 //
-// Aqua 取材自 figma.com/color-palettes 的調查（該站對自動化擷取回 403，改以搜尋結果核對）：
-// Figma 上的「dashboard／專業」類命名色票多為 4–6 色的品牌情緒板（例如 cyan/藍灰組合、
-// cool gray + 深綠 + 棕的「信任感」組合），色數與 CVD 安全性皆未針對 8 色分類圖表設計，不能直接套用；
-// 「信任感」方向修正後會收斂到與 Deep 幾乎相同的色相，因此只新增 Aqua 代表 dashboard 類的青綠/藍灰方向。
+// Aqua／Gem 取材自 figma.com/color-palettes 的調查（該站對自動化擷取回 403，改以搜尋結果核對）：
+// Aqua＝「dashboard／專業」類命名色票的共通方向（cyan/藍灰組合）；「信任感」方向（cool gray+深綠+棕）
+// 修正後會收斂到與 Deep 幾乎相同的色相，故未另外新增。
+// Gem＝綜合使用者指定的 6 個寶石命名色票（Mermaid Garnet Symphony／Copper Aquamarine Dream／
+// Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz Afternoon／Emerald Sand Dusk）研究：
+// 這些色票本身只有 4–6 色、且未做 CVD 分離設計，不能直接套用；但共通點是都圍繞「寶石色調」
+// （藍寶石/祖母綠/石榴石/黃玉/紫水晶/海藍寶石…），因此抽出 8 個彼此獨立的寶石色相，
+// 重新設計並用驗證器 snap-to-passing 成一套通過檢查的分類色票。
 const meta: Meta = { title: "元件庫 / 圖表色票主題（比較用）", parameters: { layout: "padded" } };
 export default meta;
 
@@ -73,6 +77,17 @@ const THEMES: Record<string, ThemeDef> = {
     dark: ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2", "#db2777", "#65a30d"],
     checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 16.2"], ["對比", "pass"]],
     checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 16.2"], ["對比", "pass"]],
+  },
+  gem: {
+    name: "Gem（推薦：綜合 6 個 Figma 寶石色票研究）",
+    mood: "取材自使用者提供的 6 個 Figma 命名色票（Mermaid Garnet Symphony／Copper Aquamarine Dream／" +
+      "Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz Afternoon／Emerald Sand Dusk）共通的" +
+      "寶石色調方向，抽出 8 個各自獨立的寶石色相組成一套分類色票：藍寶石／祖母綠／石榴石／黃玉／紫水晶／" +
+      "粉晶／紅玉髓／海藍寶石。淺色模式四項檢查零警示全過，本次候選中與 Bold 並列最乾淨。",
+    light: ["#1d4ed8", "#0e8a5f", "#a3123a", "#a16207", "#7e3af2", "#db5a79", "#c2570d", "#0e9488"],
+    dark: ["#1d4ed8", "#0e8a5f", "#c11f4a", "#a16207", "#7e3af2", "#db5a79", "#c2570d", "#0e9488"],
+    checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 15.7"], ["對比", "pass"]],
+    checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 13.8"], ["對比", "warn", "1 色臨界值"]],
   },
 };
 
