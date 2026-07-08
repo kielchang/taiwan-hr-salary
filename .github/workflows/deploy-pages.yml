@@ -1,9 +1,17 @@
 name: Deploy to GitHub Pages
 
+# 多環境部署（同一 Pages 站、以子路徑區分）：
+#   main  → /            （正式站 · PROD）
+#   stage → /stage/      （預覽 · STAGE）
+#   dev   → /dev/        （開發 · DEV，對應 claude/salary-calculator-react-shadcn-stxjp7）
+# 因 Vite base 為相對路徑（"./"）＋ HashRouter，同一份 build 可掛任一子路徑，免逐環境改 base。
+# 每次任一分支有 push 都會重新組裝三個環境後整站發佈（官方 Pages 部署為單一 artifact＝整站）。
 on:
   push:
     branches:
       - main
+      - stage
+      - claude/salary-calculator-react-shadcn-stxjp7
   workflow_dispatch:
 
 permissions:
@@ -17,62 +25,103 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  # 正式環境（main）：跑驗收測試把關，注入 APP_ENV=prod（畫面不顯示徽章）。
+  build-prod:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
       - name: Run acceptance tests (README §9)
         run: npm test
-
-      - name: Build
+      - name: Build (prod)
         run: npm run build
-
-      # 元件/畫面目錄一併發佈於 /storybook 子路徑（storybook base 為相對路徑）
+        env: { APP_ENV: prod }
       - name: Build Storybook
         run: npm run build-storybook -- -o dist/storybook
+      - uses: actions/upload-artifact@v4
+        with: { name: site-prod, path: dist, retention-days: 1 }
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+  # 預覽環境（stage）：build 失敗不擋正式站（continue-on-error）；分支不存在時此 job 失敗即略過該預覽。
+  build-stage:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: stage }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Build (stage)
+        run: npm run build
+        env: { APP_ENV: stage }
+      - name: Build Storybook
+        run: npm run build-storybook -- -o dist/storybook
+      - uses: actions/upload-artifact@v4
+        with: { name: site-stage, path: dist, retention-days: 1 }
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+  # 開發環境（dev）：同上，對應 claude 開發分支。
+  build-dev:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: claude/salary-calculator-react-shadcn-stxjp7 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Build (dev)
+        run: npm run build
+        env: { APP_ENV: dev }
+      - name: Build Storybook
+        run: npm run build-storybook -- -o dist/storybook
+      - uses: actions/upload-artifact@v4
+        with: { name: site-dev, path: dist, retention-days: 1 }
 
-  deploy:
-    needs: build
+  # 組裝三環境為單一 Pages artifact（prod 置根、stage/dev 置子目錄）後部署。
+  # 僅要求 prod 成功；stage/dev 缺任一（build 失敗或分支不存在）則該子路徑本次不更新。
+  assemble-deploy:
+    needs: [build-prod, build-stage, build-dev]
+    if: ${{ !cancelled() && needs.build-prod.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - name: Download prod (root)
+        uses: actions/download-artifact@v4
+        with: { name: site-prod, path: site }
+      - name: Download stage (/stage)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: site-stage, path: site/stage }
+      - name: Download dev (/dev)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: site-dev, path: site/dev }
+      - name: Show assembled layout
+        run: find site -maxdepth 2 -type d | sort
+      - uses: actions/configure-pages@v5
+        with: { enablement: true }
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deployment
         uses: actions/deploy-pages@v4
 
-  # 依 package.json 版號自動打 tag 並建立 GitHub Release（該版已存在則略過）。
+  # 依 package.json 版號自動打 tag 並建立 GitHub Release（僅 main 推送、該版已存在則略過）。
   # 版號 bump 時才會產生新 Release；發佈流程見 docs/versioning.md。
   release:
-    needs: build
+    needs: build-prod
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with: { ref: main }
 
       - name: Tag & Release when version bumped
         env:
@@ -87,5 +136,5 @@ jobs:
           NOTES="$(awk -v v="$VER" '/^## \[/{on=($0 ~ ("\\[" v "\\]"))} on' CHANGELOG.md)"
           [ -z "$NOTES" ] && NOTES="詳見 CHANGELOG.md"
           printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
-          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
-          echo "已建立 Release $TAG（指向 $GITHUB_SHA）"
+          gh release create "$TAG" --target "$(git rev-parse HEAD)" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          echo "已建立 Release $TAG"

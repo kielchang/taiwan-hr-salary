@@ -19,8 +19,13 @@ storage undefined 時先想到這裡，不要改測試本身。
 ## 分支與部署慣例
 
 - 開發分支：`claude/salary-calculator-react-shadcn-stxjp7`（所有變更先 commit 到這裡並 push）。
-- 上線＝merge 到 `main` push → GitHub Actions `deploy-pages.yml`（跑驗收測試＋build＋Pages 發佈）。
-  **merge main 前務必取得使用者同意**（deploy 即正式上線）。線上站：<https://kielchang.github.io/taiwan-hr-salary/>。
+- **三環境（同一 Pages 站、子路徑區分）**：main→`/`（PROD 正式站）、`stage`→`/stage/`（STAGE 預覽）、
+  開發分支→`/dev/`（DEV）。因 `base:"./"`＋HashRouter，同一 build 可掛任一子路徑。畫面右上依 `APP_ENV`
+  顯示 STAGE/DEV 徽章（PROD 不顯示）。`deploy-pages.yml` 於任一分支 push 時**重組三環境整站發佈**
+  （官方 Pages＝單一 artifact；stage/dev build 失敗不擋正式站）。
+  URL：正式 <https://kielchang.github.io/taiwan-hr-salary/>、預覽 `…/stage/`、開發 `…/dev/`（各含 `/storybook`）。
+- 上線＝merge 到 `main` push → `deploy-pages.yml`（跑驗收測試＋build＋Pages 發佈）。
+  **merge main 前務必取得使用者同意**（deploy 即正式上線）。
 - **版號**（發佈流程見 `docs/versioning.md`）：每次發佈到 main＝bump `package.json` `version`（SemVer；功能→minor、修正→patch）＋補 `CHANGELOG.md` 一段。
   tag `vX.Y.Z` 與 GitHub Release 由 `deploy-pages.yml` 的 `release` job **自動建立**（依 package.json 版號、已存在則略過；Release 內容取自 CHANGELOG），一般不用手動打 tag。
   SHA/建置時間由 `vite.config.ts` define 自動注入（CI 用 `GITHUB_SHA`、本地＝`dev`），畫面版號來源＝`src/version.ts`（側邊欄/設定「關於」/列印頁尾共用）。

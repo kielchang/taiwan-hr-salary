@@ -4,3 +4,4 @@
 declare const __APP_VERSION__: string; // package.json 版號（SemVer）
 declare const __GIT_SHA__: string; // 短 commit SHA；本地非 CI build＝"dev"
 declare const __BUILD_TIME__: string; // 建置時間 ISO 字串
+declare const __APP_ENV__: string; // 部署環境（prod/stage/dev）；本地非 CI build＝"dev"

@@ -44,7 +44,7 @@ import { AnalyticsView } from "@/views/AnalyticsView";
 import { ProjectsView } from "@/views/ProjectsView";
 import { ReportsHubView } from "@/views/ReportsHubView";
 import { DashboardView } from "@/views/DashboardView";
-import { VERSION_LABEL, COMMIT_URL } from "@/version";
+import { VERSION_LABEL, COMMIT_URL, ENV_BADGE } from "@/version";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
   FileText, FolderKanban, Menu, LayoutDashboard, X,
@@ -148,6 +148,18 @@ function Layout() {
               <p className="text-sm font-bold">薪資管理系統</p>
               <p className="text-[11px] text-muted-foreground">115 年度（2026）</p>
             </div>
+            {/* 環境徽章（stage/dev 才顯示；正式站不顯示保持乾淨），一眼分辨目前階段 */}
+            {ENV_BADGE && (
+              <span
+                title={`目前為 ${ENV_BADGE.label} 環境（非正式站）`}
+                className={cn(
+                  "ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide",
+                  ENV_BADGE.tone === "stage" ? "bg-amber-500 text-white" : "bg-sky-600 text-white",
+                )}
+              >
+                {ENV_BADGE.label}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="hidden sm:inline">本月：{formatPeriod(currentPeriod)}</span>

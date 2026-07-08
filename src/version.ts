@@ -17,6 +17,16 @@ export const BUILD_TIME: string =
 /** 是否為正式部署版本（CI build 帶 GITHUB_SHA）；本地 dev＝false */
 export const IS_RELEASE = GIT_SHA !== "dev";
 
+/** 部署環境（prod/stage/dev）；由 CI 各環境 build 時以 APP_ENV 注入，本地＝dev */
+export const APP_ENV: string =
+  typeof __APP_ENV__ !== "undefined" ? __APP_ENV__ : "dev";
+
+/** 環境徽章顯示設定（畫面用）：prod 不顯示徽章（正式站保持乾淨），stage/dev 顯示。 */
+export const ENV_BADGE: { label: string; tone: "stage" | "dev" } | null =
+  APP_ENV === "stage" ? { label: "STAGE", tone: "stage" }
+    : APP_ENV === "dev" ? { label: "DEV", tone: "dev" }
+      : null; // prod（或未知）不顯示
+
 /** GitHub 上對應此版本的 commit 連結（本地 dev 為 repo 首頁） */
 export const COMMIT_URL = IS_RELEASE
   ? `https://github.com/kielchang/taiwan-hr-salary/commit/${GIT_SHA}`
