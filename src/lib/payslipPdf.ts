@@ -7,17 +7,9 @@
 // jspdf 與 html2canvas 體積較大且僅瀏覽器可用，故以動態 import 延遲載入，
 // 不影響其他頁面與測試環境。
 
-/** 觸發瀏覽器下載一個 Blob */
-export function saveBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+// saveBlob 已移至通用 `@/lib/download`（元件庫依賴面，無業務相依）；此處匯入＋re-export 維持既有相容與內部使用。
+import { saveBlob } from "@/lib/download";
+export { saveBlob };
 
 /**
  * 擷取薪資條 DOM → 產生加密 PDF，回傳 Blob（不下載）。

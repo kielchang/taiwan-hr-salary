@@ -42,6 +42,11 @@ storage undefined 時先想到這裡，不要改測試本身。
 6. **變異顯示用 `<Delta>`**（▲▼＋文字＋色，非純色語意）；空狀態用 `<EmptyState>`；列印靠 `@media print`＋`PrintHeader`。
 7. **敏感異動要入稽核**：新 mutation 記得 `pushAudit`（AuditAction 已含 parameter/dependent/declare/allocation/clear）。
 8. 「帶入上月異動」**不帶獎金與代扣稅**（使用者拍板，防誤重發）；累計獎金由 `ytdBonusBefore` 自動帶入。
+9. **元件庫邊界不可耦合 app**（使用者拍板：未來要切成共用套件統一介面風格）：`src/components/{ui,form,charts}`＋
+   `NumberInput/Stepper/ErrorBoundary`＋支撐工具（`lib/utils`・`useSort`・`csv`・`forms/diff`・`download`）**只能**依賴設計 token
+   與彼此，**禁止** import `@/store`／`@/data`／`@/views`／`@/content`／`@/version`／`@/lib/types`／`@/lib/calc`… 等 app 模組。
+   由 `tests/uiKit.test.ts` 守衛（新增元件請加進 barrel `src/components/index.ts`）。元件庫**版號獨立於 app**
+   （`src/components/version.ts` `UI_KIT`；改元件→bump＋補 `docs/ui-kit/CHANGELOG.md`）。`HelpHint`/`PrintHeader`/`BracketTables`＝app glue，刻意**不入** barrel。
 
 ## 架構地圖
 

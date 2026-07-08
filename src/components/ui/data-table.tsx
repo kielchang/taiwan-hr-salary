@@ -9,7 +9,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Tooltip } from "@/components/ui/tooltip";
 import { useSort, type SortState } from "@/lib/useSort";
 import { csvSerialize } from "@/lib/csv";
-import { saveBlob } from "@/lib/payslipPdf";
+import { saveBlob } from "@/lib/download";
 import { cn } from "@/lib/utils";
 import { Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
 
