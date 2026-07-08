@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
-  Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell, SortHead, freezeFirst,
+  Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell, freezeFirst,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { useSort, type SortState } from "@/lib/useSort";
 import { csvSerialize } from "@/lib/csv";
 import { saveBlob } from "@/lib/download";
 import { cn } from "@/lib/utils";
-import { Search, Download, ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
+import { Search, Download, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp, ChevronDown, Filter, X } from "lucide-react";
 
 /** 欄位定義：以設定描述一欄如何顯示、排序、篩選、合計。 */
 export type Column<T> = {
@@ -40,6 +41,7 @@ export type Column<T> = {
 
 type ColFilter = { text: string; min: string; max: string };
 const EMPTY_FILTER: ColFilter = { text: "", min: "", max: "" };
+const POP_W = 224;
 
 export type DataTableProps<T> = {
   rows: T[];
@@ -57,6 +59,8 @@ export type DataTableProps<T> = {
   maxHeight?: string;
   /** 滑鼠/觸控指向儲存格時，highlight 當前行列（十字對準）；預設開 */
   crosshair?: boolean;
+  /** 可拖曳欄位邊界調整寬度、雙擊自適應內容；預設開 */
+  resizable?: boolean;
   empty?: { title: string; hint?: string; icon?: ReactNode; action?: ReactNode };
   /** 工具列額外元素（期間選擇器、其他按鈕…），置於搜尋列右側 */
   toolbar?: ReactNode;
@@ -67,15 +71,15 @@ export type DataTableProps<T> = {
 };
 
 /**
- * 通用資料表（全站規範）：關鍵字搜尋、**單欄篩選（文字包含／數值範圍）**、排序、門檻式分頁
- * （每頁 5/15/30/50 可選）、**十字對準 highlight**、黏性表頭、斑馬紋、凍結首欄、合計列、
- * 空狀態、CSV 匯出，皆由欄位設定驅動，確保資料量變多時一致可用。
+ * 通用資料表（全站規範）：關鍵字搜尋、**單欄篩選（文字包含·數值範圍，漏斗固定於表頭最右）**、排序、
+ * **可調欄寬（拖邊界／雙擊自適應）**、**十字對準 highlight**、門檻分頁（每頁 5/15/30/50，預設 15）、
+ * 黏性表頭、斑馬紋、凍結首欄、合計列、空狀態、CSV 匯出，皆由欄位設定驅動。
  */
 export function DataTable<T>({
   rows, columns, getRowKey, initialSort = null,
   pageSize = 15, pageSizeOptions = [5, 15, 30, 50],
   searchable = true, searchPlaceholder = "搜尋關鍵字…",
-  zebra = true, stickyHeader = true, dense = false, maxHeight, crosshair = true,
+  zebra = true, stickyHeader = true, dense = false, maxHeight, crosshair = true, resizable = true,
   empty, toolbar, csv, rowClassName, onRowClick,
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
@@ -83,7 +87,12 @@ export function DataTable<T>({
   const [page, setPage] = useState(0);
   const [cross, setCross] = useState<{ r: number; c: number } | null>(null);
   const [colFilters, setColFilters] = useState<Record<string, ColFilter>>({});
-  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const [openFilter, setOpenFilter] = useState<{ key: string; top: number; left: number } | null>(null);
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+
+  const tableRef = useRef<HTMLTableElement>(null);
+  const headRefs = useRef<(HTMLTableCellElement | null)[]>([]);
+  const resizing = useRef<{ key: string; startX: number; startW: number } | null>(null);
 
   // 欄位篩選型態（顯式 > 自動判定）
   const filterKind = (c: Column<T>): "text" | "range" | "none" =>
@@ -138,9 +147,32 @@ export function DataTable<T>({
   const pageCount = Math.max(1, Math.ceil(sorted.length / size));
   const showPager = sorted.length > size;
 
-  // 篩選/排序/頁長變動時回到第一頁
   useEffect(() => { setPage(0); }, [query, size, sort, colFilters]);
   useEffect(() => { if (page > pageCount - 1) setPage(0); }, [page, pageCount]);
+
+  // ── 欄寬調整 ─────────────────────────────────────────────
+  const onResizeMove = useCallback((e: PointerEvent) => {
+    const r = resizing.current;
+    if (!r) return;
+    setColWidths((m) => ({ ...m, [r.key]: Math.max(48, r.startW + (e.clientX - r.startX)) }));
+  }, []);
+  const onResizeUp = useCallback(() => {
+    resizing.current = null;
+    document.body.style.cursor = "";
+    window.removeEventListener("pointermove", onResizeMove);
+    window.removeEventListener("pointerup", onResizeUp);
+  }, [onResizeMove]);
+  const startResize = (e: React.PointerEvent, key: string, ci: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizing.current = { key, startX: e.clientX, startW: colWidths[key] ?? headRefs.current[ci]?.offsetWidth ?? 120 };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("pointermove", onResizeMove);
+    window.addEventListener("pointerup", onResizeUp);
+  };
+  /** 雙擊欄位邊界：清除手動寬度 → 該欄自適應內容（auto-layout）。 */
+  const autoFit = (key: string) => setColWidths((m) => { const { [key]: _d, ...rest } = m; return rest; });
+  useEffect(() => () => { window.removeEventListener("pointermove", onResizeMove); window.removeEventListener("pointerup", onResizeUp); }, [onResizeMove, onResizeUp]);
 
   const hasTotals = columns.some((c) => c.total);
   const showToolbar = searchable || toolbar || csv || activeFilterCount > 0;
@@ -152,6 +184,12 @@ export function DataTable<T>({
 
   const xline = "bg-primary/[0.06]";
   const xcell = "bg-primary/20";
+
+  const openFilterAt = (key: string, btn: HTMLElement) => {
+    if (openFilter?.key === key) { setOpenFilter(null); return; }
+    const r = btn.getBoundingClientRect();
+    setOpenFilter({ key, top: r.bottom + 4, left: Math.max(8, Math.min(r.right - POP_W, window.innerWidth - POP_W - 8)) });
+  };
 
   return (
     <div className="space-y-2">
@@ -184,52 +222,51 @@ export function DataTable<T>({
           compact
         />
       ) : (
-        <Table zebra={zebra} maxHeight={maxHeight}>
+        <Table ref={tableRef} zebra={zebra} maxHeight={maxHeight}>
           <TableHeader sticky={stickyHeader}>
             <TableRow onMouseLeave={() => crosshair && setCross(null)}>
               {columns.map((c, ci) => {
                 const kind = filterKind(c);
                 const active = isFilterActive(c);
-                const headClass = cn(c.freeze && freezeFirst, c.headerClassName, crosshair && cross?.c === ci && xline, "relative");
-                const f = getFilter(c.key);
-                const filterBtn = kind !== "none" && (
-                  <button
-                    type="button"
-                    aria-label={`篩選 ${typeof c.header === "string" ? c.header : c.key}`}
-                    onClick={(e) => { e.stopPropagation(); setOpenFilter((o) => (o === c.key ? null : c.key)); }}
-                    className={cn("tap-target inline-flex shrink-0 items-center justify-center rounded p-0.5 align-middle transition-colors", active ? "text-primary" : "text-muted-foreground/40 hover:text-muted-foreground")}
+                const cw = colWidths[c.key];
+                const isSorted = sort?.key === c.key;
+                const SortIcon = !c.sortValue ? null : !isSorted ? ChevronsUpDown : sort!.dir === "desc" ? ChevronDown : ChevronUp;
+                return (
+                  <TableHead
+                    key={c.key}
+                    ref={(el) => { headRefs.current[ci] = el; }}
+                    style={cw ? { width: cw, maxWidth: cw } : undefined}
+                    className={cn("relative select-none p-0", c.freeze && freezeFirst, c.headerClassName, crosshair && cross?.c === ci && xline)}
                   >
-                    <Filter className="size-3" />
-                  </button>
-                );
-                const popover = openFilter === c.key && (
-                  <div className={cn("absolute top-full z-50 mt-1 w-56 rounded-md border bg-popover p-2.5 text-left font-normal normal-case text-foreground shadow-lg", c.numeric ? "right-0" : "left-0")} onClick={(e) => e.stopPropagation()}>
-                    {kind === "range" ? (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium">數值範圍</p>
-                        <div className="flex items-center gap-1.5">
-                          <Input type="number" placeholder="最小" className="h-8 tabular-nums" value={f.min} onChange={(e) => setFilter(c.key, { min: e.target.value })} />
-                          <span className="text-xs text-muted-foreground">～</span>
-                          <Input type="number" placeholder="最大" className="h-8 tabular-nums" value={f.max} onChange={(e) => setFilter(c.key, { max: e.target.value })} />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium">包含文字</p>
-                        <Input autoFocus placeholder="輸入關鍵字…" className="h-8" value={f.text} onChange={(e) => setFilter(c.key, { text: e.target.value })} />
-                      </div>
-                    )}
-                    <div className="mt-2 flex justify-between">
-                      <Button variant="ghost" size="sm" className="h-7" disabled={!active} onClick={() => clearFilter(c.key)}>清除</Button>
-                      <Button size="sm" className="h-7" onClick={() => setOpenFilter(null)}>完成</Button>
+                    <div className="flex h-10 items-center gap-1 px-2">
+                      {c.sortValue ? (
+                        <button type="button" onClick={() => toggle(c.key)} className={cn("inline-flex min-w-0 items-center gap-1 hover:text-foreground", isSorted && "text-foreground")}>
+                          <span className="truncate">{c.header}</span>
+                          {SortIcon && <SortIcon className={cn("size-3.5 shrink-0", !isSorted && "opacity-40")} />}
+                        </button>
+                      ) : (
+                        <span className="min-w-0 truncate">{c.header}</span>
+                      )}
+                      {kind !== "none" && (
+                        <button
+                          type="button"
+                          aria-label={`篩選 ${typeof c.header === "string" ? c.header : c.key}`}
+                          onClick={(e) => { e.stopPropagation(); openFilterAt(c.key, e.currentTarget); }}
+                          className={cn("tap-target ml-auto inline-flex shrink-0 items-center justify-center rounded p-0.5 transition-colors", active ? "text-primary" : "text-muted-foreground/40 hover:text-muted-foreground")}
+                        >
+                          <Filter className="size-3" />
+                        </button>
+                      )}
                     </div>
-                  </div>
-                );
-                const inner = <span className="inline-flex items-center gap-1">{c.header}{filterBtn}{popover}</span>;
-                return c.sortValue ? (
-                  <SortHead key={c.key} sortKey={c.key} sort={sort} onSort={toggle} numeric={c.numeric} className={headClass}>{inner}</SortHead>
-                ) : (
-                  <TableHead key={c.key} className={cn(c.numeric && "text-right", headClass)}>{inner}</TableHead>
+                    {resizable && (
+                      <div
+                        onPointerDown={(e) => startResize(e, c.key, ci)}
+                        onDoubleClick={() => autoFit(c.key)}
+                        title="拖曳調整欄寬，雙擊自適應內容"
+                        className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize touch-none hover:bg-primary/40"
+                      />
+                    )}
+                  </TableHead>
                 );
               })}
             </TableRow>
@@ -248,14 +285,17 @@ export function DataTable<T>({
                   const cls = typeof c.cellClassName === "function" ? c.cellClassName(row) : c.cellClassName;
                   const inRow = crosshair && cross?.r === i;
                   const inCol = crosshair && cross?.c === ci;
+                  const cw = colWidths[c.key];
+                  const maxW = c.truncate ?? cw;
                   return (
                     <TableCell
                       key={c.key}
-                      style={c.truncate ? { maxWidth: c.truncate } : undefined}
+                      style={maxW ? { width: cw, maxWidth: maxW } : undefined}
                       onMouseEnter={crosshair ? () => setCross({ r: i, c: ci }) : undefined}
                       onTouchStart={crosshair ? () => setCross({ r: i, c: ci }) : undefined}
                       className={cn(
-                        c.numeric && "text-right tabular-nums", c.freeze && cn(freezeFirst, "font-medium"), dense && "py-1", cls,
+                        c.numeric && "text-right tabular-nums", c.freeze && cn(freezeFirst, "font-medium"), dense && "py-1",
+                        cw && "overflow-hidden", cls,
                         (inRow || inCol) && xline, inRow && inCol && xcell,
                       )}
                     >
@@ -263,6 +303,8 @@ export function DataTable<T>({
                         <Tooltip content={c.filterText?.(row)} className="w-full" focusable>
                           <span className="block truncate">{c.cell(row)}</span>
                         </Tooltip>
+                      ) : cw ? (
+                        <div className="truncate">{c.cell(row)}</div>
                       ) : c.cell(row)}
                     </TableCell>
                   );
@@ -284,8 +326,42 @@ export function DataTable<T>({
         </Table>
       )}
 
-      {/* 篩選 popover 外點關閉：透明遮罩 */}
-      {openFilter && <div className="fixed inset-0 z-40" onClick={() => setOpenFilter(null)} aria-hidden />}
+      {/* 篩選 popover：用 portal＋fixed 定位，避免被表格水平捲動/凍結首欄裁切或蓋住 */}
+      {openFilter && createPortal(
+        <>
+          <div className="fixed inset-0 z-[55]" onClick={() => setOpenFilter(null)} aria-hidden />
+          {(() => {
+            const c = columns.find((x) => x.key === openFilter.key);
+            if (!c) return null;
+            const f = getFilter(c.key);
+            const active = isFilterActive(c);
+            return (
+              <div style={{ position: "fixed", top: openFilter.top, left: openFilter.left, width: POP_W }} className="z-[60] rounded-md border bg-popover p-2.5 text-left text-sm text-foreground shadow-lg" onClick={(e) => e.stopPropagation()}>
+                {filterKind(c) === "range" ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">數值範圍</p>
+                    <div className="flex items-center gap-1.5">
+                      <Input type="number" placeholder="最小" className="h-8 tabular-nums" value={f.min} onChange={(e) => setFilter(c.key, { min: e.target.value })} />
+                      <span className="text-xs text-muted-foreground">～</span>
+                      <Input type="number" placeholder="最大" className="h-8 tabular-nums" value={f.max} onChange={(e) => setFilter(c.key, { max: e.target.value })} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">包含文字</p>
+                    <Input autoFocus placeholder="輸入關鍵字…" className="h-8" value={f.text} onChange={(e) => setFilter(c.key, { text: e.target.value })} />
+                  </div>
+                )}
+                <div className="mt-2 flex justify-between">
+                  <Button variant="ghost" size="sm" className="h-7" disabled={!active} onClick={() => clearFilter(c.key)}>清除</Button>
+                  <Button size="sm" className="h-7" onClick={() => setOpenFilter(null)}>完成</Button>
+                </div>
+              </div>
+            );
+          })()}
+        </>,
+        document.body,
+      )}
 
       {showPager && (
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground print:hidden">

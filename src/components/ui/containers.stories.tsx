@@ -35,7 +35,8 @@ export const 資料表_DataTable: S = {
   render: () => (
     <div className="max-w-3xl space-y-2">
       <p className="text-xs text-muted-foreground">
-        互動：指向儲存格看**十字對準**；點欄位表頭漏斗做**單欄篩選**（文字＝包含、數字＝範圍）；下方切換**每頁 5/15/30/50**。
+        互動：指向儲存格看**十字對準**；表頭最右漏斗做**單欄篩選**（文字＝包含、數字＝範圍）；
+        **拖曳欄位右邊界調整欄寬、雙擊自適應內容**；下方切換**每頁 5/15/30/50**。
       </p>
       <DataTable
         rows={big}
