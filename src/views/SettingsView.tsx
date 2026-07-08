@@ -30,8 +30,9 @@ import { csvSerialize } from "@/lib/csv";
 import { ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
-import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban, Sun, Moon, Monitor } from "lucide-react";
 import { APP_VERSION, GIT_SHA, IS_RELEASE, COMMIT_URL, buildTimeTaipei } from "@/version";
+import { useTheme, type Theme } from "@/lib/theme";
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
   salary: "薪資異動", employee: "員工異動", dependent: "眷屬異動", event: "結算異動", confirm: "月結確認",
@@ -218,6 +219,7 @@ export function SettingsView() {
       </Card>
       )}
 
+      {secTab === "company" && <AppearanceCard />}
       {secTab === "company" && <LeavePolicyCard locked={locked} />}
       {secTab === "company" && <SalaryDefaultsCard locked={locked} />}
 
@@ -507,6 +509,46 @@ export function ProjectMasterCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </Card>
+  );
+}
+
+/** 外觀（深色模式）：淺色／深色／跟隨系統三選一。偏好存於這台裝置（獨立於資料，清空資料後仍保留）。 */
+function AppearanceCard() {
+  const [theme, setTheme] = useTheme();
+  const OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
+    { value: "light", label: "淺色", icon: Sun },
+    { value: "dark", label: "深色", icon: Moon },
+    { value: "system", label: "跟隨系統", icon: Monitor },
+  ];
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">外觀</CardTitle>
+        <CardDescription>深色模式偏好。此設定屬「這台裝置的瀏覽器」，不隨資料備份、清空資料後仍保留。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div role="radiogroup" aria-label="深色模式" className="inline-flex flex-wrap gap-1.5">
+          {OPTIONS.map(({ value, label, icon: Icon }) => {
+            const active = theme === value;
+            return (
+              <Button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                variant={active ? "default" : "outline"}
+                size="sm"
+                className="tap-target gap-1.5"
+                onClick={() => setTheme(value)}
+              >
+                <Icon className="size-4" />
+                {label}
+              </Button>
+            );
+          })}
+        </div>
+      </CardContent>
     </Card>
   );
 }

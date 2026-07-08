@@ -37,7 +37,9 @@ app 內部可漸進改用 `import { Button, DataTable } from "@/components"`。
 - **深色**：`.dark` 值經過刻意的 UI/UX 色彩設計（非機械式反轉）——沿用品牌冷靛藍色相、飽和度由 84%
   降到 16–22%，並建立 5 級表面抬升層次（background < card < popover < muted/secondary/accent < border/input）；
   語意狀態色/圖表色皆用 dataviz 技能 `validate_palette.js` 的 `contrast()` 重新對新背景驗證過（WCAG，非目測）。
-  **Storybook 已可預覽切換**（右上工具列「主題」淺色/深色）；正式站尚未接 `ThemeProvider`，行為不受影響。
+  **正式站已可切換**：設定頁「公司與出勤 → 外觀」淺色/深色/跟隨系統（`src/lib/theme.ts` 獨立於 store、
+  存於裝置、`document.documentElement` 掛 `.dark`；`index.html` inline script 防首繪白閃）。Storybook 亦有
+  右上工具列「主題」切換供元件預覽。
 - **鐵律**：元件庫**不得**直接寫原始調色盤色（`amber-/emerald-/rose-/sky-/orange-/yellow-NNN`），一律走上述 token；由 `tests/uiKit.test.ts` 守衛。
 - 可視型錄：Storybook「元件庫 / 設計 Tokens」頁。新增狀態色＝在 `index.css`+`tailwind.config.js` 加 token，再於元件與型錄使用。
 

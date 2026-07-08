@@ -3,7 +3,12 @@ import ReactDOM from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { initTheme } from "./lib/theme";
 import "./index.css";
+
+// 深色模式：inline script（index.html）已搶先套用初始 class；此處接手執行期同步
+// （使用者於設定頁切換、以及「跟隨系統」時 OS 色偏好變動）。
+initTheme();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
