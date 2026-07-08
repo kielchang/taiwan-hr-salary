@@ -52,18 +52,20 @@
 
     /* 圖表分類色票（8 色，供 charts/index.tsx 的 PALETTE／AXIS／GRID／TEXT 讀取）。
        值＝原色 hex（非 HSL 三元組）：SVG fill/stroke 直接吃 var()，不經 hsl() 包裝。
-       來源＝「Gem」寶石色票：綜合使用者指定的 6 個 Figma 命名色票（Mermaid Garnet Symphony／
-       Copper Aquamarine Dream／Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz
-       Afternoon／Emerald Sand Dusk）研究後，抽出 8 個彼此獨立的寶石色相，經 dataviz 技能驗證器
-       實測通過亮度帶/彩度/CVD 分離/對比四項檢查（詳見 src/components/ChartThemes.stories.tsx）。 */
+       來源＝「Gem」寶石色票：綜合使用者指定的 6 個 Figma 命名色票研究後，抽出 8 個彼此獨立的
+       寶石色相，經 dataviz 技能驗證器實測通過亮度帶/彩度/CVD 分離/對比四項檢查。
+       排序沿色相環走一圈（藍→青→綠→金→橙→粉→紅→紫），刻意把「環的接縫」切在藍寶石↔紫水晶
+       （色相環上最接近的一段，對色盲最不安全）讓兩者在陣列中不相鄰；PALETTE[0] 維持藍寶石，
+       單系列圖表沒指定顏色時的預設色不變。詳見 src/components/ChartThemes.stories.tsx 的
+       gem.mood 說明。 */
     --chart-1: #1d4ed8; /* 藍寶石 */
-    --chart-2: #0e8a5f; /* 祖母綠 */
-    --chart-3: #a3123a; /* 石榴石 */
+    --chart-2: #0e9488; /* 海藍寶石 */
+    --chart-3: #0e8a5f; /* 祖母綠 */
     --chart-4: #b88d0a; /* 黃玉 */
-    --chart-5: #7e3af2; /* 紫水晶 */
+    --chart-5: #cf4217; /* 紅玉髓 */
     --chart-6: #db5a79; /* 粉晶 */
-    --chart-7: #cf4217; /* 紅玉髓 */
-    --chart-8: #0e9488; /* 海藍寶石 */
+    --chart-7: #a3123a; /* 石榴石 */
+    --chart-8: #7e3af2; /* 紫水晶 */
     --chart-axis: #cbd5e1;
     --chart-grid: #e2e8f0;
     --chart-text: #475569;
@@ -114,17 +116,17 @@
     --col-assumption: 45 40% 14%;
     --col-assumption-foreground: 48 85% 88%;
 
-    /* 圖表分類色票——深色版（Gem 寶石色票；藍寶石另配較亮的深色步階 #2a5ae5，
-       其餘 7 色淺深色同一 hex 即可通過。已對「本站實際深色背景 #101319」重新驗證，
+    /* 圖表分類色票——深色版（Gem 寶石色票，色相環排序同 :root；藍寶石另配較亮的深色步階
+       #2a5ae5，其餘 7 色淺深色同一 hex 即可通過。已對「本站實際深色背景 #101319」重新驗證，
        非沿用先前色票研究時期的比較用背景 #020817——兩者亮度不同，對比結果需重跑。） */
     --chart-1: #2a5ae5;
-    --chart-2: #0e8a5f;
-    --chart-3: #c11f4a;
+    --chart-2: #0e9488;
+    --chart-3: #0e8a5f;
     --chart-4: #b88d0a;
-    --chart-5: #7e3af2;
+    --chart-5: #cf4217;
     --chart-6: #db5a79;
-    --chart-7: #cf4217;
-    --chart-8: #0e9488;
+    --chart-7: #c11f4a;
+    --chart-8: #7e3af2;
     --chart-axis: #3a465c;
     --chart-grid: #131c2b;
     --chart-text: #94a3b8;

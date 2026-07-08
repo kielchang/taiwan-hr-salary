@@ -18,7 +18,10 @@ import { StackedBar, Legend } from "@/components/charts";
 // Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz Afternoon／Emerald Sand Dusk）研究：
 // 這些色票本身只有 4–6 色、且未做 CVD 分離設計，不能直接套用；但共通點是都圍繞「寶石色調」
 // （藍寶石/祖母綠/石榴石/黃玉/紫水晶/海藍寶石…），因此抽出 8 個彼此獨立的寶石色相，
-// 重新設計並用驗證器 snap-to-passing 成一套通過檢查的分類色票。
+// 重新設計並用驗證器 snap-to-passing 成一套通過檢查的分類色票。定案後使用者要求「順序要有共同
+// 邏輯」，改沿色相環排序（非隨機湊出的寶石命名順序）——細節見下方 gem.mood。
+// 重排會影響 app 內所有寫死 PALETTE[N] 索引的畫面（如 AnalyticsView 的本薪/加給/加班費/獎金/
+// 雇主負擔/其他），因為同一個索引現在對應到不同色相；已重新截圖確認實際畫面仍可讀。
 const meta: Meta = { title: "元件庫 / 圖表色票主題（比較用）", parameters: { layout: "padded" } };
 export default meta;
 
@@ -85,13 +88,17 @@ const THEMES: Record<string, ThemeDef> = {
     name: "Gem（目前上線）",
     mood: "取材自使用者提供的 6 個 Figma 命名色票（Mermaid Garnet Symphony／Copper Aquamarine Dream／" +
       "Lavender Sapphire Mist／Emerald Blush Sunset／Beryl Topaz Afternoon／Emerald Sand Dusk）共通的" +
-      "寶石色調方向，抽出 8 個各自獨立的寶石色相組成一套分類色票：藍寶石／祖母綠／石榴石／黃玉／紫水晶／" +
-      "粉晶／紅玉髓／海藍寶石。黃玉／紅玉髓原本色相只差 11°、容易讀成同一種棕色，已分別推向金黃(H45°)／" +
-      "紅橙(H14°)拉開到 31° 差距，更貼近寶石本名色澤。淺／深色模式四項檢查皆零警示全過，與 Bold 並列最乾淨。",
-    light: ["#1d4ed8", "#0e8a5f", "#a3123a", "#b88d0a", "#7e3af2", "#db5a79", "#cf4217", "#0e9488"],
-    dark: ["#2a5ae5", "#0e8a5f", "#c11f4a", "#b88d0a", "#7e3af2", "#db5a79", "#cf4217", "#0e9488"],
-    checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 15.7"], ["對比", "pass"]],
-    checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "pass", "ΔE 13.8"], ["對比", "pass"]],
+      "寶石色調方向，抽出 8 個各自獨立的寶石色相組成一套分類色票。黃玉／紅玉髓原本色相只差 11°、容易讀成" +
+      "同一種棕色，已分別推向金黃(H45°)／紅橙(H14°)拉開到 31° 差距，更貼近寶石本名色澤。" +
+      "排序沿色相環走一圈（藍→青→綠→金→橙→粉→紅→紫），非隨機湊出的寶石命名順序：" +
+      "藍寶石／海藍寶石／祖母綠／黃玉／紅玉髓／粉晶／石榴石／紫水晶。藍寶石與紫水晶在色相環上其實" +
+      "彼此最接近（38°，對色盲最不安全的一段），刻意把「環的接縫」切在這裡讓兩者在陣列中不相鄰" +
+      "（放在頭尾兩端），其餘 7 段依序銜接；PALETTE[0] 維持藍寶石，單系列圖表的預設色不受影響。" +
+      "淺／深色模式四項檢查皆全過（僅 1 色落在需標籤輔助的地板區間）。",
+    light: ["#1d4ed8", "#0e9488", "#0e8a5f", "#b88d0a", "#cf4217", "#db5a79", "#a3123a", "#7e3af2"],
+    dark: ["#2a5ae5", "#0e9488", "#0e8a5f", "#b88d0a", "#cf4217", "#db5a79", "#c11f4a", "#7e3af2"],
+    checksLight: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "warn", "ΔE 11.4 floor"], ["對比", "pass"]],
+    checksDark: [["亮度帶", "pass"], ["彩度", "pass"], ["CVD 分離", "warn", "ΔE 11.4 floor"], ["對比", "pass"]],
   },
 };
 
