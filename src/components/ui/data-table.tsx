@@ -12,7 +12,7 @@ import { useSort, type SortState } from "@/lib/useSort";
 import { csvSerialize } from "@/lib/csv";
 import { saveBlob } from "@/lib/download";
 import { cn } from "@/lib/utils";
-import { Search, Download, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp, ChevronDown, Filter, X, Check } from "lucide-react";
+import { Search, Download, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp, ChevronDown, Filter, X, Check, Plus } from "lucide-react";
 
 /** 欄位定義：以設定描述一欄如何顯示、排序、篩選、合計。 */
 export type Column<T> = {
@@ -39,8 +39,8 @@ export type Column<T> = {
   truncate?: number;
 };
 
-type ColFilter = { text: string; min: string; max: string; values: string[] };
-const EMPTY_FILTER: ColFilter = { text: "", min: "", max: "", values: [] };
+type ColFilter = { texts: string[]; min: string; max: string; values: string[] };
+const EMPTY_FILTER: ColFilter = { texts: [], min: "", max: "", values: [] };
 const POP_W = 224;
 
 export type DataTableProps<T> = {
@@ -90,7 +90,8 @@ export function DataTable<T>({
   const [openFilter, setOpenFilter] = useState<{ key: string; top: number; left: number } | null>(null);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [selQuery, setSelQuery] = useState(""); // 多選篩選 popover 內的清單搜尋
-  useEffect(() => { setSelQuery(""); }, [openFilter?.key]);
+  const [textInput, setTextInput] = useState(""); // 文字篩選 popover 內的輸入緩衝（推薦/加入條件用）
+  useEffect(() => { setSelQuery(""); setTextInput(""); }, [openFilter?.key]);
 
   const tableRef = useRef<HTMLTableElement>(null);
   const headRefs = useRef<(HTMLTableCellElement | null)[]>([]);
@@ -105,7 +106,7 @@ export function DataTable<T>({
   const isFilterActive = (c: Column<T>) => {
     const f = getFilter(c.key);
     const k = filterKind(c);
-    return k === "range" ? f.min !== "" || f.max !== "" : k === "select" ? f.values.length > 0 : f.text.trim() !== "";
+    return k === "range" ? f.min !== "" || f.max !== "" : k === "select" ? f.values.length > 0 : f.texts.length > 0;
   };
   const activeFilterCount = columns.filter(isFilterActive).length;
   const setFilter = (key: string, patch: Partial<ColFilter>) =>
@@ -123,11 +124,9 @@ export function DataTable<T>({
       if (f.max !== "") parts.push(`≤ ${f.max}`);
       return `${head}：${parts.join("、")}`;
     }
-    if (k === "select") {
-      const shown = f.values.slice(0, 2).join("、");
-      return `${head}：${shown}${f.values.length > 2 ? ` 等 ${f.values.length} 項` : ""}`;
-    }
-    return `${head}：含「${f.text.trim()}」`;
+    const vals = k === "select" ? f.values : f.texts;
+    const shown = vals.slice(0, 2).join("、");
+    return `${head}：${shown}${vals.length > 2 ? ` 等 ${vals.length} 項` : ""}`;
   };
 
   // 篩選：全域關鍵字 ＋ 單欄篩選（文字包含／數值範圍）
@@ -149,8 +148,9 @@ export function DataTable<T>({
           if (f.max !== "" && v > Number(f.max)) return false;
         } else if (k === "select") {
           if (!f.values.includes(colText(c, r))) return false;
-        } else if (!colText(c, r).toLowerCase().includes(f.text.trim().toLowerCase())) {
-          return false;
+        } else {
+          const t = colText(c, r).toLowerCase();
+          if (!f.texts.some((term) => t.includes(term.toLowerCase()))) return false; // 多筆條件：符合任一即列出
         }
       }
       return true;
@@ -232,19 +232,24 @@ export function DataTable<T>({
         </div>
       )}
 
-      {/* 篩選條件列：每個條件一個獨立標籤，可個別移除；避免只能一次全清 */}
+      {/* 篩選條件列：每個「值/條件」都是獨立標籤，可個別移除（含同欄多筆文字/多選值）；避免只能一次全清 */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 print:hidden">
           <span className="text-xs text-muted-foreground">篩選條件：</span>
-          {columns.filter(isFilterActive).map((c) => (
-            <span key={c.key} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2.5 pr-1 text-xs text-primary">
-              {filterLabel(c)}
-              <button
-                type="button"
-                aria-label={`移除「${typeof c.header === "string" ? c.header : c.key}」篩選`}
-                onClick={() => clearFilter(c.key)}
-                className="tap-target inline-flex items-center justify-center rounded-full p-0.5 hover:bg-primary/15"
-              >
+          {columns.filter(isFilterActive).flatMap((c) => {
+            const f = getFilter(c.key);
+            const head = typeof c.header === "string" ? c.header : c.key;
+            const k = filterKind(c);
+            if (k === "range") return [{ id: c.key, text: filterLabel(c), remove: () => clearFilter(c.key) }];
+            const vals = k === "select" ? f.values : f.texts;
+            return vals.map((v) => ({
+              id: `${c.key}|${v}`, text: `${head}：${v}`,
+              remove: () => setFilter(c.key, k === "select" ? { values: f.values.filter((x) => x !== v) } : { texts: f.texts.filter((x) => x !== v) }),
+            }));
+          }).map((chip) => (
+            <span key={chip.id} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2.5 pr-1 text-xs text-primary">
+              {chip.text}
+              <button type="button" aria-label={`移除 ${chip.text}`} onClick={chip.remove} className="tap-target inline-flex items-center justify-center rounded-full p-0.5 hover:bg-primary/15">
                 <X className="size-3" />
               </button>
             </span>
@@ -417,14 +422,46 @@ export function DataTable<T>({
                     );
                   })()
                 ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium">包含文字</p>
-                    <Input autoFocus placeholder="輸入關鍵字…" className="h-8" value={f.text} onChange={(e) => setFilter(c.key, { text: e.target.value })} />
-                  </div>
+                  (() => {
+                    const terms = f.texts;
+                    const q = textInput.trim();
+                    const add = (t: string) => { const v = t.trim(); if (!v || terms.includes(v)) return; setFilter(c.key, { texts: [...terms, v] }); setTextInput(""); };
+                    // 推薦：該欄不重複值中，與輸入最相似的前 3 項（起頭 > 包含 > 字元相近）
+                    const sim = (v: string) => { const lv = v.toLowerCase(), lq = q.toLowerCase(); if (!q) return 0.1; if (lv.startsWith(lq)) return 1; if (lv.includes(lq)) return 0.8; const qs = new Set(lq); let hit = 0; qs.forEach((ch) => { if (lv.includes(ch)) hit++; }); return (hit / qs.size) * 0.5; };
+                    const sugg = distinctValues(c).filter((v) => !terms.includes(v)).map((v) => ({ v, s: sim(v) })).filter((x) => (q === "" ? true : x.s >= 0.34)).sort((a, b) => b.s - a.s || a.v.length - b.v.length).slice(0, 3).map((x) => x.v);
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium">包含文字（可多筆，符合任一即列出）</p>
+                        {terms.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {terms.map((t) => (
+                              <span key={t} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                {t}<button type="button" aria-label={`移除 ${t}`} onClick={() => setFilter(c.key, { texts: terms.filter((x) => x !== t) })} className="rounded-full hover:bg-primary/20"><X className="size-3" /></button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <Input autoFocus placeholder="輸入關鍵字，Enter 加入…" className="h-8" value={textInput} onChange={(e) => setTextInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(textInput); } }} />
+                        {sugg.length > 0 && (
+                          <div className="space-y-0.5">
+                            <p className="px-1 text-[11px] text-muted-foreground">推薦（點擊快速加入）</p>
+                            {sugg.map((v) => (
+                              <button key={v} type="button" onClick={() => add(v)} className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs hover:bg-accent">
+                                <Plus className="size-3 shrink-0 text-muted-foreground" /><span className="truncate">{v}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 )}
                 <div className="mt-2 flex justify-between">
                   <Button variant="ghost" size="sm" className="h-7" disabled={!active} onClick={() => clearFilter(c.key)}>清除</Button>
-                  <Button size="sm" className="h-7" onClick={() => setOpenFilter(null)}>完成</Button>
+                  <Button size="sm" className="h-7" onClick={() => {
+                    if (filterKind(c) === "text" && textInput.trim() && !f.texts.includes(textInput.trim())) setFilter(c.key, { texts: [...f.texts, textInput.trim()] });
+                    setOpenFilter(null);
+                  }}>完成</Button>
                 </div>
               </div>
             );
