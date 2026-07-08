@@ -43,8 +43,9 @@ storage undefined 時先想到這裡，不要改測試本身。
    UI 需預攔提示「先取消確認」。**不要**改回「編輯自動解除確認」的舊行為。
    `unconfirmPeriod` 會同步刪該期快照；重新確認時 `ReviewView.doConfirm` 重建。
 4. **比率顯示＝百分比**（使用者拍板）：compa-ratio／市場 compa 顯示 105% 不是 1.05（`ratioPct`）；百分比用 `pctOf`；金額 `ntd`。
-5. **表格一律用 `DataTable`**（`src/components/ui/data-table.tsx`）：欄位設定驅動，內建搜尋/排序/門檻分頁(>25)/
-   合計/凍結首欄/空狀態/CSV。圖表卡用 `ChartCard`。不要退回手刻 `<Table>`（僅可編輯參數格例外）。
+5. **表格一律用 `DataTable`**（`src/components/ui/data-table.tsx`）：欄位設定驅動，內建關鍵字搜尋/**單欄篩選（文字包含·數值範圍）**/
+   排序/**十字對準 highlight**/門檻分頁（每頁 5/15/30/50，預設 15）/合計/凍結首欄/空狀態/CSV。圖表卡用 `ChartCard`。
+   不要退回手刻 `<Table>`（僅可編輯參數格例外）。
 6. **變異顯示用 `<Delta>`**（▲▼＋文字＋色，非純色語意）；空狀態用 `<EmptyState>`；列印靠 `@media print`＋`PrintHeader`。
 7. **敏感異動要入稽核**：新 mutation 記得 `pushAudit`（AuditAction 已含 parameter/dependent/declare/allocation/clear）。
 8. 「帶入上月異動」**不帶獎金與代扣稅**（使用者拍板，防誤重發）；累計獎金由 `ytdBonusBefore` 自動帶入。
