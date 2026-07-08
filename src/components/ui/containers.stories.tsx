@@ -44,8 +44,8 @@ export const 資料表_DataTable: S = {
         searchPlaceholder="搜尋姓名／部門…"
         columns={[
           { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, filterText: (r) => `${r.name} ${r.id}`, cell: (r) => <><span className="font-medium">{r.name}</span><span className="ml-1.5 text-xs text-muted-foreground">{r.id}</span></> },
-          { key: "dept", header: "部門", sortValue: (r) => r.dept, cell: (r) => r.dept },
-          { key: "title", header: "職稱", sortValue: (r) => r.title, cell: (r) => r.title },
+          { key: "dept", header: "部門", sortValue: (r) => r.dept, filter: "select", cell: (r) => r.dept },
+          { key: "title", header: "職稱", sortValue: (r) => r.title, filter: "select", cell: (r) => r.title },
           { key: "tenure", header: "年資（月）", numeric: true, sortValue: (r) => r.tenure, cell: (r) => `${r.tenure} 月` },
           { key: "total", header: "月薪總額", numeric: true, sortValue: (r) => r.total, cell: (r) => ntd(r.total), total: (rs) => ntd(rs.reduce((a, r) => a + r.total, 0)) },
         ]}

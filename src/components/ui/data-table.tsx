@@ -12,7 +12,7 @@ import { useSort, type SortState } from "@/lib/useSort";
 import { csvSerialize } from "@/lib/csv";
 import { saveBlob } from "@/lib/download";
 import { cn } from "@/lib/utils";
-import { Search, Download, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp, ChevronDown, Filter, X } from "lucide-react";
+import { Search, Download, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp, ChevronDown, Filter, X, Check } from "lucide-react";
 
 /** 欄位定義：以設定描述一欄如何顯示、排序、篩選、合計。 */
 export type Column<T> = {
@@ -26,9 +26,9 @@ export type Column<T> = {
   sortValue?: (row: T) => number | string;
   /** 參與關鍵字篩選的文字；未給時數字欄不參與、文字欄以 cell 推導 */
   filterText?: (row: T) => string;
-  /** 單欄篩選型態（Excel 式）：text＝包含、range＝數值範圍、none＝不可篩。
+  /** 單欄篩選型態（Excel 式）：text＝包含、range＝數值範圍、select＝從清單多選、none＝不可篩。
    *  未給則自動判定：數字欄且可排序→range、有 filterText/sortValue→text、其餘 none。 */
-  filter?: "text" | "range" | "none";
+  filter?: "text" | "range" | "select" | "none";
   /** 合計列內容（傳入「篩選後全部」列，非僅當頁） */
   total?: (rows: T[]) => ReactNode;
   /** 凍結為首欄（長表水平捲動保留脈絡） */
@@ -39,8 +39,8 @@ export type Column<T> = {
   truncate?: number;
 };
 
-type ColFilter = { text: string; min: string; max: string };
-const EMPTY_FILTER: ColFilter = { text: "", min: "", max: "" };
+type ColFilter = { text: string; min: string; max: string; values: string[] };
+const EMPTY_FILTER: ColFilter = { text: "", min: "", max: "", values: [] };
 const POP_W = 224;
 
 export type DataTableProps<T> = {
@@ -89,19 +89,23 @@ export function DataTable<T>({
   const [colFilters, setColFilters] = useState<Record<string, ColFilter>>({});
   const [openFilter, setOpenFilter] = useState<{ key: string; top: number; left: number } | null>(null);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const [selQuery, setSelQuery] = useState(""); // 多選篩選 popover 內的清單搜尋
+  useEffect(() => { setSelQuery(""); }, [openFilter?.key]);
 
   const tableRef = useRef<HTMLTableElement>(null);
   const headRefs = useRef<(HTMLTableCellElement | null)[]>([]);
   const resizing = useRef<{ key: string; startX: number; startW: number } | null>(null);
 
   // 欄位篩選型態（顯式 > 自動判定）
-  const filterKind = (c: Column<T>): "text" | "range" | "none" =>
+  const filterKind = (c: Column<T>): "text" | "range" | "select" | "none" =>
     c.filter ?? (c.numeric && c.sortValue ? "range" : c.filterText || c.sortValue ? "text" : "none");
   const colText = (c: Column<T>, r: T) => (c.filterText ? c.filterText(r) : c.sortValue ? String(c.sortValue(r)) : "");
+  const distinctValues = (c: Column<T>) => [...new Set(rows.map((r) => colText(c, r)).filter((v) => v !== ""))].sort();
   const getFilter = (key: string) => colFilters[key] ?? EMPTY_FILTER;
   const isFilterActive = (c: Column<T>) => {
     const f = getFilter(c.key);
-    return filterKind(c) === "range" ? f.min !== "" || f.max !== "" : f.text.trim() !== "";
+    const k = filterKind(c);
+    return k === "range" ? f.min !== "" || f.max !== "" : k === "select" ? f.values.length > 0 : f.text.trim() !== "";
   };
   const activeFilterCount = columns.filter(isFilterActive).length;
   const setFilter = (key: string, patch: Partial<ColFilter>) =>
@@ -112,11 +116,16 @@ export function DataTable<T>({
   const filterLabel = (c: Column<T>) => {
     const f = getFilter(c.key);
     const head = typeof c.header === "string" ? c.header : c.key;
-    if (filterKind(c) === "range") {
+    const k = filterKind(c);
+    if (k === "range") {
       const parts: string[] = [];
       if (f.min !== "") parts.push(`≥ ${f.min}`);
       if (f.max !== "") parts.push(`≤ ${f.max}`);
       return `${head}：${parts.join("、")}`;
+    }
+    if (k === "select") {
+      const shown = f.values.slice(0, 2).join("、");
+      return `${head}：${shown}${f.values.length > 2 ? ` 等 ${f.values.length} 項` : ""}`;
     }
     return `${head}：含「${f.text.trim()}」`;
   };
@@ -132,11 +141,14 @@ export function DataTable<T>({
       if (q && !rowText(r).includes(q)) return false;
       for (const c of active) {
         const f = getFilter(c.key);
-        if (filterKind(c) === "range") {
+        const k = filterKind(c);
+        if (k === "range") {
           const v = Number(c.sortValue?.(r));
           if (Number.isNaN(v)) return false;
           if (f.min !== "" && v < Number(f.min)) return false;
           if (f.max !== "" && v > Number(f.max)) return false;
+        } else if (k === "select") {
+          if (!f.values.includes(colText(c, r))) return false;
         } else if (!colText(c, r).toLowerCase().includes(f.text.trim().toLowerCase())) {
           return false;
         }
@@ -376,6 +388,34 @@ export function DataTable<T>({
                       <Input type="number" placeholder="最大" className="h-8 tabular-nums" value={f.max} onChange={(e) => setFilter(c.key, { max: e.target.value })} />
                     </div>
                   </div>
+                ) : filterKind(c) === "select" ? (
+                  (() => {
+                    const all = distinctValues(c);
+                    const shown = all.filter((v) => v.toLowerCase().includes(selQuery.toLowerCase()));
+                    const toggle = (v: string) => setFilter(c.key, { values: f.values.includes(v) ? f.values.filter((x) => x !== v) : [...f.values, v] });
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium">選取值（多選）</p>
+                        {all.length > 8 && <Input autoFocus placeholder="搜尋值…" className="h-8" value={selQuery} onChange={(e) => setSelQuery(e.target.value)} />}
+                        <div className="max-h-48 space-y-0.5 overflow-y-auto">
+                          {shown.length === 0 && <p className="px-1 py-2 text-xs text-muted-foreground">無符合的值</p>}
+                          {shown.map((v) => {
+                            const on = f.values.includes(v);
+                            return (
+                              <button key={v} type="button" onClick={() => toggle(v)} className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-xs hover:bg-accent">
+                                <span className={cn("flex size-4 shrink-0 items-center justify-center rounded border", on ? "border-primary bg-primary text-primary-foreground" : "border-input")}>{on && <Check className="size-3" />}</span>
+                                <span className="truncate">{v}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex gap-3 text-xs text-muted-foreground">
+                          <button type="button" className="hover:underline" onClick={() => setFilter(c.key, { values: all })}>全選</button>
+                          <button type="button" className="hover:underline" onClick={() => setFilter(c.key, { values: [] })}>取消全選</button>
+                        </div>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="space-y-2">
                     <p className="text-xs font-medium">包含文字</p>

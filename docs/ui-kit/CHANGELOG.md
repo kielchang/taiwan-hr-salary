@@ -3,6 +3,11 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.5.0] - 2026-07-08
+
+### 新增（DataTable）
+- **多選篩選（select）**：欄位設 `filter: "select"` 時，篩選 popover 改為該欄**不重複值的勾選清單**（>8 項附搜尋、全選／取消全選），符合 Excel 的多選篩選；條件標籤顯示「欄：值1、值2 等 N 項」。
+
 ## [0.4.0] - 2026-07-08
 
 ### 新增（DataTable）
