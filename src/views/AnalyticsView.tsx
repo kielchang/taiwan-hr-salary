@@ -30,6 +30,7 @@ import { StackedBar, BarChart, LineChart, Pareto, Scatter, Bullet, Heatmap, Tren
 import { Delta } from "@/components/ui/delta";
 import { DataTable } from "@/components/ui/data-table";
 import { ChartCard } from "@/components/ui/chart-card";
+import { TabPills } from "@/components/ui/tab-pills";
 import {
   analyzeCost, analyzeDistribution, analyzeGrades, analyzeBonus, analyzeRaise,
   analyzeMarket, analyzeTrend, analyzeBudget, analyzeProjectCost, type Insight,
@@ -132,14 +133,7 @@ export function AnalyticsView() {
             <p className="mb-0.5 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {g.title}{g.tag && <span className={cn("ml-1 rounded px-1 py-0.5 text-[9px]", g.tag === "例行" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700")}>{g.tag}</span>}
             </p>
-            <div className="flex flex-wrap gap-1">
-              {g.tabs.map((k) => (
-                <button key={k} onClick={() => setTab(k)}
-                  className={cn("rounded-md px-3 py-1.5 text-sm", tab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
-                  {TAB_LABEL[k]}
-                </button>
-              ))}
-            </div>
+            <TabPills tabs={g.tabs.map((k) => ({ key: k, label: TAB_LABEL[k] }))} value={tab} onChange={(k) => setTab(k as typeof tab)} />
           </div>
         ))}
       </div>

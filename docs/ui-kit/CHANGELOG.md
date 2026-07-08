@@ -3,6 +3,11 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.7.0] - 2026-07-08
+
+### 新增
+- **TabPills**（分頁膠囊列）：全站分頁切換的統一元件（tablist/tab 語意＋觸控目標）。取代各畫面手刻的 `<button>` 分頁列——ProjectsView／ReportsHubView／SettingsView／FilingView／AnalyticsView／MasterDataView 皆改用，樣式集中、一改全站同步。
+
 ## [0.6.0] - 2026-07-08
 
 ### 變更（DataTable 文字篩選）

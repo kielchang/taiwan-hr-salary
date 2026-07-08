@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { EditableField } from "@/components/form/EditableField";
 import { ChangeSummary } from "@/components/form/ChangeSummary";
+import { TabPills } from "@/components/ui/tab-pills";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION } from "@/store/usePayrollStore";
@@ -26,7 +27,7 @@ import { parseIpList } from "@/lib/attendance";
 import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
 import { csvSerialize } from "@/lib/csv";
-import { cn, ntd } from "@/lib/utils";
+import { ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban } from "lucide-react";
@@ -201,14 +202,7 @@ export function SettingsView() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1">
-        {SEC_TABS.map(([k, label]) => (
-          <button key={k} onClick={() => setSecTab(k)}
-            className={cn("rounded-md px-3 py-1.5 text-sm", secTab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabPills tabs={SEC_TABS.map(([k, label]) => ({ key: k, label }))} value={secTab} onChange={(k) => setSecTab(k as SecTab)} />
 
       {secTab === "company" && (
       <Card>

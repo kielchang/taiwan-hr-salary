@@ -29,6 +29,7 @@ export * from "./ui/tooltip";
 // 資料呈現容器
 export * from "./ui/data-table";
 export * from "./ui/chart-card";
+export * from "./ui/tab-pills";
 
 // 零相依 SVG 圖表
 export * from "./charts";

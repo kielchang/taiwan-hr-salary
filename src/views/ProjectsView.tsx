@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows } from "@/store/selectors";
-import { cn } from "@/lib/utils";
+import { TabPills } from "@/components/ui/tab-pills";
 import { ProjectMasterCard } from "@/views/SettingsView";
 import { ProjectCostTab } from "@/views/AnalyticsView";
 import { AllocationEditor } from "@/views/AllocationEditor";
@@ -36,14 +36,7 @@ export function ProjectsView() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1">
-        {TABS.map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={cn("rounded-md px-3 py-1.5 text-sm", tab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabPills tabs={TABS.map(([k, label]) => ({ key: k, label }))} value={tab} onChange={(k) => setTab(k as Tab)} />
 
       {tab === "master" && <ProjectMasterCard />}
       {tab === "alloc" && <AllocationEditor />}

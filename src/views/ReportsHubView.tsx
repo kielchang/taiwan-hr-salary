@@ -6,7 +6,7 @@
 //  - 支援 ?tab= 深連結（工作台待辦一鍵跳到對應報表），消化後即清除參數避免殘留。
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { cn, formatPeriod } from "@/lib/utils";
+import { formatPeriod } from "@/lib/utils";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { ReportsView, type ReportsTab } from "@/views/ReportsView";
 import { FilingView, type FilingTab } from "@/views/FilingView";
 import { HelpHint } from "@/components/HelpHint";
+import { TabPills } from "@/components/ui/tab-pills";
 import { FileText } from "lucide-react";
 
 type Group = "monthly" | "filing";
@@ -62,14 +63,7 @@ export function ReportsHubView() {
           <p className="text-[11px] text-muted-foreground">{formatPeriod(currentPeriod)}</p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-1 print:hidden">
-        {GROUPS.map(([g, label]) => (
-          <button key={g} onClick={() => setGroup(g)}
-            className={cn("rounded-md px-3 py-1.5 text-sm", group === g ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabPills className="print:hidden" tabs={GROUPS.map(([g, label]) => ({ key: g, label }))} value={group} onChange={(g) => setGroup(g as Group)} />
       <p className="text-xs text-muted-foreground print:hidden">{desc}</p>
       {group === "monthly"
         ? <ReportsView key={monthlyTab ?? "d"} initialTab={monthlyTab} />

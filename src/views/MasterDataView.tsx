@@ -26,6 +26,7 @@ import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import { EditableField } from "@/components/form/EditableField";
 import { ChangeSummary } from "@/components/form/ChangeSummary";
+import { TabPills } from "@/components/ui/tab-pills";
 import { diffRecord, type FieldSpec, type Change, type FieldKind } from "@/lib/forms/diff";
 import { Pencil, Plus, Trash2, UserPlus, Upload, FileDown } from "lucide-react";
 
@@ -405,26 +406,12 @@ export function MasterDataView() {
             <DialogTitle>{isNew ? "新增員工" : `${draftEmp.name} 的員工檔案`}</DialogTitle>
           </DialogHeader>
 
-          <div className="flex gap-1 border-b pb-2">
-            {(
-              [
-                ["basic", "基本資料"],
-                ["salary", "固定薪資項目"],
-                ["family", "眷屬與扣繳"],
-              ] as [DialogTab, string][]
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm",
-                  tab === k ? "bg-primary text-primary-foreground" : "hover:bg-accent",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <TabPills
+            className="border-b pb-2"
+            tabs={([["basic", "基本資料"], ["salary", "固定薪資項目"], ["family", "眷屬與扣繳"]] as [DialogTab, string][]).map(([k, label]) => ({ key: k, label }))}
+            value={tab}
+            onChange={(k) => setTab(k as DialogTab)}
+          />
 
           {tab === "basic" && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

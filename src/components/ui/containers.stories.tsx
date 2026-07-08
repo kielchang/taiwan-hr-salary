@@ -4,6 +4,7 @@ import { ChartCard } from "./chart-card";
 import { DataTable } from "./data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
+import { TabPills } from "./tab-pills";
 import { Button } from "./button";
 import { Badge } from "./badge";
 import { StackedBar, BarChart, Pareto, PALETTE } from "@/components/charts";
@@ -141,6 +142,20 @@ export const 圖表卡_互動: StoryObj<{ 標題: string; 說明: string; 圖表
         </ChartCard>
       </div>
     );
+  },
+};
+
+/** 分頁膠囊列（全站分頁切換統一元件）：右側 Controls 調整分頁數。 */
+export const 分頁膠囊_TabPills: StoryObj<{ 分頁數: number }> = {
+  args: { 分頁數: 4 },
+  argTypes: { 分頁數: { control: { type: "range", min: 2, max: 8, step: 1 } } },
+  render: (a) => {
+    const Demo = () => {
+      const tabs = Array.from({ length: a.分頁數 }, (_, i) => ({ key: String(i), label: `分頁 ${i + 1}` }));
+      const [v, setV] = useState("0");
+      return <div className="w-[520px]"><TabPills tabs={tabs} value={v} onChange={setV} /><p className="mt-3 text-sm text-muted-foreground">目前：分頁 {Number(v) + 1}</p></div>;
+    };
+    return <Demo key={a.分頁數} />;
   },
 };
 

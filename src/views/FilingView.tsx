@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { TabPills } from "@/components/ui/tab-pills";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -42,14 +43,7 @@ export function FilingView({ initialTab }: { initialTab?: FilingTab } = {}) {
           （本系統不直接介接政府申報，報表可匯出 CSV）。
         </p>
       </div>
-      <div className="flex flex-wrap gap-1 print:hidden">
-        {TABS.map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={cn("rounded-md px-3 py-1.5 text-sm", tab === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabPills className="print:hidden" tabs={TABS.map(([k, label]) => ({ key: k, label }))} value={tab} onChange={(k) => setTab(k as FilingTab)} />
       {tab === "withholding" && <WithholdingTab />}
       {tab === "insurance" && <InsuranceTab />}
       {tab === "bracket" && <BracketTab />}

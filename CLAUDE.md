@@ -46,7 +46,8 @@ storage undefined 時先想到這裡，不要改測試本身。
 5. **表格一律用 `DataTable`**（`src/components/ui/data-table.tsx`）：欄位設定驅動，內建關鍵字搜尋/**單欄篩選（文字包含·數值範圍）**/
    排序/**十字對準 highlight**/門檻分頁（每頁 5/15/30/50，預設 15）/合計/凍結首欄/空狀態/CSV。圖表卡用 `ChartCard`。
    不要退回手刻 `<Table>`（僅可編輯參數格例外）。
-6. **變異顯示用 `<Delta>`**（▲▼＋文字＋色，非純色語意）；空狀態用 `<EmptyState>`；列印靠 `@media print`＋`PrintHeader`。
+6. **變異顯示用 `<Delta>`**（▲▼＋文字＋色，非純色語意）；空狀態用 `<EmptyState>`；**分頁切換一律用 `<TabPills>`**
+   （勿再手刻 `<button>` 分頁列，否則改樣式無法全站同步）；列印靠 `@media print`＋`PrintHeader`。
 7. **敏感異動要入稽核**：新 mutation 記得 `pushAudit`（AuditAction 已含 parameter/dependent/declare/allocation/clear）。
 8. 「帶入上月異動」**不帶獎金與代扣稅**（使用者拍板，防誤重發）；累計獎金由 `ytdBonusBefore` 自動帶入。
 9. **元件庫邊界不可耦合 app**（使用者拍板：未來要切成共用套件統一介面風格）：`src/components/{ui,form,charts}`＋
