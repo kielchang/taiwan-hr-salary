@@ -1,4 +1,36 @@
-// 應用狀態 — 以 zustand persist middleware 寫入瀏覽器 localStorage（在地操作、離線可用）。
+// ─────────────────────────────────────────────────────────────────────────
+// 應用狀態（single source of truth）— zustand ＋ persist middleware，寫入瀏覽器
+// localStorage（純前端、離線可用、無後端）。以下是這支 store 的設計原理，改動前必讀。
+//
+// ── 分層邊界
+//   store 只做「狀態＋mutation＋稽核」；計算全部委給純函數層 `lib/calc/*`（store 呼叫 calc，
+//   calc 絕不 import store）。衍生讀取（列表/在職判定/累計獎金）放 `store/selectors.ts`，
+//   不塞進 store，維持 state 精簡、可序列化。
+//
+// ── 硬鎖定（hard-lock，使用者拍板；勿改回舊行為）
+//   `isPeriodLocked(confirmations, period)`＝該月已確認＝資料凍結。所有「影響薪資計算」的
+//   mutation 在當期已確認時一律 **no-op（直接 return st）**：參數/級距/給薪政策/薪資/眷屬/
+//   事件/調薪核定…。員工主檔只鎖「影響計算的欄位」（`EMP_PAY_FIELDS`），聯絡資訊等仍可改。
+//   UI 需**預先攔截並提示「先取消確認」**。**不要**改回「編輯即自動解除確認」的舊設計
+//   （會讓已申報月份被無聲改動）。
+//
+// ── 確認 / 快照（月結凍結與趨勢一致性）
+//   `confirmPeriod` 蓋確認時戳；`unconfirmPeriod` 會**一併刪除該期快照**，重新確認時以最新
+//   資料重建——避免趨勢圖/環比讀到失真的舊快照。
+//
+// ── 稽核（可追溯）
+//   敏感異動都經 `makeAudit`＋`pushAudit` 追加一筆（最新在前、上限 `AUDIT_CAP`＝1000）；
+//   actor＝`operatorName`。新增 mutation 請記得補稽核（見 CLAUDE.md 鐵律 7）。
+//
+// ── 刪除連鎖（不留孤兒資料）
+//   `removeEmployee` 會連帶清除該員的薪資/眷屬/事件/打卡/工時分攤/申報基準/排程調薪/分析對應，
+//   確保沒有指向已刪員工的殘留資料。
+//
+// ── persist 相容策略（免逐欄 migration）
+//   `version`＝`STORE_VERSION`；`migrate` 只處理**結構性**升級（v1→v2：由 employees[].project
+//   合成專案主檔）。新增的「選填欄位」靠 `merge` 與預設**深度合併**自動補上，故多數新功能
+//   免寫 migration（如 leavePolicy/salaryDefaults/customAllowances 皆選填、合併相容）。
+// ─────────────────────────────────────────────────────────────────────────
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_PARAMETERS, type Parameters } from "@/config/parameters";
