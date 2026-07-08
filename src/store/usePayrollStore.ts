@@ -214,6 +214,8 @@ interface PayrollState {
   /** 稽核軌跡 */
   auditLog: AuditEntry[];
   clearAuditLog: () => void;
+  /** F6：把某筆可回復稽核（逐欄編輯）的記錄還原成變更前的值；鎖定期間 no-op（UI 預攔）。回復本身另記一筆稽核。 */
+  restoreAudit: (id: string) => void;
 
   /** 批次匯入員工＋薪資 */
   importEmployees: (rows: { employee: Employee; salary: SalaryStructure }[]) => void;
@@ -268,6 +270,11 @@ function makeAudit(actor: string, action: AuditAction, summary: string, extra: P
   return { id: newId(), at: new Date().toISOString(), actor: actor?.trim() || "（未具名）", action, summary, ...extra };
 }
 const pushAudit = (log: AuditEntry[], entry: AuditEntry) => [entry, ...log].slice(0, AUDIT_CAP);
+
+/** F6：此筆稽核是否可「回復」＝有結構化 before/after 的逐欄編輯，且本身不是回復動作。 */
+export function auditRestorable(e: AuditEntry): boolean {
+  return !!e.restoreKind && e.before != null && e.after != null && !e.restoredFrom;
+}
 
 export const usePayrollStore = create<PayrollState>()(
   persist(
@@ -361,6 +368,43 @@ export const usePayrollStore = create<PayrollState>()(
 
       auditLog: DEMO.auditLog,
       clearAuditLog: () => set({ auditLog: [] }),
+      restoreAudit: (id) =>
+        set((st) => {
+          const entry = st.auditLog.find((a) => a.id === id);
+          if (!entry || !auditRestorable(entry)) return st;
+          // 鎖定守衛：event 看該筆 period，其餘（主檔類）看當期；已確認即不可回復（同硬鎖定鐵律）。
+          const lockPeriod = entry.restoreKind === "event" ? (entry.period ?? st.currentPeriod) : st.currentPeriod;
+          if (isPeriodLocked(st.confirmations, lockPeriod)) return st;
+          const logEntry = makeAudit(st.operatorName, entry.action, `回復：${entry.summary}`, {
+            targetId: entry.targetId,
+            period: entry.period,
+            restoredFrom: entry.id,
+          });
+          const auditLog = pushAudit(st.auditLog, logEntry);
+          switch (entry.restoreKind) {
+            case "salary": {
+              const rec = entry.before as SalaryStructure;
+              return { salaries: st.salaries.map((x) => (x.employeeId === rec.employeeId ? rec : x)), auditLog };
+            }
+            case "employee": {
+              const rec = entry.before as Employee;
+              return { employees: st.employees.map((e) => (e.id === rec.id ? rec : e)), auditLog };
+            }
+            case "dependent": {
+              const rec = entry.before as Dependent;
+              return { dependents: st.dependents.map((d) => (d.id === rec.id ? rec : d)), auditLog };
+            }
+            case "event": {
+              const rec = entry.before as MonthlyEvent;
+              return {
+                events: st.events.map((x) => (x.employeeId === rec.employeeId && x.period === rec.period ? rec : x)),
+                auditLog,
+              };
+            }
+            default:
+              return st;
+          }
+        }),
 
       // 批次匯入＝以員工編號 upsert（同 id 覆蓋、新 id 追加）；不刪除既有未列於匯入檔的員工。
       importEmployees: (rows) =>
@@ -390,16 +434,26 @@ export const usePayrollStore = create<PayrollState>()(
       applyRaise: (rows, note) =>
         set((st) => {
           if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          // F7：寫回時同步彙整摘要——調整人數、月薪資總額增減合計與平均調幅，寫入稽核（可稽可查）。
+          let totalBefore = 0;
+          let totalAfter = 0;
           const salaries = st.salaries.map((s) => {
             const r = rows.find((x) => x.employeeId === s.employeeId);
             if (!r) return s;
             const allowances = sumSalary(s) - s.baseSalary; // 加給維持不變，差額套在本薪
+            totalBefore += sumSalary(s);
+            totalAfter += r.newSalary;
             return { ...s, baseSalary: Math.max(0, r.newSalary - allowances) };
           });
+          const delta = totalAfter - totalBefore;
+          const avgPct = totalBefore > 0 ? (delta / totalBefore) * 100 : 0;
+          const summary =
+            `核定調薪：${rows.length} 人寫回薪資，月薪資總額 ${totalBefore.toLocaleString()} → ${totalAfter.toLocaleString()}` +
+            `（${delta >= 0 ? "+" : ""}${delta.toLocaleString()}、平均 ${avgPct >= 0 ? "+" : ""}${avgPct.toFixed(1)}%）` +
+            `${note ? `（${note}）` : ""}`;
           return {
             salaries,
-            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "raiseApply",
-              `核定調薪方案：${rows.length} 人寫回薪資${note ? `（${note}）` : ""}`)),
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "raiseApply", summary)),
           };
         }),
 
@@ -563,7 +617,9 @@ export const usePayrollStore = create<PayrollState>()(
             : statusChanged
               ? `${emp.name} 狀態 ${prev?.status ?? "在職"} → ${emp.status ?? "在職"}${emp.leaveDate ? `（${emp.leaveDate}）` : ""}`
               : `更新員工 ${emp.name}（${emp.id}）`;
-          return { employees, salaries, auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "employee", summary, { targetId: emp.id })) };
+          // F6：僅「更新既有員工」附結構化 before/after 供回復（新增不可回復）。
+          const restore = exists ? { restoreKind: "employee" as const, before: prev, after: emp } : {};
+          return { employees, salaries, auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "employee", summary, { targetId: emp.id, ...restore })) };
         }),
       removeEmployee: (id) =>
         set((st) => {
@@ -596,7 +652,7 @@ export const usePayrollStore = create<PayrollState>()(
             exists && before !== after
               ? pushAudit(st.auditLog, makeAudit(st.operatorName, "salary",
                   `${st.employees.find((e) => e.id === s.employeeId)?.name ?? s.employeeId} 月薪資總額 ${before} → ${after}`,
-                  { targetId: s.employeeId }))
+                  { targetId: s.employeeId, restoreKind: "salary", before: prev, after: s })) // F6：可回復
               : st.auditLog;
           return {
             salaries: exists
@@ -612,12 +668,14 @@ export const usePayrollStore = create<PayrollState>()(
       upsertDependent: (d) =>
         set((st) => {
           if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定
+          const prev = st.dependents.find((x) => x.id === d.id);
+          const restore = prev ? { restoreKind: "dependent" as const, before: prev, after: d } : {}; // F6：僅更新可回復
           return {
-            dependents: st.dependents.some((x) => x.id === d.id)
+            dependents: prev
               ? st.dependents.map((x) => (x.id === d.id ? d : x))
               : [...st.dependents, d],
             auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "dependent",
-              `異動眷屬 ${d.name}（${d.relationship}）`, { targetId: d.employeeId })),
+              `異動眷屬 ${d.name}（${d.relationship}）`, { targetId: d.employeeId, ...restore })),
           };
         }),
       removeDependent: (id) =>
@@ -654,10 +712,12 @@ export const usePayrollStore = create<PayrollState>()(
           const prev = st.events.find((x) => x.employeeId === e.employeeId && x.period === e.period);
           // 僅就敏感欄位（代扣稅）留稽核，避免一般時數異動灌爆紀錄
           const taxChanged = (prev?.withheldTax ?? null) !== (e.withheldTax ?? null);
+          // F6：代扣稅異動且該員該期原本已有事件記錄時可回復（無 prev＝新建，不回復）。
+          const eventRestore = prev ? { restoreKind: "event" as const, before: prev, after: e } : {};
           const log = taxChanged
             ? pushAudit(st.auditLog, makeAudit(st.operatorName, "event",
                 `${st.employees.find((x) => x.id === e.employeeId)?.name ?? e.employeeId} ${e.period} 代扣稅 ${prev?.withheldTax ?? "未填"} → ${e.withheldTax ?? "未填"}`,
-                { targetId: e.employeeId, period: e.period }))
+                { targetId: e.employeeId, period: e.period, ...eventRestore }))
             : st.auditLog;
           return {
             auditLog: log,

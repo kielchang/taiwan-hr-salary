@@ -52,6 +52,9 @@ storage undefined 時先想到這裡，不要改測試本身。
 6. **變異顯示用 `<Delta>`**（▲▼＋文字＋色，非純色語意）；空狀態用 `<EmptyState>`；**分頁切換一律用 `<TabPills>`**
    （勿再手刻 `<button>` 分頁列，否則改樣式無法全站同步）；列印靠 `@media print`＋`PrintHeader`。
 7. **敏感異動要入稽核**：新 mutation 記得 `pushAudit`（AuditAction 已含 parameter/dependent/declare/allocation/clear）。
+   **逐欄編輯類（salary/employee/dependent/event）的更新**須附結構化 `before/after`＋`restoreKind`（見 `AuditEntry`），
+   讓「回復」（`restoreAudit`，設定頁稽核表的「回復」鈕）能把記錄還原成變更前值；回復受硬鎖定守衛（已確認期間 no-op）、
+   本身另記一筆稽核（`restoredFrom`）。新增/刪除/批次/確認類**不附** before/after ＝不可回復（`auditRestorable` 判定）。
 8. 「帶入上月異動」**不帶獎金與代扣稅**（使用者拍板，防誤重發）；累計獎金由 `ytdBonusBefore` 自動帶入。
 9. **元件庫邊界不可耦合 app**（使用者拍板：未來要切成共用套件統一介面風格）：`src/components/{ui,form,charts}`＋
    `NumberInput/Stepper/ErrorBoundary`＋支撐工具（`lib/utils`・`useSort`・`csv`・`forms/diff`・`download`）**只能**依賴設計 token

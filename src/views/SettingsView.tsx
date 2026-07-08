@@ -20,7 +20,7 @@ import { ChangeSummary } from "@/components/form/ChangeSummary";
 import { TabPills } from "@/components/ui/tab-pills";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus } from "@/lib/types";
-import { usePayrollStore, STORE_VERSION } from "@/store/usePayrollStore";
+import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
 import { parseIpList } from "@/lib/attendance";
@@ -111,7 +111,7 @@ type SecTab = "legal" | "company" | "data";
 const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", "公司與出勤"], ["data", "資料與安全"]];
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, currentPeriod, confirmations } = usePayrollStore();
+  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
   const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：當期已確認 → 參數/級距凍結
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -329,6 +329,25 @@ export function SettingsView() {
               { key: "actor", header: "操作者", sortValue: (a) => a.actor, filterText: (a) => a.actor, cell: (a) => <span className="text-sm">{a.actor}</span> },
               { key: "action", header: "類別", sortValue: (a) => AUDIT_LABEL[a.action], filterText: (a) => AUDIT_LABEL[a.action], cell: (a) => <Badge variant="outline">{AUDIT_LABEL[a.action]}</Badge> },
               { key: "summary", header: "說明", sortValue: (a) => a.summary, filterText: (a) => a.summary, cell: (a) => <span className="text-sm">{a.summary}</span> },
+              {
+                key: "restore", header: "", headerClassName: "w-24",
+                cell: (a) => {
+                  if (!auditRestorable(a)) return null;
+                  // 鎖定守衛：event 看該筆 period，其餘（主檔類）看當期；已確認即不可回復（UI 預攔）。
+                  const lockPeriod = a.restoreKind === "event" ? (a.period ?? currentPeriod) : currentPeriod;
+                  const rowLocked = isPeriodLocked(confirmations, lockPeriod);
+                  return (
+                    <Button
+                      variant="outline" size="sm" className="tap-target"
+                      disabled={rowLocked}
+                      title={rowLocked ? "該期已確認鎖定，請先取消確認再回復" : "把此筆變更還原成變更前的值"}
+                      onClick={() => { if (confirm(`確定回復此筆變更？\n\n${a.summary}\n\n將還原成變更前的值，並另記一筆稽核。`)) restoreAudit(a.id); }}
+                    >
+                      <RotateCcw className="size-3.5" /> 回復
+                    </Button>
+                  );
+                },
+              },
             ]}
           />
         </CardContent>

@@ -7,7 +7,7 @@ import {
   validateAll, allocationIssues, checkLifecycleDates, checkNationalIds, checkCumulativeBonus,
 } from "@/lib/validation";
 import { ytdBonusBefore } from "@/store/selectors";
-import { usePayrollStore, isPeriodLocked, blankEvent } from "@/store/usePayrollStore";
+import { usePayrollStore, isPeriodLocked, blankEvent, auditRestorable } from "@/store/usePayrollStore";
 import { SEED_EMPLOYEES, evt, salary } from "@/data/seed";
 import type { Allocation, Employee } from "@/lib/types";
 
@@ -130,5 +130,45 @@ describe("硬鎖定守衛（store）", () => {
     st().applyScheduledRaise(item.id);
     expect(sumOf(st().salaries.find((s) => s.employeeId === empId)!)).toBe(target);
     expect(st().scheduledRaises.some((r) => r.id === item.id)).toBe(false);
+  });
+});
+
+describe("F6 稽核回復（restoreAudit）", () => {
+  const st = () => usePayrollStore.getState();
+
+  it("薪資編輯可回復：把記錄還原成變更前值，並另記一筆回復稽核", () => {
+    st().setCurrentPeriod("2028-01");
+    const empId = st().employees[0].id;
+    const before = st().salaries.find((s) => s.employeeId === empId)!;
+    st().upsertSalary({ ...before, baseSalary: before.baseSalary + 5000 });
+    expect(st().salaries.find((s) => s.employeeId === empId)!.baseSalary).toBe(before.baseSalary + 5000);
+    // 取最新一筆可回復的 salary 稽核
+    const entry = st().auditLog.find((a) => a.action === "salary" && auditRestorable(a))!;
+    expect(entry).toBeTruthy();
+    st().restoreAudit(entry.id);
+    // 記錄已還原
+    expect(st().salaries.find((s) => s.employeeId === empId)!.baseSalary).toBe(before.baseSalary);
+    // 回復動作本身另記一筆、且不可再回復
+    const restoreEntry = st().auditLog.find((a) => a.restoredFrom === entry.id)!;
+    expect(restoreEntry).toBeTruthy();
+    expect(auditRestorable(restoreEntry)).toBe(false);
+  });
+
+  it("鎖定期間不可回復（no-op）；批次/確認類不可回復", () => {
+    const period = "2028-02";
+    st().setCurrentPeriod(period);
+    const empId = st().employees[0].id;
+    const before = st().salaries.find((s) => s.employeeId === empId)!;
+    st().upsertSalary({ ...before, baseSalary: before.baseSalary + 3000 });
+    const entry = st().auditLog.find((a) => a.action === "salary" && auditRestorable(a))!;
+    // 確認鎖定當期後回復應 no-op
+    st().saveSnapshot({ period, savedAt: "t", headcount: 1, totalSalary: 1, meanSalary: 1, medianSalary: 1, totalCost: 1, employerBurden: 0, overtimePay: 0, bonusTotal: 0, gini: 0 });
+    st().confirmPeriod(period);
+    st().restoreAudit(entry.id);
+    expect(st().salaries.find((s) => s.employeeId === empId)!.baseSalary).toBe(before.baseSalary + 3000); // 未還原
+    // confirm 類稽核不可回復
+    const confirmEntry = st().auditLog.find((a) => a.action === "confirm")!;
+    expect(auditRestorable(confirmEntry)).toBe(false);
+    st().unconfirmPeriod(period);
   });
 });

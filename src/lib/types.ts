@@ -276,6 +276,9 @@ export type AuditAction =
   | "allocation" // 工時分攤異動
   | "clear"; // 清空資料
 
+/** F6 可回復稽核的類別（僅逐欄編輯類；批次匯入/調薪核定/月結確認/清空不可回復）。 */
+export type AuditRestoreKind = "salary" | "employee" | "dependent" | "event";
+
 export interface AuditEntry {
   id: string;
   at: string; // ISO
@@ -284,6 +287,11 @@ export interface AuditEntry {
   targetId?: string; // 員工編號等
   period?: string;
   summary: string; // 一句話描述（含前後值）
+  // ── F6：結構化前後值。僅「逐欄編輯的更新」具備（新增/刪除/批次不填）；供「回復」還原用。
+  restoreKind?: AuditRestoreKind; // 有值＝此筆可回復（把記錄還原成 before）
+  before?: unknown; // 變更前的完整記錄（還原目標）
+  after?: unknown; // 變更後的完整記錄（僅供對照顯示）
+  restoredFrom?: string; // 若此筆＝回復動作，記來源稽核 id（回復動作本身不可再回復）
 }
 
 /* ───────────── 調薪排程（核定於未來月份生效） ───────────── */
