@@ -85,3 +85,15 @@ describe("元件庫邊界（不得耦合 app 模組）", () => {
     });
   }
 });
+
+// 統一設計語言守衛：元件庫不得出現「原始調色盤字面色」（amber/emerald/rose/sky/orange/yellow-NNN），
+// 強制走語意 token（success/warning/info/danger/edit）。避免狀態色散落各處、改一次無法全站同步。
+const FORBIDDEN_PALETTE = /\b(?:border|bg|text|ring|from|to|via|fill|stroke)-(?:amber|emerald|rose|sky|orange|yellow)-\d{2,3}\b/g;
+describe("元件庫設計語言（狀態色須走語意 token）", () => {
+  for (const rel of collect()) {
+    it(`${rel} 不含原始調色盤字面色`, () => {
+      const hits = [...readFileSync(join(ROOT, rel), "utf8").matchAll(FORBIDDEN_PALETTE)].map((m) => m[0]);
+      expect(hits, `${rel} 請改用語意 token（如 text-success/border-edit）：${[...new Set(hits)].join(", ")}`).toEqual([]);
+    });
+  }
+});

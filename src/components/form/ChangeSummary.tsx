@@ -9,11 +9,11 @@ type Pending = { field: string; from: string; to: string } | { all: true };
 /** 行內還原確認：顯示 現值→還原後，確認才執行（與欄位 undo 一致）。 */
 function RevertConfirm({ from, to, onCancel, onConfirm }: { from: string; to: string; onCancel: () => void; onConfirm: () => void }) {
   return (
-    <span className="flex flex-1 flex-wrap items-center gap-1.5 rounded border border-amber-400 bg-amber-50 px-2 py-1">
-      <span className="font-medium text-amber-900">還原？</span>
+    <span className="flex flex-1 flex-wrap items-center gap-1.5 rounded border border-edit bg-edit-bg px-2 py-1">
+      <span className="font-medium text-edit-foreground">還原？</span>
       <span className="text-muted-foreground line-through">{from}</span>
-      <ArrowRight className="size-3 shrink-0 text-amber-500" />
-      <span className="font-medium text-amber-900">{to}</span>
+      <ArrowRight className="size-3 shrink-0 text-warning" />
+      <span className="font-medium text-edit-foreground">{to}</span>
       <span className="ml-auto flex gap-1">
         <button type="button" onClick={onCancel} className="tap-target-y rounded border border-input bg-background px-2 py-0.5 hover:bg-accent">取消</button>
         <button type="button" onClick={onConfirm} className="tap-target-y rounded bg-primary px-2 py-0.5 text-primary-foreground">確定</button>
@@ -42,9 +42,9 @@ export function ChangeSummary({
   }
   const allPending = pending != null && "all" in pending;
   return (
-    <div className={cn("rounded-md border border-amber-300 bg-amber-50/60 p-3", className)}>
+    <div className={cn("rounded-md border border-edit bg-edit-bg/60 p-3", className)}>
       <div className="mb-2 flex items-center justify-between gap-2 text-xs">
-        <p className="text-sm font-medium text-amber-900">本次變更（{changes.length}）</p>
+        <p className="text-sm font-medium text-edit-foreground">本次變更（{changes.length}）</p>
         {onRevertAll && (allPending ? (
           <RevertConfirm
             from={`${changes.length} 項變更`}
@@ -53,7 +53,7 @@ export function ChangeSummary({
             onConfirm={() => { onRevertAll(); setPending(null); }}
           />
         ) : (
-          <button type="button" onClick={() => setPending({ all: true })} className="tap-target-y flex items-center gap-1 text-amber-700 hover:underline">
+          <button type="button" onClick={() => setPending({ all: true })} className="tap-target-y flex items-center gap-1 text-edit-foreground hover:underline">
             <Undo2 className="size-3.5" /> 全部還原
           </button>
         ))}
@@ -74,10 +74,10 @@ export function ChangeSummary({
                 <>
                   <Tooltip content={c.label} className="w-24 shrink-0" focusable><span className="block truncate text-muted-foreground">{c.label}</span></Tooltip>
                   <Tooltip content={c.beforeText} className="min-w-0" focusable><span className="block truncate text-muted-foreground line-through">{c.beforeText}</span></Tooltip>
-                  <ArrowRight className="size-3 shrink-0 text-amber-500" />
-                  <Tooltip content={c.afterText} className="min-w-0" focusable><span className="block truncate font-medium text-amber-900">{c.afterText}</span></Tooltip>
+                  <ArrowRight className="size-3 shrink-0 text-warning" />
+                  <Tooltip content={c.afterText} className="min-w-0" focusable><span className="block truncate font-medium text-edit-foreground">{c.afterText}</span></Tooltip>
                   {onRevertField && (
-                    <button type="button" onClick={() => setPending({ field: c.field, from: c.afterText, to: c.beforeText })} title="還原此欄" aria-label={`還原 ${c.label}`} className="tap-target ml-auto flex shrink-0 items-center justify-center rounded p-0.5 text-amber-600 hover:bg-amber-100">
+                    <button type="button" onClick={() => setPending({ field: c.field, from: c.afterText, to: c.beforeText })} title="還原此欄" aria-label={`還原 ${c.label}`} className="tap-target ml-auto flex shrink-0 items-center justify-center rounded p-0.5 text-warning hover:bg-edit-bg">
                       <Undo2 className="size-3.5" />
                     </button>
                   )}

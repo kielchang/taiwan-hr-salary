@@ -24,6 +24,21 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* 語意狀態色（單一來源；供全站 success/warning/info/danger 與「已變更」edit 使用，
+       取代散落各處的 emerald/amber/sky/rose 硬編色）。值＝對應 Tailwind 色階換算 HSL。 */
+    --success: 160 84% 39%;            /* ≈ emerald-600 */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;             /* ≈ amber-500 */
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;               /* ≈ sky-500 */
+    --info-foreground: 0 0% 100%;
+    --danger: 347 77% 50%;             /* ≈ rose-600 */
+    --danger-foreground: 0 0% 100%;
+    /* 「已變更」欄位態（唯讀逐欄編輯的 amber 標色）：邊框/文字/底色三件套 */
+    --edit: 43 96% 56%;                /* ≈ amber-400（邊框） */
+    --edit-foreground: 23 78% 26%;     /* ≈ amber-900（文字） */
+    --edit-bg: 48 100% 96%;            /* ≈ amber-50（底色） */
   }
 
   .dark {
@@ -46,6 +61,15 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* 深色 dark-ready（目前未啟用切換；tokenize 後未來加主題切換即可用） */
+    --success: 160 60% 45%;
+    --warning: 38 92% 55%;
+    --info: 199 89% 55%;
+    --danger: 347 77% 58%;
+    --edit: 43 90% 60%;
+    --edit-foreground: 43 96% 76%;
+    --edit-bg: 26 60% 14%;
   }
 }
 

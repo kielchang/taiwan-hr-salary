@@ -32,7 +32,7 @@ export function Delta({
   const label = positive ? posLabel : negLabel;
   return (
     <span
-      className={cn("inline-flex items-center gap-0.5 tabular-nums", good ? "text-emerald-600" : "text-rose-600", className)}
+      className={cn("inline-flex items-center gap-0.5 tabular-nums", good ? "text-success" : "text-danger", className)}
       title={`${label}${format(Math.abs(r))}`}
     >
       <span aria-hidden>{arrow}</span>

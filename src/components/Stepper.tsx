@@ -37,7 +37,7 @@ export function Stepper({ steps, current, completed = {}, onStep }: StepperProps
                 className={cn(
                   "flex size-9 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
                   state === "current" && "border-primary bg-primary text-primary-foreground",
-                  state === "done" && "border-emerald-500 bg-emerald-500 text-white",
+                  state === "done" && "border-success bg-success text-white",
                   state === "todo" && "border-muted-foreground/30 bg-background text-muted-foreground group-hover:border-primary/50",
                 )}
               >
@@ -63,7 +63,7 @@ export function Stepper({ steps, current, completed = {}, onStep }: StepperProps
               <span
                 className={cn(
                   "mt-[18px] h-0.5 flex-1",
-                  i < currentIndex || isDone ? "bg-emerald-500" : "bg-muted-foreground/20",
+                  i < currentIndex || isDone ? "bg-success" : "bg-muted-foreground/20",
                 )}
               />
             )}

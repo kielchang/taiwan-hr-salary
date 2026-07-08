@@ -112,7 +112,7 @@ export function EditableField({
 
   // 唯讀值（過長截斷；hover/長壓顯示完整泡泡）
   const valueEl = (
-    <TruncatedText text={display} numeric={numeric} className={cn(isEmpty && "text-muted-foreground", negMoney && "font-medium text-rose-600")} />
+    <TruncatedText text={display} numeric={numeric} className={cn(isEmpty && "text-muted-foreground", negMoney && "font-medium text-danger")} />
   );
   const collapsed = (
     <button
@@ -266,7 +266,7 @@ function fieldBtnCls(changed: boolean, locked: boolean) {
   return cn(
     "flex h-9 w-full items-center gap-2 rounded-md border px-3 text-left text-sm transition-colors",
     locked ? "cursor-not-allowed border-input bg-muted/50 text-muted-foreground" : "border-input bg-background hover:bg-accent",
-    changed && "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100",
+    changed && "border-edit bg-edit-bg text-edit-foreground hover:bg-edit-bg",
   );
 }
 
@@ -280,17 +280,17 @@ function FieldShell({
     <div className={cn("space-y-1", className)}>
       <div className="flex items-center gap-1.5">
         <Label className="text-xs">{label}</Label>
-        {changed && <span className="rounded bg-amber-100 px-1 text-[10px] font-medium text-amber-700">已變更</span>}
+        {changed && <span className="rounded bg-edit-bg px-1 text-[10px] font-medium text-edit-foreground">已變更</span>}
       </div>
       <div className="flex items-center gap-1">
         <div className="min-w-0 flex-1">{children}</div>
         {onUndo && (
-          <button type="button" onClick={onUndo} title="還原為原始值（會先確認）" aria-label="還原" className="tap-target flex shrink-0 items-center justify-center rounded-md p-1.5 text-amber-600 hover:bg-amber-100">
+          <button type="button" onClick={onUndo} title="還原為原始值（會先確認）" aria-label="還原" className="tap-target flex shrink-0 items-center justify-center rounded-md p-1.5 text-warning hover:bg-edit-bg">
             <Undo2 className="size-4" />
           </button>
         )}
         {onRedo && (
-          <button type="button" onClick={onRedo} title="重做（回到修改後的值，會先確認）" aria-label="重做" className="tap-target flex shrink-0 items-center justify-center rounded-md p-1.5 text-sky-600 hover:bg-sky-100">
+          <button type="button" onClick={onRedo} title="重做（回到修改後的值，會先確認）" aria-label="重做" className="tap-target flex shrink-0 items-center justify-center rounded-md p-1.5 text-info hover:bg-info/10">
             <Redo2 className="size-4" />
           </button>
         )}
@@ -307,11 +307,11 @@ function ConfirmBar({
   action: "undo" | "redo"; fromText: string; toText: string; onCancel: () => void; onConfirm: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400 bg-amber-50 px-2 py-1.5 text-xs">
-      <span className="font-medium text-amber-900">{action === "undo" ? "還原" : "重做"}？</span>
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-edit bg-edit-bg px-2 py-1.5 text-xs">
+      <span className="font-medium text-edit-foreground">{action === "undo" ? "還原" : "重做"}？</span>
       <span className="text-muted-foreground line-through">{fromText}</span>
-      <ArrowRight className="size-3 shrink-0 text-amber-500" />
-      <span className="font-medium text-amber-900">{toText}</span>
+      <ArrowRight className="size-3 shrink-0 text-warning" />
+      <span className="font-medium text-edit-foreground">{toText}</span>
       <span className="ml-auto flex gap-1">
         <button type="button" onClick={onCancel} className="rounded border border-input bg-background px-2 py-0.5 hover:bg-accent">取消</button>
         <button type="button" onClick={onConfirm} className="rounded bg-primary px-2 py-0.5 text-primary-foreground">確定</button>
@@ -369,7 +369,7 @@ function SegGroup({
       title={disabled ? lockHint : undefined}
       className={cn(
         "inline-flex flex-wrap items-center gap-0.5 rounded-md border p-0.5",
-        changed ? "border-amber-400 bg-amber-50" : "border-input bg-background",
+        changed ? "border-edit bg-edit-bg" : "border-input bg-background",
         disabled && "cursor-not-allowed opacity-60",
       )}
     >
@@ -438,7 +438,7 @@ function Chips({
       title={disabled ? lockHint : undefined}
       className={cn(
         "flex flex-wrap items-center gap-1.5 rounded-md border p-1.5",
-        changed ? "border-amber-400 bg-amber-50" : "border-input bg-background",
+        changed ? "border-edit bg-edit-bg" : "border-input bg-background",
         disabled && "cursor-not-allowed opacity-60",
       )}
     >

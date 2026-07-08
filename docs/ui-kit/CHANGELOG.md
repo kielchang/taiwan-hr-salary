@@ -3,6 +3,17 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.8.0] - 2026-07-08
+
+### 新增（統一設計語言：語意色彩 token）
+- **語意狀態 token**：`success`／`warning`／`info`／`danger`＋「已變更」`edit`（`edit`/`edit-foreground`/`edit-bg`）。定義於 `src/index.css` CSS 變數（含 dark-ready `.dark` 值）、映射於 `tailwind.config.js`。取代散落各處的 emerald/amber/sky/rose 硬編色——改 token 即全站同步。
+- **元件庫改走 token**：`badge`(success/warning)、`Delta`(good/bad)、`Stepper`(完成步)、`EditableField`／`ChangeSummary`（「已變更」amber 態、undo/redo 色）皆改用語意 token。
+- **Storybook「設計 Tokens」型錄**：色彩/狀態/edit/圖表色票/型級/圓角的可視單一參考。
+- **shadcn CLI 設定** `components.json`（default/slate/cssVariables/aliases）：未來可 `npx shadcn add` 並對比上游。
+
+### 治理
+- **設計語言守衛**（`tests/uiKit.test.ts`）：元件庫檔案不得出現原始調色盤字面色（amber-/emerald-/rose-/sky-/orange-/yellow-NNN），強制走語意 token。
+
 ## [0.7.0] - 2026-07-08
 
 ### 新增

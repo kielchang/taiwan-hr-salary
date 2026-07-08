@@ -23,6 +23,21 @@ app 內部可漸進改用 `import { Button, DataTable } from "@/components"`。
 **不在**元件庫內（app glue，刻意排除）：`HelpHint`（吃 `content/help`）、`PrintHeader`（吃 `@/version`）、
 `BracketTables`／`BracketTableCards`（業務資料表）。這些留在 `src/components` 但不進 barrel。
 
+### stock（shadcn 原件）vs 客製
+接了 shadcn CLI（根目錄 `components.json`，`baseColor: slate`、`cssVariables: true`）。升級/新增 stock 原件用 `npx shadcn add <x>`，**勿覆蓋客製元件**。
+- **stock（貼近上游、minimal 客製）**：`badge`・`button`・`card`・`checkbox`・`dialog`・`input`・`label`・`select`・`table`・`tabs`・`tooltip`。
+- **客製（本專案自建，勿用 CLI 覆蓋）**：`data-table`・`delta`・`chart-card`・`tab-pills`・`empty-state`・`form/*`・`charts/*`・`Stepper`・`NumberInput`。
+
+## 設計語言（色彩 token 單一來源）
+色彩以語意 token 驅動，改一次全站同步：`src/index.css` 的 CSS 變數（HSL）→ `tailwind.config.js` 映射 → 元件用語意類別。
+- **基礎角色**（shadcn）：`background/foreground`・`primary`・`secondary`・`muted`・`accent`・`destructive`・`border`・`input`・`ring`・`popover`・`card`。
+- **狀態色**：`success`（良好/正差異）・`warning`（警示）・`info`（提示/參考）・`danger`（負值/錯誤）— 各含 `-foreground`。
+- **已變更態** `edit`：`edit`（邊框）・`edit-foreground`（文字）・`edit-bg`（底色）——唯讀逐欄編輯的 amber 標色。
+- **圖表**：`charts/index.tsx` 的 `PALETTE`（8 色類別型）＋軸/格線/文字，為圖表專用色票。
+- 深色：`.dark` 已備 dark-ready 值（切換未啟用；未來加 `ThemeProvider`＋toggle 即可）。
+- **鐵律**：元件庫**不得**直接寫原始調色盤色（`amber-/emerald-/rose-/sky-/orange-/yellow-NNN`），一律走上述 token；由 `tests/uiKit.test.ts` 守衛。
+- 可視型錄：Storybook「元件庫 / 設計 Tokens」頁。新增狀態色＝在 `index.css`+`tailwind.config.js` 加 token，再於元件與型錄使用。
+
 ## 鐵律：邊界不得耦合 app
 
 元件庫檔案**只能**依賴：設計 token（Tailwind＋`index.css`）＋通用工具

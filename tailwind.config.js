@@ -43,6 +43,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // 語意狀態色（單一來源；取代散落的 emerald/amber/sky/rose 硬編色）
+        success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))" },
+        warning: { DEFAULT: "hsl(var(--warning))", foreground: "hsl(var(--warning-foreground))" },
+        info: { DEFAULT: "hsl(var(--info))", foreground: "hsl(var(--info-foreground))" },
+        danger: { DEFAULT: "hsl(var(--danger))", foreground: "hsl(var(--danger-foreground))" },
+        edit: { DEFAULT: "hsl(var(--edit))", foreground: "hsl(var(--edit-foreground))", bg: "hsl(var(--edit-bg))" },
       },
       borderRadius: {
         lg: "var(--radius)",

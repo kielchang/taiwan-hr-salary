@@ -12,3 +12,6 @@ dist/
 
 # Storybook build output
 storybook-static
+
+# local screenshot/verification scratchpad (not shipped)
+scratchpad/
