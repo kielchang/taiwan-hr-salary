@@ -1,5 +1,17 @@
-// 跨月專案成本：逐月重算 computeProjectCost，並算累計實際(AC)、燃燒率、完工預估(EAC)。
-// 純函數；逐期重建 PayrollRow 沿用 calculatePayroll（與 selectors 相同）。
+// ─────────────────────────────────────────────────────────────────────────
+// 跨月專案成本趨勢 ＋ 完工預估（EAC）— 純函數。設計原理：
+//
+// ── 逐期重算（不吃快照）
+//   對每個期間重建當期 PayrollRow（沿用 selectors 的 buildPayrollRows/calculatePayroll，
+//   同一套計算邏輯），再跑 computeProjectCost。好處：任何歷史月都可重算、與月結一致。
+//
+// ── 兩種 EAC（完工總成本預估），並列供對照
+//   1) run-rate（燃燒率外推）：burnRate＝AC ÷ 已投入月數；runRateEac＝burnRate × 專案總月數
+//      （有起訖用起訖、否則沿用已投入月數）。**免填 %完成**，任何專案都算得出。
+//   2) EVM（實獲值，需填 %完成）：EV＝預算×%完成；CPI＝EV ÷ AC；eacEvm＝預算 ÷ CPI（＝AC ÷ %完成）。
+//      CPI<1＝超支、>1＝節省；比 run-rate 更反映「進度 vs 花費」，但依賴人工填的完成度。
+//   兩法差異＝提醒 PM「是照花錢速度、還是照實際產出」在看完工預估。
+// ─────────────────────────────────────────────────────────────────────────
 import type { Employee, SalaryStructure, Dependent, MonthlyEvent, Project, Allocation } from "@/lib/types";
 import type { Parameters } from "@/config/parameters";
 import type { InsuranceBrackets } from "@/config/brackets";

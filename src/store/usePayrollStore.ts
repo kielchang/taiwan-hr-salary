@@ -358,6 +358,7 @@ export const usePayrollStore = create<PayrollState>()(
       auditLog: DEMO.auditLog,
       clearAuditLog: () => set({ auditLog: [] }),
 
+      // 批次匯入＝以員工編號 upsert（同 id 覆蓋、新 id 追加）；不刪除既有未列於匯入檔的員工。
       importEmployees: (rows) =>
         set((st) => {
           let employees = [...st.employees];
@@ -377,6 +378,11 @@ export const usePayrollStore = create<PayrollState>()(
           };
         }),
 
+      // ── 調薪（兩條路徑）：
+      //   1) applyRaise＝**即時核定**，把新月薪寫回 salaries（本批同月生效）。
+      //   2) scheduleRaises → applyScheduledRaise＝**排程**，到生效月才由 applyScheduledRaise
+      //      轉呼叫 applyRaise 寫回並移除該筆。兩者皆受硬鎖定守衛（已確認月不可寫回）。
+      //   寫回策略：新月薪 − 既有加給＝新本薪（**加給不變、差額全落在本薪**），避免動到津貼結構。
       applyRaise: (rows, note) =>
         set((st) => {
           if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認

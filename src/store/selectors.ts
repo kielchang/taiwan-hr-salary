@@ -1,4 +1,22 @@
-// 衍生計算：以純函數計算模組（§5）將 store 狀態轉為當月薪資結算結果與彙總。
+// ─────────────────────────────────────────────────────────────────────────
+// 衍生讀取層（derived reads）：把 store 的原始狀態，經純函數計算模組（§5）轉成
+// 當月薪資結算列與彙總。設計原理：
+//
+// ── 純函數 + 薄 hook 兩層
+//   核心（`buildPayrollRows`/`isActiveInPeriod`/`ytdBonusBefore`/`sumTotals`）皆為
+//   **明確吃參數的純函數**——可測、可算任一期間、可用歷史資料重算（月結快照、趨勢、環比皆靠此）。
+//   `useXxx` 只是薄殼：訂閱 store 當前狀態後轉呼叫純函數。衍生值不入 store，保持 state 精簡。
+//
+// ── 為何算得出「破月」
+//   `buildPayrollRows` 把 `{ period, leavePolicy }` 傳進 `calculatePayroll`，計算層才會啟用
+//   破月（payFactor/勞保按天）；不傳 period 的呼叫（如驗收）則全月＝1（TC-9 不變量）。
+//
+// ── 在職過濾（isActiveInPeriod）刻意排除「整月無給休假」
+//   避免產生 0 薪卻仍被扣保費、實發為負的列；這些人仍出現在停保名冊與主檔，只是不列入計薪。
+//
+// ── 累計獎金自動化（ytdBonusBefore）
+//   由系統累加「本期之前同年度的 monthlyBonus」取代人工記憶，直接餵二代健保 4× 門檻判斷。
+// ─────────────────────────────────────────────────────────────────────────
 import { calculatePayroll, type PayrollResult, isLeaveStatus, effectiveLeaveRatio } from "@/lib/calc";
 import { companySupplementary } from "@/lib/calc";
 import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy } from "@/lib/types";
