@@ -40,6 +40,16 @@
     --edit-foreground: 23 78% 26%;     /* ≈ amber-900（文字） */
     --edit-bg: 48 100% 96%;            /* ≈ amber-50（底色） */
 
+    /* 表格欄位色彩語意（對齊附錄B §B3.7）：橘＝輸入欄、深藍＝公式欄、黃＝公司自訂假設。
+       獨立 token（非走 Tailwind theme.extend.colors）：.col-input 等三個 @layer components
+       規則直接 hsl(var(--x)) 取值，供 NumberInput／各 view 的可編輯儲存格共用。 */
+    --col-input: 33 100% 96%;             /* ≈ orange-50 */
+    --col-input-foreground: 222.2 84% 4.9%;
+    --col-formula: 210 40% 98%;           /* ≈ slate-50 */
+    --col-formula-foreground: 215 25% 27%; /* ≈ slate-700 */
+    --col-assumption: 55 92% 95%;         /* ≈ yellow-50 */
+    --col-assumption-foreground: 222.2 84% 4.9%;
+
     /* 圖表分類色票（8 色，供 charts/index.tsx 的 PALETTE／AXIS／GRID／TEXT 讀取）。
        值＝原色 hex（非 HSL 三元組）：SVG fill/stroke 直接吃 var()，不經 hsl() 包裝。
        來源＝dataviz 技能驗證器實測通過的「Cobalt」參考色票（取代原本未過 CVD 分離／彩度/對比檢查的舊色）。 */
@@ -91,6 +101,16 @@
     --edit-foreground: 43 96% 76%;
     --edit-bg: 26 60% 14%;
 
+    /* 表格欄位色彩語意——深色版：深色調底＋淺色調字（比照 --edit 既有模式，非機械式反轉）。
+       已用 dataviz 技能 contrast() 驗證：col-input 文字 12.97:1、col-formula 10.55:1、
+       col-assumption 12.30:1，皆遠超 4.5:1 內文標準；底色對頁面背景層次可辨識（≈1.2–1.3）。 */
+    --col-input: 24 35% 14%;
+    --col-input-foreground: 33 90% 90%;
+    --col-formula: 217 22% 18%;
+    --col-formula-foreground: 210 30% 88%;
+    --col-assumption: 45 40% 14%;
+    --col-assumption-foreground: 48 85% 88%;
+
     /* 圖表分類色票——深色版（Cobalt 深色步階，已驗證通過深色亮度帶/彩度/對比） */
     --chart-1: #3987e5;
     --chart-2: #199e70;
@@ -128,15 +148,20 @@
   }
 }
 
-/* 顏色語意（對齊附錄B §B3.7）：橘＝輸入欄、深藍＝公式欄、黃＝公司自訂假設 */
+/* 顏色語意（對齊附錄B §B3.7）：橘＝輸入欄、深藍＝公式欄、黃＝公司自訂假設。
+   讀 --col-* token（非寫死調色盤色）：淺/深色模式各一份定義（見 @layer base），
+   避免 Input 元件繼承的 text-foreground 在深色模式翻成近白時，襯著沒隨模式變化的淺色底而看不見。 */
 .col-input {
-  @apply bg-orange-50;
+  background-color: hsl(var(--col-input));
+  color: hsl(var(--col-input-foreground));
 }
 .col-formula {
-  @apply bg-slate-50 text-slate-700;
+  background-color: hsl(var(--col-formula));
+  color: hsl(var(--col-formula-foreground));
 }
 .col-assumption {
-  @apply bg-yellow-50;
+  background-color: hsl(var(--col-assumption));
+  color: hsl(var(--col-assumption-foreground));
 }
 
 /* ───────────── 列印樣式（報表存檔/簽核用） ───────────── */
