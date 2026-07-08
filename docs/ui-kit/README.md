@@ -34,7 +34,10 @@ app 內部可漸進改用 `import { Button, DataTable } from "@/components"`。
 - **狀態色**：`success`（良好/正差異）・`warning`（警示）・`info`（提示/參考）・`danger`（負值/錯誤）— 各含 `-foreground`。
 - **已變更態** `edit`：`edit`（邊框）・`edit-foreground`（文字）・`edit-bg`（底色）——唯讀逐欄編輯的 amber 標色。
 - **圖表**：`charts/index.tsx` 的 `PALETTE`（8 色類別型，「Cobalt」）＋ `--chart-axis/grid/text`，定義於 `index.css`（SVG `fill`/`stroke` 直接吃 `var()`，不經 `hsl()`）；經色票驗證器實測通過亮度帶/彩度/CVD 分離/對比四項檢查（原色票未過，已於 0.9.0 換掉）。深色步階已備於 `.dark`。
-- 深色：`.dark` 已備 dark-ready 值（切換未啟用；未來加 `ThemeProvider`＋toggle 即可）。
+- **深色**：`.dark` 值經過刻意的 UI/UX 色彩設計（非機械式反轉）——沿用品牌冷靛藍色相、飽和度由 84%
+  降到 16–22%，並建立 5 級表面抬升層次（background < card < popover < muted/secondary/accent < border/input）；
+  語意狀態色/圖表色皆用 dataviz 技能 `validate_palette.js` 的 `contrast()` 重新對新背景驗證過（WCAG，非目測）。
+  **Storybook 已可預覽切換**（右上工具列「主題」淺色/深色）；正式站尚未接 `ThemeProvider`，行為不受影響。
 - **鐵律**：元件庫**不得**直接寫原始調色盤色（`amber-/emerald-/rose-/sky-/orange-/yellow-NNN`），一律走上述 token；由 `tests/uiKit.test.ts` 守衛。
 - 可視型錄：Storybook「元件庫 / 設計 Tokens」頁。新增狀態色＝在 `index.css`+`tailwind.config.js` 加 token，再於元件與型錄使用。
 
