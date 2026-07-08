@@ -13,7 +13,7 @@ import { monthWorkedHours } from "@/lib/attendance";
 import { ytdBonusBefore } from "@/store/selectors";
 import { addMonths as addMonthsStr } from "@/data/seed";
 import type { MonthlyEvent } from "@/lib/types";
-import { ntd, formatPeriod } from "@/lib/utils";
+import { cn, ntd, formatPeriod } from "@/lib/utils";
 import { AllocationEditor } from "@/views/AllocationEditor";
 import { Pencil, ArrowRight, Wand2, Info } from "lucide-react";
 
@@ -175,7 +175,7 @@ export function MonthlyView({
                 } },
                 { key: "gross", header: "應發", numeric: true, sortValue: ({ r }) => r.grossPay, cell: ({ r }) => ntd(r.grossPay), total: (rs) => ntd(rs.reduce((a, { r }) => a + r.grossPay, 0)) },
                 { key: "ded", header: "代扣合計", numeric: true, sortValue: ({ r }) => r.totalDeductions, cell: ({ r }) => <span className="text-muted-foreground">−{ntd(r.totalDeductions)}</span>, total: (rs) => `−${ntd(rs.reduce((a, { r }) => a + r.totalDeductions, 0))}` },
-                { key: "net", header: "實發", numeric: true, sortValue: ({ r }) => r.netPay, cell: ({ r }) => <span className="font-semibold">{ntd(r.netPay)}</span>, total: (rs) => <span className="font-bold">{ntd(rs.reduce((a, { r }) => a + r.netPay, 0))}</span> },
+                { key: "net", header: "實發", numeric: true, sortValue: ({ r }) => r.netPay, cell: ({ r }) => <span className={cn("font-semibold", r.netPay < 0 && "text-rose-600")}>{r.netPay < 0 ? `(${ntd(-r.netPay)})` : ntd(r.netPay)}</span>, total: (rs) => { const t = rs.reduce((a, { r }) => a + r.netPay, 0); return <span className={cn("font-bold", t < 0 && "text-rose-600")}>{t < 0 ? `(${ntd(-t)})` : ntd(t)}</span>; } },
                 { key: "ops", header: "", headerClassName: "w-24", cell: ({ emp }) => <Button variant="outline" size="sm" disabled={locked} title={locked ? "本月已確認鎖定" : undefined} onClick={() => openEdit(emp.id)}><Pencil className="size-3.5" /> 編輯</Button> },
               ]}
             />
@@ -228,11 +228,11 @@ export function MonthlyView({
                 <section>
                   <p className="mb-2 text-sm font-semibold">加班時數</p>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <Num label="平日加班・前 2 小時" help="每小時 ×1⅓" v={draft.overtimeWeekday1} on={(v) => patchDraft({ overtimeWeekday1: v })} />
-                    <Num label="平日加班・第 3–4 小時" help="每小時 ×1⅔" v={draft.overtimeWeekday2} on={(v) => patchDraft({ overtimeWeekday2: v })} />
-                    <Num label="休息日加班・前 2 小時" help="每小時 ×1⅓" v={draft.overtimeRestday1} on={(v) => patchDraft({ overtimeRestday1: v })} />
-                    <Num label="休息日加班・第 3 小時起" help="每小時 ×1⅔" v={draft.overtimeRestday2} on={(v) => patchDraft({ overtimeRestday2: v })} />
-                    <Num label="國定假日出勤" help="整天出勤填 8（加發一日工資）" v={draft.overtimeHoliday} on={(v) => patchDraft({ overtimeHoliday: v })} />
+                    <Num label="平日加班・前 2 小時" help="每小時 ×1⅓" unit="h" v={draft.overtimeWeekday1} on={(v) => patchDraft({ overtimeWeekday1: v })} />
+                    <Num label="平日加班・第 3–4 小時" help="每小時 ×1⅔" unit="h" v={draft.overtimeWeekday2} on={(v) => patchDraft({ overtimeWeekday2: v })} />
+                    <Num label="休息日加班・前 2 小時" help="每小時 ×1⅓" unit="h" v={draft.overtimeRestday1} on={(v) => patchDraft({ overtimeRestday1: v })} />
+                    <Num label="休息日加班・第 3 小時起" help="每小時 ×1⅔" unit="h" v={draft.overtimeRestday2} on={(v) => patchDraft({ overtimeRestday2: v })} />
+                    <Num label="國定假日出勤" help="整天出勤填 8（加發一日工資）" unit="h" v={draft.overtimeHoliday} on={(v) => patchDraft({ overtimeHoliday: v })} />
                   </div>
                   <p className="mt-1.5 text-xs text-muted-foreground">
                     本月加班費試算：<span className="font-medium text-foreground">{ntd(liveResult.overtimePay)}</span> 元
@@ -251,8 +251,8 @@ export function MonthlyView({
                 <section>
                   <p className="mb-2 text-sm font-semibold">請假</p>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <Num label="事假（小時）" help="不給薪，整段扣薪" v={draft.personalLeaveHours} on={(v) => patchDraft({ personalLeaveHours: v })} />
-                    <Num label="病假（小時）" help="半薪，扣一半" v={draft.sickLeaveHours} on={(v) => patchDraft({ sickLeaveHours: v })} />
+                    <Num label="事假" help="不給薪，整段扣薪" unit="h" v={draft.personalLeaveHours} on={(v) => patchDraft({ personalLeaveHours: v })} />
+                    <Num label="病假" help="半薪，扣一半" unit="h" v={draft.sickLeaveHours} on={(v) => patchDraft({ sickLeaveHours: v })} />
                   </div>
                   <p className="mt-1.5 text-xs text-muted-foreground">
                     請假扣款試算：<span className="font-medium text-foreground">{ntd(liveResult.leaveDeduction)}</span> 元。
@@ -363,19 +363,22 @@ export function MonthlyView({
 }
 
 function Num({
-  label, help, v, on, wide,
+  label, help, v, on, wide, unit,
 }: {
-  label: string; help?: string; v: number; on: (v: number) => void; wide?: boolean;
+  label: string; help?: string; v: number; on: (v: number) => void; wide?: boolean; unit?: string;
 }) {
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
-      <Input
-        type="number" min="0"
-        className={`h-8 col-input text-right tabular-nums ${wide ? "w-36" : "w-24"}`}
-        value={v}
-        onChange={(e) => on(e.target.value === "" ? 0 : Number(e.target.value))}
-      />
+      <div className="flex items-center gap-1">
+        <Input
+          type="number" min="0"
+          className={`h-8 col-input text-right tabular-nums ${wide ? "w-36" : "w-24"}`}
+          value={v}
+          onChange={(e) => on(e.target.value === "" ? 0 : Number(e.target.value))}
+        />
+        {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+      </div>
       {help && <p className="text-[11px] leading-snug text-muted-foreground">{help}</p>}
     </div>
   );

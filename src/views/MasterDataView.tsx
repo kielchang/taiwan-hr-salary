@@ -432,7 +432,7 @@ export function MasterDataView() {
                   {empField("leaveDate", { label: `${draftEmp.status}生效日`, kind: "date", nullable: true, help: "區間起日；此日起依給薪比例計薪、辦理停保" })}
                   {empField("returnDate", { label: "復職日（空＝尚未復職）", kind: "date", nullable: true, help: "復職日起恢復全額計薪並辦理復保" })}
                   <EditableField
-                    label="給薪比例" kind="select"
+                    label="給薪比例" kind="radio"
                     value={draftEmp.leavePaidRatio == null ? "policy" : String(draftEmp.leavePaidRatio)}
                     original={!origEmp ? undefined : origEmp.leavePaidRatio == null ? "policy" : String(origEmp.leavePaidRatio)}
                     alwaysEdit={isNew} trackChanges={!isNew}
@@ -517,10 +517,10 @@ export function MasterDataView() {
           {tab === "family" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {empField("taxResidency", { label: "稅務身分", kind: "select", options: RESIDENCY_OPTS, help: "該年度在台滿 183 天為居住者" })}
+                {empField("taxResidency", { label: "稅務身分", kind: "radio", options: RESIDENCY_OPTS, help: "該年度在台滿 183 天為居住者" })}
                 {draftEmp.taxResidency === "居住者" && (
                   <>
-                    {empField("withholdingMethod", { label: "每月扣繳方式", kind: "select", options: WITHHOLD_OPTS, help: "由員工在免稅額申報表上勾選" })}
+                    {empField("withholdingMethod", { label: "每月扣繳方式", kind: "radio", options: WITHHOLD_OPTS, help: "由員工在免稅額申報表上勾選" })}
                     {empField("exemptionFormReceivedDate", { label: "免稅額申報表收件日", kind: "date", nullable: true, help: "未收件者依規定按固定 5% 扣繳" })}
                   </>
                 )}

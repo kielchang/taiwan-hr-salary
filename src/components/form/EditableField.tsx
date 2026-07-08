@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { eqValue, fmtValue, type FieldKind } from "@/lib/forms/diff";
-import { Undo2, Lock } from "lucide-react";
+import { Undo2, Redo2, Lock, ArrowRight } from "lucide-react";
 
 export interface EditableFieldOption {
   value: string;
@@ -50,18 +50,45 @@ export function EditableField({
 }: EditableFieldProps) {
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [redoValue, setRedoValue] = useState<EditableFieldProps["value"] | undefined>(undefined);
+  const [confirm, setConfirm] = useState<null | { action: "undo" | "redo"; fromText: string; toText: string; apply: () => void }>(null);
   const changed = trackChanges && !alwaysEdit && !eqValue(value, original);
+  const canRedo = !alwaysEdit && !changed && redoValue !== undefined && !eqValue(redoValue, original);
   const showInput = alwaysEdit || editing;
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
 
+  // 手動改值（非 undo/redo）→ 使 redo 失效
+  useEffect(() => {
+    if (redoValue !== undefined && !eqValue(value, original) && !eqValue(value, redoValue)) setRedoValue(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   const exit = () => { if (!alwaysEdit) setEditing(false); };
-  const handleRevert = () => { onRevert?.(); setEditing(false); };
-  const shell = (children: React.ReactNode) => (
-    <FieldShell label={label} help={help} className={className} changed={changed} onRevert={changed && onRevert ? handleRevert : undefined}>
-      {children}
+  const ft = (v: EditableFieldProps["value"]) => fmtValue(v, kind, format, unit);
+  const askUndo = () => setConfirm({
+    action: "undo", fromText: ft(value), toText: ft(original),
+    apply: () => { setRedoValue(value); onRevert?.(); setEditing(false); },
+  });
+  const askRedo = () => setConfirm({
+    action: "redo", fromText: ft(value), toText: ft(redoValue),
+    apply: () => { if (redoValue !== undefined) onChange(redoValue as string | number | boolean | string[]); },
+  });
+  const shell = (control: React.ReactNode) => (
+    <FieldShell
+      label={label} help={help} className={className} changed={changed}
+      onUndo={!confirm && changed && onRevert ? askUndo : undefined}
+      onRedo={!confirm && canRedo ? askRedo : undefined}
+    >
+      {confirm ? (
+        <ConfirmBar
+          action={confirm.action} fromText={confirm.fromText} toText={confirm.toText}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => { confirm.apply(); setConfirm(null); }}
+        />
+      ) : control}
     </FieldShell>
   );
 
@@ -182,9 +209,9 @@ function fieldBtnCls(changed: boolean, locked: boolean) {
 
 /** 欄位外殼：標籤 + 控制項（右側預留 undo 鈕）+ 說明 */
 function FieldShell({
-  label, help, changed, onRevert, children, className,
+  label, help, changed, onUndo, onRedo, children, className,
 }: {
-  label: string; help?: string; changed: boolean; onRevert?: () => void; children: React.ReactNode; className?: string;
+  label: string; help?: string; changed: boolean; onUndo?: () => void; onRedo?: () => void; children: React.ReactNode; className?: string;
 }) {
   return (
     <div className={cn("space-y-1", className)}>
@@ -194,19 +221,38 @@ function FieldShell({
       </div>
       <div className="flex items-center gap-1">
         <div className="min-w-0 flex-1">{children}</div>
-        {onRevert && (
-          <button
-            type="button"
-            onClick={onRevert}
-            title="還原為原始值"
-            aria-label="還原為原始值"
-            className="shrink-0 rounded-md p-1.5 text-amber-600 hover:bg-amber-100"
-          >
+        {onUndo && (
+          <button type="button" onClick={onUndo} title="還原為原始值（會先確認）" aria-label="還原" className="shrink-0 rounded-md p-1.5 text-amber-600 hover:bg-amber-100">
             <Undo2 className="size-4" />
+          </button>
+        )}
+        {onRedo && (
+          <button type="button" onClick={onRedo} title="重做（回到修改後的值，會先確認）" aria-label="重做" className="shrink-0 rounded-md p-1.5 text-sky-600 hover:bg-sky-100">
+            <Redo2 className="size-4" />
           </button>
         )}
       </div>
       {help && <p className="text-[11px] leading-snug text-muted-foreground">{help}</p>}
+    </div>
+  );
+}
+
+/** undo/redo 前的行內確認：顯示 舊值→新值，確認才執行 */
+function ConfirmBar({
+  action, fromText, toText, onCancel, onConfirm,
+}: {
+  action: "undo" | "redo"; fromText: string; toText: string; onCancel: () => void; onConfirm: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400 bg-amber-50 px-2 py-1.5 text-xs">
+      <span className="font-medium text-amber-900">{action === "undo" ? "還原" : "重做"}？</span>
+      <span className="text-muted-foreground line-through">{fromText}</span>
+      <ArrowRight className="size-3 shrink-0 text-amber-500" />
+      <span className="font-medium text-amber-900">{toText}</span>
+      <span className="ml-auto flex gap-1">
+        <button type="button" onClick={onCancel} className="rounded border border-input bg-background px-2 py-0.5 hover:bg-accent">取消</button>
+        <button type="button" onClick={onConfirm} className="rounded bg-primary px-2 py-0.5 text-primary-foreground">確定</button>
+      </span>
     </div>
   );
 }
