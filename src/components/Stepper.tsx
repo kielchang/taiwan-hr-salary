@@ -19,7 +19,7 @@ export function Stepper({ steps, current, completed = {}, onStep }: StepperProps
   const currentIndex = steps.findIndex((s) => s.key === current);
 
   return (
-    <ol className="flex w-full items-start">
+    <ol className="flex w-full items-start overflow-x-auto pb-1">
       {steps.map((s, i) => {
         const isCurrent = s.key === current;
         const isDone = completed[s.key];

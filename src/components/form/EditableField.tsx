@@ -92,84 +92,109 @@ export function EditableField({
     </FieldShell>
   );
 
-  const display = fmtValue(value, kind, format, unit);
+  // 顯示文字：select/radio 取選項標籤；multiselect 合併選中標籤；其餘依 kind 格式化
+  const optLabel = (v: string) => options?.find((o) => o.value === v)?.label ?? v;
+  let display: string;
+  if (kind === "select" || kind === "radio") {
+    display = value == null || value === "" ? "—" : format ? format(value) : optLabel(String(value));
+  } else if (kind === "multiselect") {
+    const s = Array.isArray(value) ? value.map(String) : [];
+    display = s.length ? s.map(optLabel).join("、") : "—";
+  } else if (kind === "checkbox") {
+    display = value ? "是" : "否";
+  } else {
+    display = fmtValue(value, kind, format, unit);
+  }
   const isEmpty = display === "—";
+  const numeric = kind === "money" || kind === "number" || kind === "rate";
   const negMoney = kind === "money" && Number(value) < 0; // 帳務：負值紅字
 
-  // checkbox（是/否）：分段切換
+  // 唯讀值（過長截斷、hover 顯示完整）
+  const valueSpan = (
+    <span title={isEmpty ? undefined : display} className={cn("min-w-0 truncate", isEmpty && "text-muted-foreground", numeric && "ml-auto tabular-nums", negMoney && "font-medium text-rose-600")}>{display}</span>
+  );
+  const collapsed = (
+    <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false), "overflow-hidden")}>
+      {valueSpan}
+    </button>
+  );
+
+  // 鎖定：所有型態統一顯示唯讀值＋鎖頭
+  if (disabled) {
+    return shell(
+      <div title={lockHint} className={cn(fieldBtnCls(false, true), "overflow-hidden")}>
+        {valueSpan}
+        <Lock className="ml-1 size-3.5 shrink-0 opacity-60" />
+      </div>,
+    );
+  }
+
+  // checkbox（是/否）：唯讀顯示 → 點擊展開分段
   if (kind === "checkbox") {
+    if (!showInput) return shell(collapsed);
     return shell(
       <SegGroup
         options={[{ value: "true", label: "是" }, { value: "false", label: "否" }]}
         value={value ? "true" : "false"}
-        onPick={(v) => onChange(v === "true")}
-        disabled={disabled} lockHint={lockHint} changed={changed}
+        onPick={(v) => { onChange(v === "true"); exit(); }}
+        changed={changed}
       />,
     );
   }
 
-  // radio（單選）：分段按鈕
+  // radio（單選）：唯讀顯示 → 點擊展開分段
   if (kind === "radio") {
+    if (!showInput) return shell(collapsed);
     return shell(
       <SegGroup
         options={options ?? []}
         value={value == null ? "" : String(value)}
-        onPick={(v) => onChange(v)}
-        disabled={disabled} lockHint={lockHint} changed={changed}
+        onPick={(v) => { onChange(v); exit(); }}
+        changed={changed}
       />,
     );
   }
 
-  // multiselect（多選）：可切換標籤片
+  // multiselect（多選）：唯讀顯示 → 點擊展開標籤片，「完成」收合
   if (kind === "multiselect") {
+    if (!showInput) return shell(collapsed);
     const sel = Array.isArray(value) ? value.map(String) : [];
     return shell(
-      <Chips
-        options={options ?? []}
-        selected={sel}
-        onToggle={(v) => onChange(sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v])}
-        disabled={disabled} lockHint={lockHint} changed={changed}
-      />,
-    );
-  }
-
-  if (disabled) {
-    return shell(
-      <div title={lockHint} className={cn(fieldBtnCls(false, true))}>
-        <span className={cn(isEmpty && "text-muted-foreground", negMoney && "text-rose-600 font-medium")}>{display}</span>
-        <Lock className="ml-auto size-3.5 opacity-60" />
+      <div className="space-y-1.5">
+        <Chips
+          options={options ?? []}
+          selected={sel}
+          onToggle={(v) => onChange(sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v])}
+          changed={changed}
+        />
+        {!alwaysEdit && (
+          <button type="button" onClick={exit} className="rounded border border-input bg-background px-2.5 py-0.5 text-xs hover:bg-accent">完成</button>
+        )}
       </div>,
     );
   }
 
   // select
   if (kind === "select") {
-    if (showInput) {
-      return shell(
-        <Select
-          open={alwaysEdit ? undefined : true}
-          value={value == null || value === "" ? undefined : String(value)}
-          onValueChange={(v) => { onChange(v); exit(); }}
-          onOpenChange={(o) => { if (!o) exit(); }}
-        >
-          <SelectTrigger className="h-9"><SelectValue placeholder={placeholder} /></SelectTrigger>
-          <SelectContent>
-            {options?.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-          </SelectContent>
-        </Select>,
-      );
-    }
+    if (!showInput) return shell(collapsed);
     return shell(
-      <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
-        <span className={cn(isEmpty && "text-muted-foreground", negMoney && "text-rose-600 font-medium")}>{display}</span>
-      </button>,
+      <Select
+        open={alwaysEdit ? undefined : true}
+        value={value == null || value === "" ? undefined : String(value)}
+        onValueChange={(v) => { onChange(v); exit(); }}
+        onOpenChange={(o) => { if (!o) exit(); }}
+      >
+        <SelectTrigger className="h-9"><SelectValue placeholder={placeholder} /></SelectTrigger>
+        <SelectContent>
+          {options?.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+        </SelectContent>
+      </Select>,
     );
   }
 
   // text / number / money / rate / date
   if (showInput) {
-    const type = kind === "date" ? "date" : (kind === "number" || kind === "money" || kind === "rate") ? "number" : "text";
-    const numeric = kind === "money" || kind === "number" || kind === "rate";
+    const type = kind === "date" ? "date" : numeric ? "number" : "text";
     const editVal = kind === "rate" && value != null && value !== "" ? Number(value) * 100 : (value ?? "");
     const commit = (raw: string) => {
       if (kind === "number" || kind === "money") onChange(raw === "" ? 0 : Number(raw));
@@ -191,12 +216,7 @@ export function EditableField({
       />,
     );
   }
-  const numeric = kind === "money" || kind === "number" || kind === "rate";
-  return shell(
-    <button type="button" onClick={() => setEditing(true)} className={cn(fieldBtnCls(changed, false))}>
-      <span className={cn(isEmpty && "text-muted-foreground", numeric && "ml-auto tabular-nums", negMoney && "text-rose-600 font-medium")}>{display}</span>
-    </button>,
-  );
+  return shell(collapsed);
 }
 
 function fieldBtnCls(changed: boolean, locked: boolean) {
