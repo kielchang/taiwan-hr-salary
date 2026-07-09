@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveSettingVersion, latestSettingVersion, SETTINGS_BASE_PERIOD } from "../src/store/usePayrollStore";
+import { resolveSettingVersion, latestSettingVersion, SETTINGS_BASE_PERIOD, hasConfirmedFrom, isSettingsInPlaceLocked, maxConfirmedPeriod } from "../src/store/usePayrollStore";
 import { buildPayrollRows } from "../src/store/selectors";
 import { DEFAULT_PARAMETERS } from "../src/config/parameters";
 import { DEFAULT_BRACKETS } from "../src/config/brackets";
@@ -39,6 +39,34 @@ describe("設定生效月版本解析（P2-a）", () => {
     for (const period of ["2020-01", "2026-06", "2099-12"]) {
       expect(resolveSettingVersion(single, period, { rate: 0 }).rate).toBe(0.0517);
     }
+  });
+});
+
+describe("編輯守衛（P2-c 危險 5：不得就地改已被已確認月引用的版本）", () => {
+  const confirmed = { "2026-03": "2026-04-01T00:00:00Z", "2026-06": "2026-07-01T00:00:00Z" };
+  it("hasConfirmedFrom：是否有 ≥ from 的已確認月", () => {
+    expect(hasConfirmedFrom(confirmed, "2026-01")).toBe(true);
+    expect(hasConfirmedFrom(confirmed, "2026-06")).toBe(true);
+    expect(hasConfirmedFrom(confirmed, "2026-07")).toBe(false);
+    expect(hasConfirmedFrom({}, "2026-01")).toBe(false);
+  });
+  it("maxConfirmedPeriod：最後已確認月", () => {
+    expect(maxConfirmedPeriod(confirmed)).toBe("2026-06");
+    expect(maxConfirmedPeriod({})).toBeNull();
+  });
+  it("哨兵版本（涵蓋所有月）＋有已確認月 → 就地編輯被鎖（須新增生效版本）", () => {
+    const versions = [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: { rate: 0.05 } }];
+    expect(isSettingsInPlaceLocked(confirmed, versions)).toBe(true);
+  });
+  it("最新版本生效於所有已確認月之後 → 可就地編輯（不影響已確認月）", () => {
+    const versions = [
+      { effectiveFrom: SETTINGS_BASE_PERIOD, value: { rate: 0.05 } },
+      { effectiveFrom: "2026-07", value: { rate: 0.06 } },
+    ];
+    expect(isSettingsInPlaceLocked(confirmed, versions)).toBe(false); // 最新自 2026-07，晚於最後已確認 2026-06
+  });
+  it("無已確認月 → 一律可就地編輯", () => {
+    expect(isSettingsInPlaceLocked({}, [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: {} }])).toBe(false);
   });
 });
 

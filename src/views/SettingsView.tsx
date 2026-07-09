@@ -23,7 +23,7 @@ import { validateSettings } from "@/lib/validation";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus, Currency } from "@/lib/types";
-import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable } from "@/store/usePayrollStore";
+import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable, isSettingsInPlaceLocked, maxConfirmedPeriod } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
 import { FEATURES } from "@/config/features";
@@ -145,9 +145,22 @@ type SecTab = "legal" | "company" | "currency" | "data";
 // 出勤功能隱藏時，公司分頁不含「打卡設定」，標籤簡化為「公司」（FEATURES.attendance）。
 const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", FEATURES.attendance ? "公司與出勤" : "公司"], ["currency", "幣別與匯率"], ["data", "資料與安全"]];
 
+/** 下一個月（"2026-12" → "2027-01"）；供「新增生效版本」預設生效月＝已確認月之後 */
+function nextMonthOf(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function SettingsView() {
-  const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
-  const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：當期已確認 → 參數/級距凍結
+  const { parameters, brackets, setParameters, parameterVersions, addParameterVersion, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
+  // 非版本化卡（leavePolicy/salaryDefaults/幣別）仍用「當期已確認」鎖；法定參數/級距改用版本感知鎖。
+  const locked = Boolean(confirmations[currentPeriod]);
+  // 版本化守衛：就地改「最新版本」會回溯改寫已確認月 → 鎖住就地編輯，導向「新增生效版本」
+  const paramVersionLocked = isSettingsInPlaceLocked(confirmations, parameterVersions);
+  const maxC = maxConfirmedPeriod(confirmations);
+  const nextEffMonth = maxC ? nextMonthOf(maxC) : currentPeriod;
+  const [newVerMonth, setNewVerMonth] = useState(nextEffMonth);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const exportAudit = () => {
@@ -212,8 +225,8 @@ export function SettingsView() {
       value={paramDraft[f.key] as string | number}
       original={parameters[f.key] as string | number}
       help={f.help}
-      disabled={locked}
-      lockHint="本月已確認結算，參數已鎖定（先取消確認才能修改）"
+      disabled={paramVersionLocked}
+      lockHint="已有已確認月份，請用上方「新增生效版本」調整未來費率（不回溯改動已申報月份）"
       onChange={(v) => setParamDraft((d) => ({ ...d, [f.key]: v }))}
       onRevert={() => setParamDraft((d) => ({ ...d, [f.key]: parameters[f.key] }))}
     />
@@ -301,8 +314,25 @@ export function SettingsView() {
       <div className="rounded-md border border-info/30 bg-info/10 p-3 text-xs text-info">
         <Info className="mr-1 inline size-3.5" />
         <span className="font-medium">年度更新提醒：</span>
-        每年 1 月政府會公告新年度的最低工資、費率與級距表，屆時只要更新下面的數值即可，計算方式不需要改。
+        每年 1 月政府會公告新年度的最低工資、費率與級距表。若尚無已確認月份可直接修改；已有已確認月份時請「新增生效版本」，自指定月份起生效、不回溯改動先前已申報月份。
       </div>
+
+      {paramVersionLocked && (
+        <Callout variant="warning" title="已有已確認月份 → 法定參數改用「新增生效版本」">
+          直接修改會回溯改寫已確認／已申報月份的數字（費率/級距/免稅額等）。請新增一個「自指定月份起生效」的新版本來調整；先前月份維持原費率。
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs">自</span>
+            <Input type="month" className="col-input h-8 w-40" min={nextEffMonth} value={newVerMonth}
+              onChange={(e) => e.target.value && setNewVerMonth(e.target.value)} />
+            <span className="text-xs">起生效</span>
+            <Button size="sm" disabled={!!maxC && newVerMonth <= maxC}
+              onClick={() => { addParameterVersion(newVerMonth, { ...paramDraft }); alert(`已建立自 ${newVerMonth} 起生效的新版本（複製自最新值）。現在可編輯下方費率，只影響 ${newVerMonth} 之後的月份。`); }}>
+              <Plus /> 新增生效版本
+            </Button>
+          </div>
+          <p className="mt-1 text-[11px]">目前生效版本共 {parameterVersions.length} 個；新版本生效月須晚於最後已確認月（{maxC}）。</p>
+        </Callout>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
@@ -490,7 +520,7 @@ export function SettingsView() {
       </>)}
 
       {/* 參數變更黏著送出列：跨分頁（法定/公司）彙整未套用的參數變更，一次套用或全部還原。 */}
-      {!locked && paramChanges.length > 0 && (
+      {!paramVersionLocked && paramChanges.length > 0 && (
         <div className="sticky bottom-0 z-30 -mx-4 border-t bg-background/95 px-4 py-2.5 backdrop-blur print:hidden">
           <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-warning">

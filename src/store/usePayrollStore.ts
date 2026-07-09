@@ -118,6 +118,23 @@ function upsertVersion<T>(versions: SettingVersion<T>[], effectiveFrom: string, 
   const rest = versions.filter((v) => v.effectiveFrom !== effectiveFrom);
   return [...rest, { effectiveFrom, value }].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
 }
+/** 最新版本的生效月（空→哨兵）。 */
+function latestEffectiveFrom<T>(versions: SettingVersion<T>[]): string {
+  return versions.length ? [...versions].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))[versions.length - 1].effectiveFrom : SETTINGS_BASE_PERIOD;
+}
+/** 是否存在「≥ from」的已確認期間（就地改該版本會回溯改寫這些已確認/已申報月）。 */
+export function hasConfirmedFrom(confirmations: Record<string, string>, from: string): boolean {
+  return Object.keys(confirmations).some((period) => period >= from);
+}
+/** 就地編輯「最新設定版本」是否被鎖（＝其生效區間內有已確認月）。UI 據此導向「新增生效版本」。 */
+export function isSettingsInPlaceLocked<T>(confirmations: Record<string, string>, versions: SettingVersion<T>[]): boolean {
+  return hasConfirmedFrom(confirmations, latestEffectiveFrom(versions));
+}
+/** 已確認期間的最大月份（無→null）；新增生效版本須 > 此值，否則會回溯改寫已確認月。 */
+export function maxConfirmedPeriod(confirmations: Record<string, string>): string | null {
+  const ks = Object.keys(confirmations);
+  return ks.length ? ks.sort()[ks.length - 1] : null;
+}
 
 /**
  * B-1 遷移（v2→v3）：把舊單段留停/停職/暫離（status＋leaveDate＋returnDate＋leavePaidRatio）
@@ -789,7 +806,8 @@ export const usePayrollStore = create<PayrollState>()(
 
       setParameters: (patch) =>
         set((st) => {
-          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          // 版本化守衛：就地改「最新版本」會回溯改寫其生效區間內的已確認月 → 擋下，導向「新增生效版本」
+          if (isSettingsInPlaceLocked(st.confirmations, st.parameterVersions)) return st;
           const parameterVersions = patchLatestVersion(st.parameterVersions, patch);
           return {
             parameterVersions,
@@ -800,7 +818,7 @@ export const usePayrollStore = create<PayrollState>()(
         }),
       setBrackets: (patch) =>
         set((st) => {
-          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          if (isSettingsInPlaceLocked(st.confirmations, st.bracketVersions)) return st; // 就地改被已確認月引用的版本→擋
           const bracketVersions = patchLatestVersion(st.bracketVersions, patch);
           return {
             bracketVersions,
@@ -811,7 +829,8 @@ export const usePayrollStore = create<PayrollState>()(
         }),
       addParameterVersion: (effectiveFrom, value) =>
         set((st) => {
-          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st;
+          const maxC = maxConfirmedPeriod(st.confirmations);
+          if (maxC && effectiveFrom <= maxC) return st; // 新版本生效月須晚於所有已確認月，否則會回溯改寫
           const parameterVersions = upsertVersion(st.parameterVersions, effectiveFrom, value);
           return {
             parameterVersions,
@@ -821,7 +840,8 @@ export const usePayrollStore = create<PayrollState>()(
         }),
       addBracketVersion: (effectiveFrom, value) =>
         set((st) => {
-          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st;
+          const maxC = maxConfirmedPeriod(st.confirmations);
+          if (maxC && effectiveFrom <= maxC) return st;
           const bracketVersions = upsertVersion(st.bracketVersions, effectiveFrom, value);
           return {
             bracketVersions,
