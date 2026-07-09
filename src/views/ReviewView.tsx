@@ -13,7 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PrintHeader } from "@/components/PrintHeader";
 import { useNavigate } from "react-router-dom";
-import { usePayrollStore } from "@/store/usePayrollStore";
+import { usePayrollStore, resolveSettingVersion } from "@/store/usePayrollStore";
+import { DEFAULT_PARAMETERS } from "@/config/parameters";
+import { DEFAULT_BRACKETS } from "@/config/brackets";
 import { usePayrollRows, useCompanySupplementary } from "@/store/selectors";
 import { validateAll, allocationIssues } from "@/lib/validation";
 import { FEATURES } from "@/config/features";
@@ -28,10 +30,12 @@ type Tab = "overview" | "checks" | "bonus";
 
 export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => void }) {
   const {
-    employees, salaries, dependents, events, parameters, brackets,
+    employees, salaries, dependents, events, parameterVersions, bracketVersions,
     currentPeriod, confirmations, confirmPeriod, unconfirmPeriod,
     snapshots, saveSnapshot, analytics, allocations, projects, fxPolicy,
   } = usePayrollStore();
+  const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
+  const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
   const [tab, setTab] = useState<Tab>("overview");
   const navigate = useNavigate();
 

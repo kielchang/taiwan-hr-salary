@@ -15,7 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ChangeSummary } from "@/components/form/ChangeSummary";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
-import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
+import { usePayrollStore, blankEvent, resolveSettingVersion } from "@/store/usePayrollStore";
+import { DEFAULT_PARAMETERS } from "@/config/parameters";
+import { DEFAULT_BRACKETS } from "@/config/brackets";
 import { calculatePayroll } from "@/lib/calc";
 import { monthWorkedHours } from "@/lib/attendance";
 import { ytdBonusBefore } from "@/store/selectors";
@@ -48,10 +50,13 @@ export function MonthlyView({
   onNext?: () => void;
 }) {
   const {
-    employees, dependents, events, parameters, brackets,
+    employees, dependents, events, parameterVersions, bracketVersions,
     currentPeriod, setCurrentPeriod, upsertEvent, getSalary, confirmations,
     attendance, punches, fxPolicy, currencies, fxRates,
   } = usePayrollStore();
+  // 費率/級距依當期生效版本解析（liveResult 與月結表一致）
+  const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
+  const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
   const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：已確認月份禁止異動
 
   const [editing, setEditing] = useState<string | null>(null); // employeeId

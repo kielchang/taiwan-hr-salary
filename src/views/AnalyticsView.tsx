@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { usePayrollStore } from "@/store/usePayrollStore";
+import { usePayrollStore, resolveSettingVersion } from "@/store/usePayrollStore";
+import { DEFAULT_PARAMETERS } from "@/config/parameters";
+import { DEFAULT_BRACKETS } from "@/config/brackets";
 import { usePayrollRows, usePayrollRowsFor, buildPayrollRows, type PayrollRow } from "@/store/selectors";
 import { annualMonths, annualTotals, simulateAnnual } from "@/lib/reports/annual";
 import { saveBlob } from "@/lib/payslipPdf";
@@ -1081,7 +1083,9 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
 
 /* ───────── 趨勢與預算 ───────── */
 function TrendTab({ rows }: { rows: PayrollRow[] }) {
-  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameters, brackets, setPlanning, loadDemoData, employees, salaries, dependents } = usePayrollStore();
+  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameterVersions, bracketVersions, setPlanning, loadDemoData, employees, salaries, dependents } = usePayrollStore();
+  const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
+  const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
 
   const bonusTotal = rows.reduce((a, r) => a + (events.find((e) => e.employeeId === r.employeeId && e.period === currentPeriod)?.monthlyBonus ?? 0), 0);
   const canSave = rows.length > 0;
@@ -1109,7 +1113,7 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
   const year = currentPeriod.slice(0, 4);
   const candidatePeriods = [...new Set(events.map((e) => e.period))];
   const recompute = (p: string) =>
-    buildSnapshot(buildPayrollRows(p, { employees, salaries, dependents, events, parameters, brackets }), p, events.filter((e) => e.period === p).reduce((a, e) => a + e.monthlyBonus, 0));
+    buildSnapshot(buildPayrollRows(p, { employees, salaries, dependents, events, parameters: resolveSettingVersion(parameterVersions, p, DEFAULT_PARAMETERS), brackets: resolveSettingVersion(bracketVersions, p, DEFAULT_BRACKETS) }), p, events.filter((e) => e.period === p).reduce((a, e) => a + e.monthlyBonus, 0));
   const aMonths = annualMonths(year, currentPeriod, snapshots, candidatePeriods, recompute);
   const aTot = annualTotals(aMonths);
   const estimatedCount = aMonths.filter((m) => m.estimated).length;

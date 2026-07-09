@@ -27,6 +27,9 @@ export interface ProjectTrendInput {
   projects: Project[];
   parameters: Parameters;
   brackets: InsuranceBrackets;
+  // 選填：逐期依生效版本解析（未給＝全期用單一 parameters/brackets，相容）
+  parametersFor?: (period: string) => Parameters;
+  bracketsFor?: (period: string) => InsuranceBrackets;
 }
 
 /** 逐期重算專案成本（每期＝重建當期 rows → computeProjectCost） */
@@ -41,10 +44,12 @@ export function projectCostByPeriod(input: ProjectTrendInput, periods: string[])
 
   for (const period of periods) {
     const active = employees.filter((e) => isActiveInPeriod(e, period));
-    const rows = buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets });
+    const p = input.parametersFor?.(period) ?? parameters;
+    const b = input.bracketsFor?.(period) ?? brackets;
+    const rows = buildPayrollRows(period, { employees, salaries, dependents, events, parameters: p, brackets: b });
     const eventOf = (id: string) => events.find((e) => e.employeeId === id && e.period === period);
     out.set(period, computeProjectCost({
-      rows, allocations, projects, period, monthlyWorkHours: parameters.monthlyWorkHours,
+      rows, allocations, projects, period, monthlyWorkHours: p.monthlyWorkHours,
       baseByEmp,
       bonusByEmp: new Map(active.map((e) => [e.id, eventOf(e.id)?.monthlyBonus ?? 0])),
       otherByEmp: new Map(active.map((e) => [e.id, eventOf(e.id)?.otherAddition ?? 0])),

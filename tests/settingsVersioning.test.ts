@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { resolveSettingVersion, latestSettingVersion, SETTINGS_BASE_PERIOD } from "../src/store/usePayrollStore";
+import { buildPayrollRows } from "../src/store/selectors";
+import { DEFAULT_PARAMETERS } from "../src/config/parameters";
+import { DEFAULT_BRACKETS } from "../src/config/brackets";
+import type { Employee, SalaryStructure } from "../src/lib/types";
 
 type P = { rate: number };
 const versions = [
@@ -35,5 +39,32 @@ describe("設定生效月版本解析（P2-a）", () => {
     for (const period of ["2020-01", "2026-06", "2099-12"]) {
       expect(resolveSettingVersion(single, period, { rate: 0 }).rate).toBe(0.0517);
     }
+  });
+});
+
+describe("逐期版本 → 保費隨期別版本改變（P2-b 治本效果）", () => {
+  const emp: Employee = {
+    id: "E1", name: "員工", department: "研發", title: "", hireDate: "2020-01-01", costCenter: "",
+    project: "", taxResidency: "居住者", withholdingMethod: "固定5%", exemptionFormReceivedDate: null,
+    voluntaryPensionRate: 0, nationalId: "", email: "", status: "在職",
+  };
+  const sal: SalaryStructure = {
+    employeeId: "E1", baseSalary: 60000, managerAllowance: 0, dutyAllowance: 0, professionalAllowance: 0,
+    mealAllowance: 0, transportAllowance: 0, attendanceBonus: 0, otherFixedAllowance: 0,
+  };
+  const versions = [
+    { effectiveFrom: "2026-01", value: { ...DEFAULT_PARAMETERS, healthRate: 0.0517 } },
+    { effectiveFrom: "2027-01", value: { ...DEFAULT_PARAMETERS, healthRate: 0.08 } },
+  ];
+
+  it("2026 月用舊健保費率、2027 月用新費率（同一員工，健保費不同）", () => {
+    const p26 = resolveSettingVersion(versions, "2026-06", DEFAULT_PARAMETERS);
+    const p27 = resolveSettingVersion(versions, "2027-03", DEFAULT_PARAMETERS);
+    const base = { employees: [emp], salaries: [sal], dependents: [], events: [], brackets: DEFAULT_BRACKETS };
+    const r26 = buildPayrollRows("2026-06", { ...base, parameters: p26 })[0];
+    const r27 = buildPayrollRows("2027-03", { ...base, parameters: p27 })[0];
+    expect(r27.premiums.healthEmployee).toBeGreaterThan(r26.premiums.healthEmployee); // 8% > 5.17%
+    // 投保金額相同（同薪），差異純來自費率版本
+    expect(r27.insured.health).toBe(r26.insured.health);
   });
 });

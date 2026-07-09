@@ -7,7 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { usePayrollStore } from "@/store/usePayrollStore";
+import { usePayrollStore, resolveSettingVersion } from "@/store/usePayrollStore";
+import { DEFAULT_PARAMETERS } from "@/config/parameters";
+import { DEFAULT_BRACKETS } from "@/config/brackets";
 import { usePayrollRows } from "@/store/selectors";
 import { validateAll, allocationIssues } from "@/lib/validation";
 import { FEATURES } from "@/config/features";
@@ -56,10 +58,12 @@ function TodoCard({
 export function DashboardView() {
   const navigate = useNavigate();
   const {
-    employees, salaries, dependents, events, parameters, brackets,
+    employees, salaries, dependents, events, parameterVersions, bracketVersions,
     currentPeriod, confirmations, allocations, declaredInsured,
     scheduledRaises, cancelScheduledRaise, applyScheduledRaise,
   } = usePayrollStore();
+  const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
+  const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
   const rows = usePayrollRows();
   const confirmed = confirmations[currentPeriod];
 

@@ -17,7 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { usePayrollStore, isPeriodLocked, auditRestorable, SCENARIO_LABEL } from "@/store/usePayrollStore";
+import { usePayrollStore, isPeriodLocked, auditRestorable, SCENARIO_LABEL, resolveSettingVersion } from "@/store/usePayrollStore";
+import { DEFAULT_PARAMETERS } from "@/config/parameters";
+import { DEFAULT_BRACKETS } from "@/config/brackets";
 import type { Employee, SalaryStructure, Dependent, LeaveSegment, LeaveStatus, ChangeScenario, AuditEntry } from "@/lib/types";
 import { monthlySalaryTotal, lookupInsuredAmounts, seniorityMonths, seniorityRefDate, formatSeniority, annualLeaveDays, isLeaveStatus } from "@/lib/calc";
 import { saveBlob } from "@/lib/payslipPdf";
@@ -99,11 +101,13 @@ type TopTab = "list" | "batch" | "log";
 
 export function MasterDataView() {
   const {
-    employees, salaries, dependents, parameters, brackets,
+    employees, salaries, dependents, parameterVersions, bracketVersions,
     applyChangeTicket, removeEmployee, importEmployees,
     currentPeriod, confirmations, leavePolicy, salaryDefaults,
     auditLog, restoreAudit, fxPolicy, currencies,
   } = usePayrollStore();
+  const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
+  const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
   const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：當期已確認
 
   const [topTab, setTopTab] = useState<TopTab>("list");

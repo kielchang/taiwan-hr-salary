@@ -22,7 +22,9 @@ import { companySupplementary } from "@/lib/calc";
 import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy, Subsidy, FxPolicy } from "@/lib/types";
 import type { Parameters } from "@/config/parameters";
 import type { InsuranceBrackets } from "@/config/brackets";
-import { usePayrollStore, blankEvent, DEFAULT_LEAVE_POLICY } from "./usePayrollStore";
+import { usePayrollStore, blankEvent, DEFAULT_LEAVE_POLICY, resolveSettingVersion } from "./usePayrollStore";
+import { DEFAULT_PARAMETERS } from "@/config/parameters";
+import { DEFAULT_BRACKETS } from "@/config/brackets";
 
 /**
  * 該員工於某期間是否列入計薪（undefined 狀態＝在職）。
@@ -130,15 +132,19 @@ export function buildPayrollRows(period: string, data: PayrollData): PayrollRow[
   });
 }
 
-/** 計算當月（currentPeriod）全體員工薪資結算 */
+/** 計算當月（currentPeriod）全體員工薪資結算（費率/級距依當期生效版本解析） */
 export function usePayrollRows(): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod, leavePolicy, subsidies, fxPolicy, fxRates } = usePayrollStore();
+  const { employees, salaries, dependents, events, parameterVersions, bracketVersions, currentPeriod, leavePolicy, subsidies, fxPolicy, fxRates } = usePayrollStore();
+  const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
+  const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
   return buildPayrollRows(currentPeriod, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies, fxPolicy, fxRates });
 }
 
-/** 計算指定期間全體員工薪資結算（檢視歷史/其他月份用） */
+/** 計算指定期間全體員工薪資結算（費率/級距依該期生效版本；檢視歷史/其他月份用） */
 export function usePayrollRowsFor(period: string): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies, fxPolicy, fxRates } = usePayrollStore();
+  const { employees, salaries, dependents, events, parameterVersions, bracketVersions, leavePolicy, subsidies, fxPolicy, fxRates } = usePayrollStore();
+  const parameters = resolveSettingVersion(parameterVersions, period, DEFAULT_PARAMETERS);
+  const brackets = resolveSettingVersion(bracketVersions, period, DEFAULT_BRACKETS);
   return buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies, fxPolicy, fxRates });
 }
 
@@ -188,7 +194,10 @@ export function ytdBonusBefore(events: MonthlyEvent[], employeeId: string, perio
 
 /** 投保單位（公司）二代健保補充保費（差額制，§5.7） */
 export function useCompanySupplementary(rows: PayrollRow[]): number {
-  const parameters = usePayrollStore((s) => s.parameters);
+  // 補充保費率依當期生效版本（rows 為當期結算）
+  const parameterVersions = usePayrollStore((s) => s.parameterVersions);
+  const currentPeriod = usePayrollStore((s) => s.currentPeriod);
+  const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
   const totalGross = rows.reduce((a, r) => a + r.grossPay, 0);
   const totalHealthInsured = rows.reduce((a, r) => a + r.insured.health, 0);
   return companySupplementary(totalGross, totalHealthInsured, parameters);

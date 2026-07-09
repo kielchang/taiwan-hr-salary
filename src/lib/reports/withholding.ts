@@ -24,6 +24,8 @@ export function yearlyWithholding(
   parameters: Parameters,
   brackets: InsuranceBrackets,
   year: string,
+  // 選填：依生效月版本逐月解析費率/級距（申報一致性）。未給＝全年用單一 parameters/brackets（相容）。
+  resolve?: { parametersFor?: (period: string) => Parameters; bracketsFor?: (period: string) => InsuranceBrackets },
 ): YearlyWithholdingRow[] {
   const prefix = `${year}-`;
   const out: YearlyWithholdingRow[] = [];
@@ -34,7 +36,9 @@ export function yearlyWithholding(
       salaries.find((s) => s.employeeId === emp.id) ?? ({ employeeId: emp.id } as SalaryStructure);
     let gross = 0, taxable = 0, bonus = 0, withheld = 0, supplementary = 0;
     for (const ev of empEvents) {
-      const r = calculatePayroll(emp, salary, dependents, ev, parameters, brackets, { period: ev.period });
+      const p = resolve?.parametersFor?.(ev.period) ?? parameters;
+      const b = resolve?.bracketsFor?.(ev.period) ?? brackets;
+      const r = calculatePayroll(emp, salary, dependents, ev, p, b, { period: ev.period });
       gross += r.grossPay;
       taxable += r.taxableSalary;
       bonus += ev.monthlyBonus;

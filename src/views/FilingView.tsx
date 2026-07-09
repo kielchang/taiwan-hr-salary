@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PrintHeader } from "@/components/PrintHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
-import { usePayrollStore } from "@/store/usePayrollStore";
+import { usePayrollStore, resolveSettingVersion } from "@/store/usePayrollStore";
 import { usePayrollRows } from "@/store/selectors";
 import { cn, ntd, formatPeriod } from "@/lib/utils";
 import { yearlyWithholding, availableYears } from "@/lib/reports/withholding";
@@ -54,10 +54,14 @@ export function FilingView({ initialTab }: { initialTab?: FilingTab } = {}) {
 
 /* B1 年度扣繳憑單彙總 */
 function WithholdingTab() {
-  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod } = usePayrollStore();
+  const { employees, salaries, dependents, events, parameters, brackets, parameterVersions, bracketVersions, currentPeriod } = usePayrollStore();
   const years = availableYears(events);
   const [year, setYear] = useState(years[0] ?? currentPeriod.slice(0, 4));
-  const rows = yearlyWithholding(employees, salaries, dependents, events, parameters, brackets, year);
+  // 扣繳憑單逐月依「該期生效版本」解析費率/級距 → 年中改率不回溯改動已申報月份
+  const rows = yearlyWithholding(employees, salaries, dependents, events, parameters, brackets, year, {
+    parametersFor: (p) => resolveSettingVersion(parameterVersions, p, parameters),
+    bracketsFor: (p) => resolveSettingVersion(bracketVersions, p, brackets),
+  });
   type R = (typeof rows)[number];
   const money = (key: string, header: string, get: (r: R) => number): Column<R> =>
     ({ key, header, numeric: true, sortValue: get, cell: (r) => ntd(get(r)), total: (rs) => ntd(rs.reduce((a, r) => a + get(r), 0)) });
