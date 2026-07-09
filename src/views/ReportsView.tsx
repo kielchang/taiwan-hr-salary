@@ -18,6 +18,7 @@ import { cn, ntd, pctOf, formatPeriod } from "@/lib/utils";
 import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
 import { buildPayslipMailto } from "@/lib/payslipEmail";
 import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
+import { FEATURES } from "@/config/features";
 import { PayslipCard } from "@/views/PayslipCard";
 import { Printer, Wand2, Lock, Mail, AlertTriangle, Package, CheckCircle2, FileText, Users } from "lucide-react";
 
@@ -118,7 +119,7 @@ function SummaryReport() {
         const entries = [...map.entries()].map(([name, g]) => ({ name, ...g }));
         return <GroupTable key={dim.key} title={dim.title} entries={entries} grand={grand} />;
       })}
-      <ProjectPnL rows={rows} bonusOf={bonusOf} />
+      {FEATURES.projects && <ProjectPnL rows={rows} bonusOf={bonusOf} />}
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
           <span>

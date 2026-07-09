@@ -23,6 +23,7 @@ import { addMonths as addMonthsStr } from "@/data/seed";
 import type { MonthlyEvent } from "@/lib/types";
 import { cn, ntd, formatPeriod } from "@/lib/utils";
 import { AllocationEditor } from "@/views/AllocationEditor";
+import { FEATURES } from "@/config/features";
 import { Pencil, ArrowRight, Wand2, Info } from "lucide-react";
 
 /** 將當月異動濃縮為 HR 一眼可讀的摘要 */
@@ -114,8 +115,9 @@ export function MonthlyView({
       : null;
   // 系統累計獎金（今年、本期之前）：自動帶入累計欄，取代人工記憶
   const ytdPrior = editingEmp ? ytdBonusBefore(events, editingEmp.id, currentPeriod) : 0;
-  // 出勤參考：該員本月打卡工時 vs 標準工時（無資料則不顯示；僅供加班輸入參考）
-  const workedHours = editingEmp ? monthWorkedHours(attendance, currentPeriod, punches).get(editingEmp.id) : undefined;
+  // 出勤參考：該員本月打卡工時 vs 標準工時（無資料則不顯示；僅供加班輸入參考）。
+  // 出勤功能隱藏時不顯示此參考（FEATURES.attendance）。
+  const workedHours = FEATURES.attendance && editingEmp ? monthWorkedHours(attendance, currentPeriod, punches).get(editingEmp.id) : undefined;
 
   const patchDraft = (p: Partial<MonthlyEvent>) => setDraft((d) => (d ? { ...d, ...p } : d));
 
@@ -221,7 +223,7 @@ export function MonthlyView({
         </Card>
       )}
 
-      {employees.length > 0 && <AllocationEditor />}
+      {FEATURES.projects && employees.length > 0 && <AllocationEditor />}
 
       {/* 單人異動編輯視窗 */}
       <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>

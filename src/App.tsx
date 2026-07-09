@@ -45,25 +45,26 @@ import { ProjectsView } from "@/views/ProjectsView";
 import { ReportsHubView } from "@/views/ReportsHubView";
 import { DashboardView } from "@/views/DashboardView";
 import { VERSION_LABEL, COMMIT_URL, ENV_BADGE } from "@/version";
+import { FEATURES } from "@/config/features";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
   FileText, FolderKanban, Menu, LayoutDashboard, X,
 } from "lucide-react";
 
-type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算" };
+type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算"; feature?: keyof typeof FEATURES };
 
 /** 側邊欄：依領域分區（每月作業／規劃分析／專案／報表申報／主檔設定／說明） */
 const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   { title: "每月作業", items: [
     { to: "/", match: "/__dashboard", label: "工作台", icon: LayoutDashboard },
     { to: "/payroll/monthly", match: "/payroll", label: "薪資結算", icon: CalendarClock, tag: "例行" },
-    { to: "/attendance", match: "/attendance", label: "出勤打卡", icon: Clock },
+    { to: "/attendance", match: "/attendance", label: "出勤打卡", icon: Clock, feature: "attendance" },
   ] },
   { title: "規劃與分析", items: [
     { to: "/analytics", match: "/analytics", label: "薪酬分析", icon: BarChart3, tag: "試算" },
   ] },
   { title: "專案", items: [
-    { to: "/projects", match: "/projects", label: "專案", icon: FolderKanban },
+    { to: "/projects", match: "/projects", label: "專案", icon: FolderKanban, feature: "projects" },
   ] },
   { title: "報表與申報", items: [
     { to: "/reports", match: "/reports", label: "報表與申報", icon: FileText, tag: "例行" },
@@ -78,6 +79,11 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   ] },
 ];
 
+/** 依 feature flag 過濾側邊欄：未啟用功能的 item 移除；過濾後為空的分區（如「專案」）整段消失。 */
+const VISIBLE_NAV = NAV_SECTIONS
+  .map((sec) => ({ ...sec, items: sec.items.filter((m) => !m.feature || FEATURES[m.feature]) }))
+  .filter((sec) => sec.items.length > 0);
+
 const PAYROLL_STEPS: PayrollStep[] = ["monthly", "review"];
 
 export default function App() {
@@ -88,10 +94,11 @@ export default function App() {
         <Route index element={<DashboardView />} />
         <Route path="/payroll/:step" element={<PayrollRoute />} />
         <Route path="/analytics" element={<AnalyticsView />} />
-        <Route path="/projects" element={<ProjectsView />} />
+        {/* 出勤/專案暫停對外（feature flag）；隱藏時交給下方 * fallback 導回每月薪資，不白屏 */}
+        {FEATURES.projects && <Route path="/projects" element={<ProjectsView />} />}
         <Route path="/reports" element={<ReportsHubView />} />
         <Route path="/filing" element={<Navigate to="/reports" replace />} />
-        <Route path="/attendance" element={<AttendanceView />} />
+        {FEATURES.attendance && <Route path="/attendance" element={<AttendanceView />} />}
         <Route path="/master" element={<MasterDataView />} />
         <Route path="/settings" element={<SettingsView />} />
         <Route path="/help" element={<HelpView />} />
@@ -195,7 +202,7 @@ function Layout() {
                 <X className="size-5" />
               </button>
             </div>
-            {NAV_SECTIONS.map((sec) => (
+            {VISIBLE_NAV.map((sec) => (
               <div key={sec.title}>
                 <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{sec.title}</p>
                 <div className="space-y-0.5">

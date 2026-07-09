@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary } from "@/store/selectors";
 import { validateAll, allocationIssues } from "@/lib/validation";
+import { FEATURES } from "@/config/features";
 import { lookupBracket, monthlySalaryTotal, supplementaryBaseDifferential, bonusWithholding } from "@/lib/calc";
 import { buildSnapshot } from "@/lib/analytics";
 import { simulateAnnual } from "@/lib/reports/annual";
@@ -40,7 +41,8 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
   const nameById = new Map(employees.map((e) => [e.id, e.name]));
   const issues = [
     ...validateAll(employees, salaries, dependents, periodEvents, parameters, brackets),
-    ...allocationIssues(allocations, parameters, currentPeriod, nameById),
+    // 專案功能隱藏時不納入「分攤超額」檢查（無頁面可修）
+    ...(FEATURES.projects ? allocationIssues(allocations, parameters, currentPeriod, nameById) : []),
   ];
   const errors = issues.filter((i) => i.severity === "error");
 

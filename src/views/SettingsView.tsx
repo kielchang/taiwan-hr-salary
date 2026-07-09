@@ -23,6 +23,7 @@ import type { Project, ProjectStatus } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
+import { FEATURES } from "@/config/features";
 import { parseIpList } from "@/lib/attendance";
 import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
@@ -108,7 +109,8 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
 ];
 
 type SecTab = "legal" | "company" | "data";
-const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", "公司與出勤"], ["data", "資料與安全"]];
+// 出勤功能隱藏時，公司分頁不含「打卡設定」，標籤簡化為「公司」（FEATURES.attendance）。
+const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", FEATURES.attendance ? "公司與出勤" : "公司"], ["data", "資料與安全"]];
 
 export function SettingsView() {
   const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
@@ -268,7 +270,7 @@ export function SettingsView() {
       </Card>
       </>)}
 
-      {secTab === "company" && <AttendanceSettings />}
+      {secTab === "company" && FEATURES.attendance && <AttendanceSettings />}
 
       {secTab === "data" && (<>
       <Card>

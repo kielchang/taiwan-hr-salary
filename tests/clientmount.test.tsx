@@ -55,11 +55,11 @@ describe("client mount + 路由（白屏防護）", () => {
     expect(div.textContent).toContain("投保級距表（四險）");
   });
 
-  it("深連結 /projects → 專案頁（成本與分析）", async () => {
+  it("專案功能隱藏（FEATURES.projects=false）→ /projects 導回每月薪資作業、不白屏", async () => {
     seedDone();
     const div = await mountAt("/projects");
-    expect(div.textContent).toContain("專案");
-    expect(div.textContent).toContain("成本與分析");
+    expect(div.textContent).toContain("每月薪資作業"); // * fallback → /payroll/monthly
+    expect(div.textContent).not.toContain("成本與分析"); // 專案頁不顯示
   });
 
   it("深連結 /reports → 報表與申報中心", async () => {
@@ -77,12 +77,11 @@ describe("client mount + 路由（白屏防護）", () => {
     expect(div.textContent).toContain("調薪試算");
   });
 
-  it("深連結 /attendance → 出勤打卡頁", async () => {
+  it("出勤功能隱藏（FEATURES.attendance=false）→ /attendance 導回每月薪資作業、不白屏", async () => {
     seedDone();
     const div = await mountAt("/attendance");
-    expect(div.textContent).toContain("出勤打卡");
-    expect(div.textContent).toContain("上班打卡");
-    expect(div.textContent).toContain("每日出勤彙整"); // 彈性上下班彙整
+    expect(div.textContent).toContain("每月薪資作業"); // * fallback → /payroll/monthly
+    expect(div.textContent).not.toContain("上班打卡"); // 出勤頁不顯示
   });
 
   it("深連結 /master → 基本資料頁", async () => {

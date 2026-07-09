@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { usePayrollRows } from "@/store/selectors";
 import { validateAll, allocationIssues } from "@/lib/validation";
+import { FEATURES } from "@/config/features";
 import { enrollmentWorklist } from "@/lib/reports/enrollment";
 import { bracketWorklist } from "@/lib/reports/bracketAdjust";
 import { ntd, formatPeriod } from "@/lib/utils";
@@ -67,7 +68,8 @@ export function DashboardView() {
   const nameById = new Map(employees.map((e) => [e.id, e.name]));
   const issues = [
     ...validateAll(employees, salaries, dependents, periodEvents, parameters, brackets),
-    ...allocationIssues(allocations, parameters, currentPeriod, nameById),
+    // 專案功能隱藏時不冒「分攤超額」警示（否則有警示卻無頁面可修）
+    ...(FEATURES.projects ? allocationIssues(allocations, parameters, currentPeriod, nameById) : []),
   ];
   const errorCount = issues.filter((i) => i.severity === "error").length;
   const warnCount = issues.filter((i) => i.severity === "warning").length;
@@ -144,7 +146,7 @@ export function DashboardView() {
         <TodoCard
           icon={<AlertTriangle className="size-4" />}
           title="檢查警告" count={warnCount}
-          hint="建議確認的提醒（加班超時、身分證疑異常、眷屬資料缺漏、分攤超額…）。"
+          hint={`建議確認的提醒（加班超時、身分證疑異常、眷屬資料缺漏${FEATURES.projects ? "、分攤超額" : ""}…）。`}
           to="/payroll/review" cta="前往查核檢視"
         />
         <TodoCard

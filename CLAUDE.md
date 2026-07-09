@@ -104,6 +104,16 @@ src/
 
 側邊欄 IA（App.tsx `NAV_SECTIONS`）：每月作業（工作台/薪資結算/出勤）／規劃與分析／專案／報表與申報／主檔與設定／說明。
 
+**功能開關（`src/config/features.ts` `FEATURES`）**（使用者拍板）：讓人事先專注薪資作業驗收，**「出勤打卡」與「專案」
+目前全環境隱藏 UI 入口**（`attendance:false`／`projects:false`，純布林、與 APP_ENV 無關）。**只隱藏入口、不刪碼/資料/計算**：
+store slices（punches/allocations/projects/attendance）、seed／示範公司資料、`lib/attendance`・`lib/reports/projectCost|projectTrend`
+純函數、`AttendanceView`/`ProjectsView`/`ProjectCostTab`/`ProjectMasterCard` 元件全部保留（Storybook 仍可預覽），
+整合成熟後把對應 flag 改 `true` 即**一鍵重啟**。已驗證薪資/保費/稅/報表數字零依賴這些資料（`selectors` 零引用）。
+gating 點：App 側邊欄+路由（隱藏時 `*` fallback 導回 `/payroll/monthly`）、Dashboard/ReviewView 的 `allocationIssues`
+（分攤超額）、ReportsView `ProjectPnL`、MonthlyView `AllocationEditor`＋出勤工時參考、SettingsView「打卡設定」分頁
+（標籤「公司與出勤」→「公司」，保留 LeavePolicy/SalaryDefaults）、HelpView 相關 FAQ/說明。
+注意：員工主檔「專案別（選填）」自由文字欄與報表「專案別」分組**是獨立的分類維度、非專案功能，仍保留**。
+
 ## 本 session 已完成（時間序）
 
 1. **UX 大改版**：側邊欄分區 IA、專案之家、報表與申報中心（actual 單一出口）、例行/試算徽章、情境式 ℹ 說明。
