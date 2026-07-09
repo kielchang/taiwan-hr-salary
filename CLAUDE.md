@@ -82,7 +82,8 @@ src/
 ├── lib/reports/       withholding/bracketAdjust/enrollment(加保/退保/停保/復保 4 類)/projectCost/projectTrend(EAC)/annual
 ├── lib/insights.ts    各分析頁「重點意見」規則
 ├── store/usePayrollStore.ts  zustand persist；硬鎖定守衛、稽核、scheduledRaises、刪除連鎖；leavePolicy/salaryDefaults 也在這
-├── store/selectors.ts buildPayrollRows/isActiveInPeriod(吃 leavePolicy，僅整月無給剔除)/ytdBonusBefore
+├── store/selectors.ts buildPayrollRows(計薪前注入當期生效「區間補貼」：計入投保→臨時 customAllowance 併月薪資總額、
+│                       不計投保→加 event.otherAddition；不改計算核心簽章，TC-9 不變)/isActiveInPeriod/ytdBonusBefore
 ├── data/seed.ts       TC-9 8 人 fixture（勿動）＋buildDemoData（歷史回填）＋salary/dep/evt/addMonths 工廠
 ├── data/demoCompany.ts 62 人示範公司（開箱預設；含離職/留停/停職半薪/復職邊界/多月快照/確認/稽核/申報基準）
 ├── components/ui/     DataTable/ChartCard/Delta/EmptyState/table(zebra/sticky/SortHead)/…
@@ -95,7 +96,8 @@ src/
     ├── ReportsHubView /reports：月結報表(ReportsView)＋申報名冊(FilingView)；?tab= 深連結；頂部月份選擇器
     ├── AnalyticsView  月報/規劃試算(沙盒)/年報 兩層分組；RaiseTab 含生效月排程
     ├── ProjectsView   專案之家（主檔+工時分攤+成本/EAC）
-    └── MasterDataView(情境化申請單：員工清單/異動紀錄兩分頁＋員工檔案面板挑情境→聚焦表單＋原因→applyChangeTicket)/AttendanceView/
+    └── MasterDataView(情境化申請單：員工清單/批次薪資/異動紀錄三分頁＋員工檔案面板挑情境→聚焦表單＋原因→applyChangeTicket；
+        批次薪資＝BatchSalaryPanel 族群選擇→調整既有%/定額·新增津貼·區間補貼→預覽→即時套用/排程)/AttendanceView/
         SettingsView(公司分頁含 LeavePolicyCard 非在職給薪比例＋SalaryDefaultsCard 新進預設)/SetupWizard/HelpView/SourcesView
 ```
 
