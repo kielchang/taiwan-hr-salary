@@ -15,6 +15,7 @@ export { UI_KIT } from "./version";
 export * from "./ui/badge";
 export * from "./ui/button";
 export * from "./ui/callout";
+export * from "./ui/coachmark";
 export * from "./ui/card";
 export * from "./ui/checkbox";
 export * from "./ui/delta";

@@ -3,6 +3,12 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.13.0] - 2026-07-09
+
+### 新增（Coachmark 導引聚光框）
+- **`Coachmark`**（`src/components/ui/coachmark.tsx`）：教學/驗收導引用的聚光原語——暗化畫面＋圈住目標元素（box-shadow 挖洞、洞內可穿透點擊，導引不代填）＋邊緣感知彈出框（標題／說明／第 n·N 步／上一步·下一步·略過）。純呈現：目標矩形/內容/步進狀態全由外部（TourRunner glue）傳入，不 import store/router/content（鐵律 9）。`targetRect=null` ＝置中歡迎卡。經 portal 掛 body。
+- Storybook「元件 / 導引 Coachmark」：錨定元素（3 步示範）＋置中歡迎卡。
+
 ## [0.12.0] - 2026-07-09
 
 ### 變更（欄位用色：Excel 三色 → 「可編輯 vs 唯讀」單一語意）
