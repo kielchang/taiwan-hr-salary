@@ -10,7 +10,7 @@ interface NumberInputProps {
   disabled?: boolean;
 }
 
-/** 數字輸入（橘色＝輸入欄語意，附錄B §B3.7） */
+/** 數字輸入（col-input＝「可編輯欄位」統一長相：淡冷底＋清楚邊框，見 index.css 欄位用色） */
 export function NumberInput({ value, onChange, className, step, min, disabled }: NumberInputProps) {
   return (
     <Input

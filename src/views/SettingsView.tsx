@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { EditableField } from "@/components/form/EditableField";
 import { ChangeSummary } from "@/components/form/ChangeSummary";
 import { TabPills } from "@/components/ui/tab-pills";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable } from "@/store/usePayrollStore";
@@ -28,7 +29,7 @@ import { parseIpList } from "@/lib/attendance";
 import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
 import { csvSerialize } from "@/lib/csv";
-import { ntd } from "@/lib/utils";
+import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban, Sun, Moon, Monitor } from "lucide-react";
@@ -50,8 +51,38 @@ interface Field {
 
 const COMPANY_FIELDS: Field[] = [
   { key: "occupationalRate", label: "職業災害保險費率", kind: "rate", help: "每家公司不同，依勞保局核定通知書填寫（全產業平均約 0.21%），由公司全額負擔。" },
-  { key: "seniorityBaseDate", label: "年資／特休計算基準日", kind: "date", help: "系統以此日期計算每位員工的年資與特休天數，通常設為當月 1 日。" },
+  { key: "seniorityBaseDate", label: "年資／特休固定基準日", kind: "date", help: "曆年制的年度基準日（月/日，每年重複）。" },
 ];
+
+/** 月/日選擇器（每年重複的基準日；值＝"MM-DD"，相容舊的完整日期）。 */
+// 固定基準日每月的可選天數：不設年（每年重複的月/日），故 2 月一律上限 28
+// （避免選到 2/29 在平年失效／年資基準跳月）；小月 30、大月 31。
+function daysInFixedMonth(m: number): number {
+  if (m === 2) return 28;
+  return [4, 6, 9, 11].includes(m) ? 30 : 31;
+}
+
+export function MmddPicker({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  const mmdd = value && value.length >= 8 ? value.slice(-5) : value; // 相容 "YYYY-MM-DD"
+  const [mm, dd] = /^\d{2}-\d{2}$/.test(mmdd) ? mmdd.split("-") : ["01", "01"];
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const maxDay = daysInFixedMonth(Number(mm));
+  const ddClamped = pad(Math.min(Number(dd) || 1, maxDay)); // 顯示恆為當月合法日，避免舊值超月變空白
+  // 切換月份時，若原本的「日」超過該月天數（如 3/31 → 改 2 月），自動夾到當月上限。
+  const onMonth = (m: string) => onChange(`${m}-${pad(Math.min(Number(dd) || 1, daysInFixedMonth(Number(m))))}`);
+  return (
+    <div className="flex items-center gap-2">
+      <Select value={mm} disabled={disabled} onValueChange={onMonth}>
+        <SelectTrigger className="col-assumption h-9 w-24"><SelectValue /></SelectTrigger>
+        <SelectContent>{Array.from({ length: 12 }, (_, i) => pad(i + 1)).map((m) => <SelectItem key={m} value={m}>{Number(m)} 月</SelectItem>)}</SelectContent>
+      </Select>
+      <Select value={ddClamped} disabled={disabled} onValueChange={(d) => onChange(`${mm}-${d}`)}>
+        <SelectTrigger className="col-assumption h-9 w-24"><SelectValue /></SelectTrigger>
+        <SelectContent>{Array.from({ length: maxDay }, (_, i) => pad(i + 1)).map((d) => <SelectItem key={d} value={d}>{Number(d)} 日</SelectItem>)}</SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
   {
@@ -160,7 +191,10 @@ export function SettingsView() {
   const [paramDraft, setParamDraft] = useState<Parameters>(parameters);
   useEffect(() => setParamDraft(parameters), [parameters]);
   const efKind = (k: Field["kind"]): FieldSpec["kind"] => (k === "int" ? "number" : k);
-  const PARAM_SPECS: FieldSpec[] = [...COMPANY_FIELDS, ...LEGAL_GROUPS.flatMap((g) => g.fields)].map((f) => ({ key: f.key as string, label: f.label, kind: efKind(f.kind) }));
+  const PARAM_SPECS: FieldSpec[] = [
+    ...[...COMPANY_FIELDS, ...LEGAL_GROUPS.flatMap((g) => g.fields)].map((f) => ({ key: f.key as string, label: f.label, kind: efKind(f.kind) })),
+    { key: "seniorityBasis", label: "年資計算方式", kind: "select", format: (v) => (v === "hireDate" ? "依到職日" : "固定基準日") },
+  ];
   const paramChanges = diffRecord(parameters as unknown as Record<string, unknown>, paramDraft as unknown as Record<string, unknown>, PARAM_SPECS);
   const applyParams = () => {
     const patch: Partial<Parameters> = {};
@@ -189,8 +223,8 @@ export function SettingsView() {
         <div>
           <h1 className="flex items-center gap-2 text-lg font-bold">系統設定 <HelpHint id="settings" /></h1>
           <p className="text-sm text-muted-foreground">
-            黃色欄位是「貴公司自己的設定」；白色欄位是政府公告的法定值，已內建 115 年度資料，
-            通常每年 1 月依新公告更新一次即可。
+            有淡底＋外框的欄位都可以點擊修改。「法定參數」分頁是政府公告的法定值（已內建 115 年度資料，
+            通常每年 1 月依新公告更新一次即可）；「公司」分頁才是貴公司自己的專屬設定。
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => navigate("/setup")}>
@@ -211,11 +245,33 @@ export function SettingsView() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">公司專屬設定</CardTitle>
-          <CardDescription>這兩項依貴公司情況填寫，與法規公告無關。</CardDescription>
+          <CardDescription>依貴公司情況填寫，與法規公告無關。年資計算方式：固定基準日＝全體同一日；依到職日＝各員依到職日算實際年資（週年制）。</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            {COMPANY_FIELDS.map((f) => renderField(f))}
+            {renderField(COMPANY_FIELDS[0]) /* 職災費率 */}
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">年資／特休計算方式</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([["fixedDate", "固定基準日", "全體以同一基準日（月/日）計算年資（曆年制常用，如統一設 1/1）。"], ["hireDate", "依到職日（週年制）", "每位員工依到職日算實際年資（算至當月），特休隨週年逐年增加。"]] as const).map(([val, title, desc]) => (
+                <button key={val} type="button" disabled={locked}
+                  onClick={() => setParamDraft((d) => ({ ...d, seniorityBasis: val }))}
+                  className={cn("rounded-md border-2 p-2.5 text-left text-sm transition-colors disabled:opacity-60",
+                    (paramDraft.seniorityBasis ?? "fixedDate") === val ? "border-primary bg-primary/5" : "hover:border-primary/40")}>
+                  <p className="font-medium">{title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{desc}</p>
+                </button>
+              ))}
+            </div>
+            {(paramDraft.seniorityBasis ?? "fixedDate") === "fixedDate" && (
+              <div className="pt-1">
+                <p className="text-xs font-medium">固定基準日（每年）</p>
+                <MmddPicker value={String(paramDraft.seniorityBaseDate)} disabled={locked}
+                  onChange={(v) => setParamDraft((d) => ({ ...d, seniorityBaseDate: v }))} />
+                <p className="mt-1 text-xs text-muted-foreground">每年重複的月/日（不需設年）；系統取「當期月底前最近一次基準日」計算年資與特休。</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

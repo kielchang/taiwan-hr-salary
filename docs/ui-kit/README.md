@@ -33,6 +33,7 @@ app 內部可漸進改用 `import { Button, DataTable } from "@/components"`。
 - **基礎角色**（shadcn）：`background/foreground`・`primary`・`secondary`・`muted`・`accent`・`destructive`・`border`・`input`・`ring`・`popover`・`card`。
 - **狀態色**：`success`（良好/正差異）・`warning`（警示）・`info`（提示/參考）・`danger`（負值/錯誤）— 各含 `-foreground`。
 - **已變更態** `edit`：`edit`（邊框）・`edit-foreground`（文字）・`edit-bg`（底色）——唯讀逐欄編輯的 amber 標色。
+- **欄位用色**（可編輯 vs 唯讀，單一語意；0.12.0 收斂舊 Excel 三色）：`.col-input`＝`.col-assumption`＝**可編輯欄位**同一款長相（淡冷底 `--col-input`＋清楚邊框 `--field-border`，刻意與暖色狀態色及琥珀 `--edit` 區隔）；`.col-formula`＝唯讀/計算值 muted。舊「橘輸入/黃假設/藍公式」（附錄B §B3.7）不再套用——網頁表單只需「可不可以改」單一訊號，狀態語意交給 `success/warning/info/danger`，「已改動未送出」交給琥珀 `--edit`。深淺各一份、文字對比實測 ≥4.5:1。
 - **圖表**：`charts/index.tsx` 的 `PALETTE`（8 色類別型，「Gem」寶石色票：藍寶石/祖母綠/石榴石/黃玉/紫水晶/粉晶/紅玉髓/海藍寶石）＋ `--chart-axis/grid/text`，定義於 `index.css`（SVG `fill`/`stroke` 直接吃 `var()`，不經 `hsl()`）；經色票驗證器實測通過亮度帶/彩度/CVD 分離/對比四項檢查、零警示（0.10.0）。深色步階已備於 `.dark`。研究/比較過程與其餘候選色票見 Storybook「元件庫 / 圖表色票主題（比較用）」。
 - **深色**：`.dark` 值經過刻意的 UI/UX 色彩設計（非機械式反轉）——沿用品牌冷靛藍色相、飽和度由 84%
   降到 16–22%，並建立 5 級表面抬升層次（background < card < popover < muted/secondary/accent < border/input）；

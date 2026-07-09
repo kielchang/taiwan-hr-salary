@@ -40,15 +40,17 @@
     --edit-foreground: 23 78% 26%;     /* ≈ amber-900（文字） */
     --edit-bg: 48 100% 96%;            /* ≈ amber-50（底色） */
 
-    /* 表格欄位色彩語意（對齊附錄B §B3.7）：橘＝輸入欄、深藍＝公式欄、黃＝公司自訂假設。
-       獨立 token（非走 Tailwind theme.extend.colors）：.col-input 等三個 @layer components
-       規則直接 hsl(var(--x)) 取值，供 NumberInput／各 view 的可編輯儲存格共用。 */
-    --col-input: 33 100% 96%;             /* ≈ orange-50 */
-    --col-input-foreground: 222.2 84% 4.9%;
-    --col-formula: 210 40% 98%;           /* ≈ slate-50 */
-    --col-formula-foreground: 215 25% 27%; /* ≈ slate-700 */
-    --col-assumption: 55 92% 95%;         /* ≈ yellow-50 */
-    --col-assumption-foreground: 222.2 84% 4.9%;
+    /* 欄位用色（重新設計）：以「可編輯 vs 唯讀」單一語意取代舊 Excel 三色（橘輸入/黃假設/藍公式，
+       三個暖色淡底互相難分且語意對使用者不成立）。可編輯欄位＝**極淡冷中性底＋清楚邊框**（冷色，
+       刻意與暖色狀態語意 success/warning/danger 及琥珀「已變更」--edit 區隔）；唯讀/計算值＝muted。
+       --col-input 與 --col-assumption 現為**同值**（統一為「可編輯」），舊 class 名保留、全站零改動。 */
+    --col-input: 214 100% 98%;            /* 可編輯欄位底（極淡冷藍白 #f5f9ff；文字 16.9:1） */
+    --col-input-foreground: 222 47% 11%;
+    --col-assumption: 214 100% 98%;       /* ＝可編輯（與 col-input 同款） */
+    --col-assumption-foreground: 222 47% 11%;
+    --col-formula: 214 15% 95%;           /* 唯讀/計算值：中性 muted 底 */
+    --col-formula-foreground: 215 16% 40%;
+    --field-border: 214 30% 80%;          /* 可編輯欄位邊框（冷灰藍，可辨識邊 1.6:1，非飽和藍不像狀態色） */
 
     /* 圖表分類色票（8 色，供 charts/index.tsx 的 PALETTE／AXIS／GRID／TEXT 讀取）。
        值＝原色 hex（非 HSL 三元組）：SVG fill/stroke 直接吃 var()，不經 hsl() 包裝。
@@ -106,15 +108,15 @@
     --edit-foreground: 43 96% 76%;
     --edit-bg: 26 60% 14%;
 
-    /* 表格欄位色彩語意——深色版：深色調底＋淺色調字（比照 --edit 既有模式，非機械式反轉）。
-       已用 dataviz 技能 contrast() 驗證：col-input 文字 12.97:1、col-formula 10.55:1、
-       col-assumption 12.30:1，皆遠超 4.5:1 內文標準；底色對頁面背景層次可辨識（≈1.2–1.3）。 */
-    --col-input: 24 35% 14%;
-    --col-input-foreground: 33 90% 90%;
-    --col-formula: 217 22% 18%;
-    --col-formula-foreground: 210 30% 88%;
-    --col-assumption: 45 40% 14%;
-    --col-assumption-foreground: 48 85% 88%;
+    /* 欄位用色——深色版：可編輯＝冷色抬升底（比 card 12% 稍亮的 17%，讀成「可輸入的表面」），
+       唯讀＝muted。文字對比實測：可編輯 12.2:1、唯讀 6.6:1，皆 ≥4.5。col-input＝col-assumption 同值。 */
+    --col-input: 216 22% 17%;             /* #222935 */
+    --col-input-foreground: 210 30% 92%;
+    --col-assumption: 216 22% 17%;
+    --col-assumption-foreground: 210 30% 92%;
+    --col-formula: 222 16% 15%;
+    --col-formula-foreground: 215 20% 65%;
+    --field-border: 215 18% 34%;
 
     /* 圖表分類色票——深色版（Gem 寶石色票，色相環排序同 :root；藍寶石另配較亮的深色步階
        #2a5ae5，其餘 7 色淺深色同一 hex 即可通過。已對「本站實際深色背景 #101319」重新驗證，
@@ -155,20 +157,19 @@
   }
 }
 
-/* 顏色語意（對齊附錄B §B3.7）：橘＝輸入欄、深藍＝公式欄、黃＝公司自訂假設。
-   讀 --col-* token（非寫死調色盤色）：淺/深色模式各一份定義（見 @layer base），
-   避免 Input 元件繼承的 text-foreground 在深色模式翻成近白時，襯著沒隨模式變化的淺色底而看不見。 */
-.col-input {
+/* 欄位用色（單一語意）：.col-input／.col-assumption＝「可編輯欄位」同一款長相（極淡冷底＋清楚邊框，
+   inset box-shadow 疊在元件既有 border 之上，不受 utility 層級覆蓋）；.col-formula＝唯讀/計算值 muted。
+   讀 --col-* token（淺/深各一份，見 @layer base）：避免 Input 繼承的 text-foreground 在深色下翻近白、
+   襯淺底看不見。深色模式底色也隨之變深，文字恆可讀。 */
+.col-input,
+.col-assumption {
   background-color: hsl(var(--col-input));
   color: hsl(var(--col-input-foreground));
+  border-color: hsl(var(--field-border)); /* 覆蓋元件 border-input（未分層規則優先於 utility 層），不動 focus ring 的 box-shadow */
 }
 .col-formula {
   background-color: hsl(var(--col-formula));
   color: hsl(var(--col-formula-foreground));
-}
-.col-assumption {
-  background-color: hsl(var(--col-assumption));
-  color: hsl(var(--col-assumption-foreground));
 }
 
 /* ───────────── 列印樣式（報表存檔/簽核用） ───────────── */

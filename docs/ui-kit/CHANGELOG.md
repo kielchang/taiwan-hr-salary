@@ -3,6 +3,15 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.12.0] - 2026-07-09
+
+### 變更（欄位用色：Excel 三色 → 「可編輯 vs 唯讀」單一語意）
+- 使用者回報輸入欄配色**看不懂、不夠直覺**。根因＝把 Excel 儲存格慣例（附錄B §B3.7：橘輸入／黃假設／藍公式）硬套到網頁表單：三個近乎同色的暖色淡底（橘 h33／黃 h55／琥珀 h48）互相難分、「輸入 vs 公司自訂假設」對使用者是同一件事（都要填）、公式藍從未被使用（死碼）。
+- **一次改中央 `index.css` token，全站 66 個呼叫點零改動**：`--col-input` 與 `--col-assumption` 重定義為**同一款**「可編輯欄位」長相＝**極淡冷底（#f5f9ff／深色 #222935）＋清楚邊框 `--field-border`**，刻意與暖色狀態語意（success/warning/danger）及琥珀「已變更」`--edit` 區隔；`--col-formula` 併為唯讀/計算 muted 底。移除暖橘/暖黃 → **琥珀成為唯一暖色訊號＝「已變更未送出」**，語意更清楚。深淺色各一份、文字對比實測 ≥4.5:1（可編輯淺 16.9:1／深 12.2:1）。
+- `.col-input`/`.col-assumption` 改用 `border-color: hsl(var(--field-border))`（未分層規則，優先於 utility `border-input`）——刻意不動 focus ring 的 `box-shadow`，避免遮蔽鍵盤聚焦外框。
+- `NumberInput` 註解更新（不再提「橘色＝輸入」）；補齊散在 views 的純 `<Input>`（`BatchSalaryPanel` 生效月份、`MasterDataView` 異動原因）加上 `col-input`，使全站可編輯欄位同一長相。
+- Storybook「設計 Tokens」新增「欄位用色」型錄（可編輯／已變更／唯讀三態並列）；`HelpView` 畫面慣例圖例改寫為單一慣例。
+
 ## [0.11.1] - 2026-07-09
 
 ### 修正（DataTable 十字對準破壞凍結首欄／黏性表頭）

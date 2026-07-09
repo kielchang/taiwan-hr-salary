@@ -12,7 +12,7 @@ import type {
 import { round } from "@/lib/rounding";
 import { lookupInsuredAmounts, type InsuredAmounts } from "./brackets";
 import { dependentStats, type DependentStats } from "./dependents";
-import { seniorityMonths, annualLeaveDays } from "./seniority";
+import { seniorityMonths, annualLeaveDays, seniorityRefDate } from "./seniority";
 import { monthlySalaryTotal, overtimePay, leaveDeduction, payFactor, employmentDaysFactor, leaveSegments } from "./wage";
 
 /** 破月給薪比例預設政策（無給）；呼叫端未提供 leavePolicy 時採用 */
@@ -69,7 +69,7 @@ export function calculatePayroll(
   const salaryTotal = monthlySalaryTotal(salary);
   const insured = lookupInsuredAmounts(brackets, salaryTotal);
   const stats = dependentStats(dependents, employee.id, p);
-  const months = seniorityMonths(employee.hireDate, p.seniorityBaseDate);
+  const months = seniorityMonths(employee.hireDate, seniorityRefDate(p.seniorityBasis, p.seniorityBaseDate, opts?.period));
 
   // 破月：僅當提供 period 且非全月在職時 factor<1；factor===1 短路保持與原本逐位元相同
   // 固定薪資依 payFactor（含請假區間給薪比例）；勞保費另依在職天數（employmentDaysFactor）。

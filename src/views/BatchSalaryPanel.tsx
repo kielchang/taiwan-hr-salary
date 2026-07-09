@@ -181,7 +181,7 @@ function AdjustTab({ scope, scopePicker, salaries, minWage, currentPeriod, locke
           <LabeledText label="異動原因 *" value={reason} onChange={setReason} placeholder="例：年度調整／專案加給" />
           <div>
             <label className="text-xs font-medium">生效月份</label>
-            <Input type="month" min={currentPeriod} value={effective} onChange={(e) => setEffective(e.target.value || currentPeriod)} className="h-9" />
+            <Input type="month" min={currentPeriod} value={effective} onChange={(e) => setEffective(e.target.value || currentPeriod)} className="col-input h-9" />
             <p className="mt-1 text-[11px] text-muted-foreground">{isFuture ? "未來月份→存為排程，到期於「排程」分頁套用。" : "＝當期→立即套用（已確認月會擋下）。"}</p>
           </div>
         </div>
@@ -230,8 +230,8 @@ function SubsidyTab({ scope, scopePicker, subsidies, addSubsidy, cancelSubsidy, 
           <LabeledText label="名稱 *" value={name} onChange={setName} placeholder="如：專案津貼、輪班補貼" />
           <LabeledInput label="每月金額（元）*" value={amount} onChange={setAmount} />
           <LabeledSelect label="是否計入投保薪資" value={insured} onChange={(v) => setInsured(v as typeof insured)} options={[{ value: "no", label: "只加發、不動投保級距" }, { value: "yes", label: "計入投保薪資/級距" }]} />
-          <div><label className="text-xs font-medium">起月 *</label><Input type="month" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
-          <div><label className="text-xs font-medium">訖月 *（含）</label><Input type="month" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
+          <div><label className="text-xs font-medium">起月 *</label><Input type="month" value={from} onChange={(e) => setFrom(e.target.value)} className="col-input h-9" /></div>
+          <div><label className="text-xs font-medium">訖月 *（含）</label><Input type="month" value={to} onChange={(e) => setTo(e.target.value)} className="col-input h-9" /></div>
           <LabeledText label="異動原因 *" value={reason} onChange={setReason} />
         </div>
         <Callout variant="info" title="投保性質提醒">「計入投保」於區間內墊高月薪資總額、影響勞健保級距與加班時薪（可能牽動 2/8 月申報）；「只加發」僅加入當月實發、不動級距。</Callout>
@@ -285,5 +285,5 @@ function LabeledInput({ label, value, onChange }: { label: string; value: number
   return (<div><label className="text-xs font-medium">{label}</label><Input type="number" className="col-input h-9 text-right tabular-nums" value={value || ""} onChange={(e) => onChange(Number(e.target.value) || 0)} /></div>);
 }
 function LabeledText({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (<div><label className="text-xs font-medium">{label}</label><Input className="h-9" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></div>);
+  return (<div><label className="text-xs font-medium">{label}</label><Input className="col-input h-9" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></div>);
 }

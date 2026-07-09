@@ -51,8 +51,11 @@ export interface Parameters {
   /** 二代健保補充保費單次計費上限（健保法；來源05） */
   supplementaryCap: number;
 
-  /** 年資／特休 計算基準日（公司自訂，來源01）ISO yyyy-mm-dd */
+  /** 年資／特休 固定基準日（曆年制）＝每年重複的**月-日** "MM-DD"（如 "01-01"＝每年 1/1；相容舊的完整日期）。
+   *  於 seniorityBasis="fixedDate" 時，取「當期月底前最近一次基準日」為年資截止點。 */
   seniorityBaseDate: string;
+  /** 年資／特休計算方式：fixedDate＝固定基準日（預設）；hireDate＝依到職日算實際年資（截至當期月底）。選填，未設＝fixedDate。 */
+  seniorityBasis?: "fixedDate" | "hireDate";
 }
 
 /** 115 年（2026）法定參數值（來源01／04／05、附錄 A §A1） */
@@ -93,5 +96,6 @@ export const DEFAULT_PARAMETERS: Parameters = {
 
   supplementaryCap: 10000000,
 
-  seniorityBaseDate: "2026-06-01",
+  seniorityBaseDate: "01-01", // 每年 1/1（曆年制年度起算，最常見）
+  seniorityBasis: "fixedDate",
 };
