@@ -88,7 +88,8 @@ describe("client mount + 路由（白屏防護）", () => {
     seedDone();
     const div = await mountAt("/master");
     expect(div.textContent).toContain("基本資料");
-    expect(div.textContent).toContain("新增員工");
+    expect(div.textContent).toContain("新進到職"); // 情境化：新增員工＝「新進到職」
+    expect(div.textContent).toContain("異動紀錄"); // 頂部分頁
   });
 
   it("深連結 /payroll/reports → 報表步驟", async () => {
