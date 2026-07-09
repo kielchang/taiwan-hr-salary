@@ -335,6 +335,59 @@ export interface ScheduledRaise {
   decidedAt: string; // 核定時間 ISO
 }
 
+/* ───────────── 批次薪資作業（公司面：調整既有項目／新增固定津貼）───────────── */
+
+/** 批次操作型態：調整既有項目、或新增命名固定津貼。 */
+export type BatchSalaryOp =
+  | {
+      kind: "adjust"; // 調整既有項目
+      target: keyof Pick<SalaryStructure, "baseSalary" | "managerAllowance" | "dutyAllowance" | "professionalAllowance" | "mealAllowance" | "transportAllowance" | "attendanceBonus" | "otherFixedAllowance">;
+      mode: "add" | "subtract" | "set"; // 加／減／設為
+      amountKind: "fixed" | "pctBase" | "pctTotal"; // 定額／%×本薪／%×月薪資總額
+      value: number; // 定額（元）或百分比數（如 3＝3%）
+    }
+  | {
+      kind: "addAllowance"; // 新增命名固定津貼（併入 customAllowances）
+      name: string;
+      amountKind: "fixed" | "pctBase"; // 定額／%×本薪
+      value: number;
+    };
+
+/** 批次薪資作業輸入（applyBatchSalary）：族群＋操作＋原因。 */
+export interface BatchSalaryInput {
+  employeeIds: string[]; // 命中族群（由 UI 依全公司/單位解析）
+  op: BatchSalaryOp;
+  reason: string;
+  scopeLabel: string; // 族群描述（如「研發部・客服部」「全公司」）供稽核摘要
+}
+
+/** 排程薪資變更：未來生效月的「整份目標薪資結構」快照（比照 ScheduledRaise 動線，但存整份結構以支援津貼變更）。 */
+export interface ScheduledSalaryChange {
+  id: string;
+  employeeId: string;
+  name: string; // 快照姓名
+  salary: SalaryStructure; // 目標薪資結構（生效月整份寫入）
+  effectivePeriod: string; // 生效月份 yyyy-mm
+  note: string; // 方案摘要（族群＋操作）
+  decidedAt: string; // 核定時間 ISO
+}
+
+/* ───────────── 區間補貼（時間性、自動到期；可選是否計入投保）───────────── */
+
+/** 區間補貼：對快照族群於 [from, to]（含）每月加發；insured 決定是否計入投保薪資/級距。 */
+export interface Subsidy {
+  id: string;
+  name: string;
+  amount: number; // 每月金額（元）
+  from: string; // 起月 yyyy-mm
+  to: string; // 訖月 yyyy-mm（含）
+  insured: boolean; // true＝計入月薪資總額（影響保費/加班/最低工資）；false＝只加發到實發、不動級距
+  targetEmployeeIds: string[]; // 建立時快照的命中族群
+  scopeLabel: string; // 族群描述（顯示/稽核）
+  reason: string;
+  createdAt: string; // ISO
+}
+
 /* ───────────── 投保級距申報基準（2/8 月申報調整用） ───────────── */
 
 /** 目前向主管機關「已申報」的投保金額基準；與當前薪資算出的級距比對找出待調整者 */

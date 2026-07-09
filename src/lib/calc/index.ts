@@ -54,3 +54,4 @@ export * from "./insurance";
 export * from "./supplementary";
 export * from "./tax";
 export * from "./payroll";
+export * from "./batchSalary";

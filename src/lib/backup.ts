@@ -31,6 +31,8 @@ export const BACKUP_KEYS = [
   "declaredInsured",
   "projects",
   "allocations",
+  "scheduledSalaryChanges",
+  "subsidies",
 ] as const;
 
 /** 由完整 store 狀態（含函數）挑出資料切片，包成信封 */

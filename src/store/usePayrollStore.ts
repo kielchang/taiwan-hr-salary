@@ -57,8 +57,12 @@ import type {
   Project,
   Allocation,
   ScheduledRaise,
+  BatchSalaryInput,
+  ScheduledSalaryChange,
+  Subsidy,
   LeavePolicy,
 } from "@/lib/types";
+import { applyBatchOp, batchOpLabel, monthlySalaryTotal } from "@/lib/calc";
 
 /** 新進員工預設固定薪資範本（8 標準欄 partial ＋ 自訂津貼範本） */
 export type SalaryDefaults = { standard: Partial<Omit<SalaryStructure, "employeeId" | "customAllowances">>; custom: { name: string; amount: number }[] };
@@ -250,6 +254,19 @@ interface PayrollState {
   cancelScheduledRaise: (id: string) => void;
   /** 套用一筆到期排程（寫回薪資＋移除排程＋稽核） */
   applyScheduledRaise: (id: string) => void;
+
+  /** 批次薪資作業（公司面：對族群調整既有項目／新增固定津貼；即時套用＋摘要稽核，硬鎖定守衛） */
+  applyBatchSalary: (input: BatchSalaryInput) => void;
+  /** 排程薪資變更（未來生效月的整份目標結構；到期由工作台套用） */
+  scheduledSalaryChanges: ScheduledSalaryChange[];
+  scheduleSalaryChanges: (items: Omit<ScheduledSalaryChange, "id">[], note: string) => void;
+  cancelScheduledSalaryChange: (id: string) => void;
+  applyScheduledSalaryChange: (id: string) => void;
+
+  /** 區間補貼（時間性、自動到期；計薪於 selectors 注入。可選是否計入投保） */
+  subsidies: Subsidy[];
+  addSubsidy: (s: Omit<Subsidy, "id" | "createdAt">) => void;
+  cancelSubsidy: (id: string) => void;
 
   /** 投保級距申報基準（2/8 月申報調整） */
   declaredInsured: DeclaredInsured[];
@@ -542,6 +559,84 @@ export const usePayrollStore = create<PayrollState>()(
         set((s) => ({ scheduledRaises: s.scheduledRaises.filter((r) => r.id !== id) }));
       },
 
+      // ── 批次薪資作業（公司面）──────────────────────────────────
+      applyBatchSalary: (input) =>
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          const ids = new Set(input.employeeIds);
+          let totalBefore = 0, totalAfter = 0, n = 0;
+          const salaries = st.salaries.map((s) => {
+            if (!ids.has(s.employeeId)) return s;
+            const next = applyBatchOp(s, input.op, { allowanceId: newId() });
+            totalBefore += monthlySalaryTotal(s);
+            totalAfter += monthlySalaryTotal(next);
+            n++;
+            return next;
+          });
+          if (n === 0) return st;
+          const delta = totalAfter - totalBefore;
+          const summary =
+            `批次薪資（${input.scopeLabel}）：${batchOpLabel(input.op)}，${n} 人，` +
+            `月薪資總額 ${totalBefore.toLocaleString()} → ${totalAfter.toLocaleString()}` +
+            `（${delta >= 0 ? "+" : ""}${delta.toLocaleString()}）（原因：${input.reason}）`;
+          // 批次＝單筆摘要稽核（帶 scenario 供「異動紀錄」透鏡；量大不逐人附 before/after）
+          return { salaries, auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "salary", summary, { scenario: "salary", reason: input.reason })) };
+        }),
+
+      scheduledSalaryChanges: [],
+      scheduleSalaryChanges: (items, note) =>
+        set((st) => ({
+          scheduledSalaryChanges: [...st.scheduledSalaryChanges, ...items.map((it) => ({ ...it, id: newId() }))],
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "salary",
+            `排程批次薪資 ${items.length} 人，自 ${items[0]?.effectivePeriod ?? ""} 生效（${note}）`, { scenario: "salary" })),
+        })),
+      cancelScheduledSalaryChange: (id) =>
+        set((st) => {
+          const item = st.scheduledSalaryChanges.find((r) => r.id === id);
+          return {
+            scheduledSalaryChanges: st.scheduledSalaryChanges.filter((r) => r.id !== id),
+            auditLog: item
+              ? pushAudit(st.auditLog, makeAudit(st.operatorName, "salary", `取消排程薪資：${item.name}（生效 ${item.effectivePeriod}）`, { targetId: item.employeeId }))
+              : st.auditLog,
+          };
+        }),
+      applyScheduledSalaryChange: (id) =>
+        set((st) => {
+          const item = st.scheduledSalaryChanges.find((r) => r.id === id);
+          if (!item || isPeriodLocked(st.confirmations, st.currentPeriod)) return st;
+          const prev = st.salaries.find((s) => s.employeeId === item.employeeId);
+          const salaries = prev
+            ? st.salaries.map((s) => (s.employeeId === item.employeeId ? item.salary : s))
+            : [...st.salaries, item.salary];
+          return {
+            salaries,
+            scheduledSalaryChanges: st.scheduledSalaryChanges.filter((r) => r.id !== id),
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "salary",
+              `排程薪資生效：${item.name}（${item.effectivePeriod}・月薪資總額 ${monthlySalaryTotal(item.salary).toLocaleString()}・${item.note}）`,
+              { targetId: item.employeeId, scenario: "salary" })),
+          };
+        }),
+
+      // ── 區間補貼（時間性、自動到期；計薪注入在 selectors）─────────
+      subsidies: [],
+      addSubsidy: (s) =>
+        set((st) => ({
+          subsidies: [...st.subsidies, { ...s, id: newId(), createdAt: new Date().toISOString() }],
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "salary",
+            `新增區間補貼「${s.name}」${s.amount.toLocaleString()} 元/月・${s.from}～${s.to}・${s.insured ? "計入投保" : "不計投保"}・${s.scopeLabel}（${s.targetEmployeeIds.length} 人）（原因：${s.reason}）`,
+            { scenario: "salary", reason: s.reason })),
+        })),
+      cancelSubsidy: (id) =>
+        set((st) => {
+          const item = st.subsidies.find((x) => x.id === id);
+          return {
+            subsidies: st.subsidies.filter((x) => x.id !== id),
+            auditLog: item
+              ? pushAudit(st.auditLog, makeAudit(st.operatorName, "salary", `取消區間補貼「${item.name}」（${item.from}～${item.to}）`, { scenario: "salary" }))
+              : st.auditLog,
+          };
+        }),
+
       declaredInsured: DEMO.declaredInsured,
       setDeclaredBaseline: (list) =>
         set((st) => ({
@@ -691,6 +786,8 @@ export const usePayrollStore = create<PayrollState>()(
             allocations: st.allocations.filter((a) => a.employeeId !== id),
             declaredInsured: st.declaredInsured.filter((d) => d.employeeId !== id),
             scheduledRaises: st.scheduledRaises.filter((r) => r.employeeId !== id),
+            scheduledSalaryChanges: st.scheduledSalaryChanges.filter((r) => r.employeeId !== id),
+            subsidies: st.subsidies.map((s) => ({ ...s, targetEmployeeIds: s.targetEmployeeIds.filter((e) => e !== id) })).filter((s) => s.targetEmployeeIds.length > 0),
             analytics: { ...st.analytics, gradeByEmployee, performanceByEmployee },
             auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "employee",
               `刪除員工 ${name}（${id}）及其薪資/眷屬/事件/分攤/申報基準`, { targetId: id })),
@@ -862,6 +959,8 @@ export const usePayrollStore = create<PayrollState>()(
           projects: demo.projects,
           allocations: demo.allocations,
           scheduledRaises: [],
+          scheduledSalaryChanges: [],
+          subsidies: [],
         });
       },
       clearAll: () =>
@@ -878,6 +977,8 @@ export const usePayrollStore = create<PayrollState>()(
           projects: [],
           allocations: [],
           scheduledRaises: [],
+          scheduledSalaryChanges: [],
+          subsidies: [],
           auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "clear", "清空全部員工與結算資料")),
         })),
 
@@ -910,6 +1011,8 @@ export const usePayrollStore = create<PayrollState>()(
             projects: s.projects ?? st.projects,
             allocations: s.allocations ?? st.allocations,
             scheduledRaises: s.scheduledRaises ?? st.scheduledRaises,
+            scheduledSalaryChanges: s.scheduledSalaryChanges ?? st.scheduledSalaryChanges,
+            subsidies: s.subsidies ?? st.subsidies,
             leavePolicy: { ...DEFAULT_LEAVE_POLICY, ...(s.leavePolicy ?? {}) },
             salaryDefaults: s.salaryDefaults ?? st.salaryDefaults,
             auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
@@ -958,6 +1061,8 @@ export const usePayrollStore = create<PayrollState>()(
           declaredInsured: p.declaredInsured ?? current.declaredInsured,
           projects: p.projects ?? current.projects,
           allocations: p.allocations ?? current.allocations,
+          scheduledSalaryChanges: p.scheduledSalaryChanges ?? current.scheduledSalaryChanges,
+          subsidies: p.subsidies ?? current.subsidies,
         };
       },
     },
