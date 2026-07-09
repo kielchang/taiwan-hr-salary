@@ -272,6 +272,8 @@ interface PayrollState {
 
   /** 批次薪資作業（公司面：對族群調整既有項目／新增固定津貼；即時套用＋摘要稽核，硬鎖定守衛） */
   applyBatchSalary: (input: BatchSalaryInput) => void;
+  /** 批次外幣薪資（公司面：對族群發放/設定固定每月外幣，或按 %/定額調整既有；硬鎖定守衛＋摘要稽核） */
+  applyBatchForeign: (input: { employeeIds: string[]; currency: string; mode: "set" | "addPct" | "addAmt"; value: number; reason: string; scopeLabel: string }) => void;
   /** 排程薪資變更（未來生效月的整份目標結構；到期由工作台套用） */
   scheduledSalaryChanges: ScheduledSalaryChange[];
   scheduleSalaryChanges: (items: Omit<ScheduledSalaryChange, "id">[], note: string) => void;
@@ -595,6 +597,27 @@ export const usePayrollStore = create<PayrollState>()(
             `月薪資總額 ${totalBefore.toLocaleString()} → ${totalAfter.toLocaleString()}` +
             `（${delta >= 0 ? "+" : ""}${delta.toLocaleString()}）（原因：${input.reason}）`;
           // 批次＝單筆摘要稽核（帶 scenario 供「異動紀錄」透鏡；量大不逐人附 before/after）
+          return { salaries, auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "salary", summary, { scenario: "salary", reason: input.reason })) };
+        }),
+
+      applyBatchForeign: (input) =>
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          const ids = new Set(input.employeeIds);
+          let n = 0;
+          const salaries = st.salaries.map((s) => {
+            if (!ids.has(s.employeeId)) return s;
+            if (input.mode === "set") { n++; return { ...s, foreignPay: input.value > 0 ? { currency: input.currency, amount: input.value } : undefined }; }
+            // 調整既有：僅影響已設同幣別者
+            if (!s.foreignPay || s.foreignPay.currency !== input.currency) return s;
+            const cur = s.foreignPay.amount;
+            const next = input.mode === "addPct" ? Math.round(cur * (1 + input.value / 100)) : cur + input.value;
+            n++;
+            return { ...s, foreignPay: { currency: input.currency, amount: Math.max(0, next) } };
+          });
+          if (n === 0) return st;
+          const label = input.mode === "set" ? `設定固定外幣 ${input.currency} ${input.value}` : input.mode === "addPct" ? `調整 ${input.currency} ${input.value >= 0 ? "+" : ""}${input.value}%` : `調整 ${input.currency} ${input.value >= 0 ? "+" : ""}${input.value}`;
+          const summary = `批次外幣（${input.scopeLabel}）：${label}，${n} 人（原因：${input.reason}）`;
           return { salaries, auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "salary", summary, { scenario: "salary", reason: input.reason })) };
         }),
 

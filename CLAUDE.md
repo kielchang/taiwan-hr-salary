@@ -47,6 +47,7 @@ storage undefined 時先想到這裡，不要改測試本身。
    `unconfirmPeriod` 會同步刪該期快照；重新確認時 `ReviewView.doConfirm` 重建。
 4. **比率顯示＝百分比**（使用者拍板）：compa-ratio／市場 compa 顯示 105% 不是 1.05（`ratioPct`）；百分比用 `pctOf`；金額 `ntd`。
    **欄位用色＝「可編輯 vs 唯讀」單一語意**（使用者拍板，2026-07 收斂舊 Excel 三色）：可編輯欄位一律 `.col-input`（＝`.col-assumption` 同款：淡冷底＋`--field-border` 邊框，改一次全站同步於 `index.css`）；唯讀/計算值＝純文字或 `.col-formula` muted。**不要**再用暖橘（輸入）/暖黃（假設）/藍（公式）三分法——那是 Excel 儲存格慣例、對網頁表單語意不成立。暖色琥珀 `--edit` 專屬「已改動未送出」；狀態語意走 `success/warning/info/danger`。改欄位色屬元件庫視覺（鐵律 10）：bump `UI_KIT`＋補 `docs/ui-kit/CHANGELOG.md`。
+4.5. **多幣別外幣薪資＝獨立金流**（使用者拍板）：外幣（`SalaryStructure.foreignPay`／`MonthlyEvent.foreignOverride`）與台幣**分開計算、視作獎金**，**刻意不進 `monthlySalaryTotal`**→永不觸動投保級距/勞健保保費；台幣 `grossPay`/`netPay` 不含外幣。由「幣別與匯率維護中心」（SettingsView 分頁：`currencies`/`fxRates`/`fxPolicy`）驅動；`fxPolicy.enabled` 預設關＝全站零外幣 UI 與計算、TC-9 逐位元不變。`calculatePayroll` 無 `opts.fx` 即短路（比照 `opts.period`）。是否計所得稅/二代健保補充保費＝`fxPolicy` 開關（預設關）。發放/調整走 `applyBatchForeign`（族群公司/部門批次）或主檔逐員。分析/報表：外幣一律**獨立欄/序列＋台幣約當**，**不併入**既有台幣核心（成本/獎金比/compa/預算），`buildSnapshot.foreignTwdTotal` 為凍結歷史唯一入口且不進 `totalCost`。
 5. **表格一律用 `DataTable`**（`src/components/ui/data-table.tsx`）：欄位設定驅動，內建關鍵字搜尋/**單欄篩選（文字包含·數值範圍）**/
    排序/**十字對準 highlight**/門檻分頁（每頁 5/15/30/50，預設 15）/合計/凍結首欄/空狀態/CSV。圖表卡用 `ChartCard`。
    不要退回手刻 `<Table>`（僅可編輯參數格例外）。

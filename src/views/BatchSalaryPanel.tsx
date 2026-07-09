@@ -14,11 +14,11 @@ import { Callout } from "@/components/ui/callout";
 import { Delta } from "@/components/ui/delta";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { applyBatchOp, batchOpLabel, monthlySalaryTotal, SAL_FIELD_LABEL } from "@/lib/calc";
-import type { Employee, SalaryStructure, BatchSalaryOp, ScheduledSalaryChange, Subsidy } from "@/lib/types";
-import { ntd } from "@/lib/utils";
+import type { Employee, SalaryStructure, BatchSalaryOp, ScheduledSalaryChange, Subsidy, Currency } from "@/lib/types";
+import { ntd, foreignMoney } from "@/lib/utils";
 import { Users, CalendarClock, Trash2, Wallet } from "lucide-react";
 
-type Tab = "adjust" | "subsidy" | "scheduled";
+type Tab = "adjust" | "foreign" | "subsidy" | "scheduled";
 type ScopeMode = "all" | "dept" | "costCenter";
 const today = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => today().slice(0, 7);
@@ -30,6 +30,7 @@ export function BatchSalaryPanel() {
     employees, salaries, parameters, currentPeriod, confirmations,
     applyBatchSalary, scheduleSalaryChanges, scheduledSalaryChanges, cancelScheduledSalaryChange, applyScheduledSalaryChange,
     subsidies, addSubsidy, cancelSubsidy,
+    fxPolicy, currencies, fxRates, applyBatchForeign,
   } = usePayrollStore();
   const locked = Boolean(confirmations[currentPeriod]);
   const [tab, setTab] = useState<Tab>("adjust");
@@ -66,9 +67,13 @@ export function BatchSalaryPanel() {
     <Card>
       <CardContent className="space-y-4 pt-6">
         <TabPills
-          tabs={[{ key: "adjust", label: "批次調整" }, { key: "subsidy", label: "區間補貼" }, { key: "scheduled", label: `排程${scheduledSalaryChanges.length ? `（${scheduledSalaryChanges.length}）` : ""}` }]}
+          tabs={[{ key: "adjust", label: "批次調整" }, ...(fxPolicy.enabled ? [{ key: "foreign", label: "外幣薪資" }] : []), { key: "subsidy", label: "區間補貼" }, { key: "scheduled", label: `排程${scheduledSalaryChanges.length ? `（${scheduledSalaryChanges.length}）` : ""}` }]}
           value={tab} onChange={(k) => setTab(k as Tab)}
         />
+        {tab === "foreign" && fxPolicy.enabled && (
+          <ForeignBatchTab scope={scope} scopePicker={scopePicker} salaries={salaries} currencies={currencies} fxRates={fxRates}
+            currentPeriod={currentPeriod} locked={locked} applyBatchForeign={applyBatchForeign} />
+        )}
         {tab === "adjust" && (
           <AdjustTab scope={scope} scopePicker={scopePicker} salaries={salaries} minWage={parameters.minWageMonthly}
             currentPeriod={currentPeriod} locked={locked} applyBatchSalary={applyBatchSalary} scheduleSalaryChanges={scheduleSalaryChanges} />
@@ -189,6 +194,80 @@ function AdjustTab({ scope, scopePicker, salaries, minWage, currentPeriod, locke
           <Button onClick={doApply} disabled={!valid}><CalendarClock /> {isFuture ? "排程套用" : "立即套用"}（{preview.length} 人）</Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── 批次外幣（族群發放/調整固定每月外幣） ──────────────────────
+function ForeignBatchTab({ scope, scopePicker, salaries, currencies, fxRates, currentPeriod, locked, applyBatchForeign }: {
+  scope: Scope; scopePicker: ReactNode; salaries: SalaryStructure[]; currencies: Currency[]; fxRates: Record<string, Record<string, number>>;
+  currentPeriod: string; locked: boolean;
+  applyBatchForeign: (input: { employeeIds: string[]; currency: string; mode: "set" | "addPct" | "addAmt"; value: number; reason: string; scopeLabel: string }) => void;
+}) {
+  const enabled = currencies.filter((c) => c.enabled);
+  const [currency, setCurrency] = useState(enabled[0]?.code ?? "");
+  const [mode, setMode] = useState<"set" | "addPct" | "addAmt">("set");
+  const [value, setValue] = useState(0);
+  const [reason, setReason] = useState("");
+  const cur = currencies.find((c) => c.code === currency);
+  const rate = fxRates[currency]?.[currentPeriod] ?? 0;
+  const salById = new Map(salaries.map((s) => [s.employeeId, s]));
+  const valid = !!currency && !!reason.trim() && scope.emps.length > 0 && (mode !== "set" || value >= 0);
+  type Row = { id: string; name: string; before: number; after: number };
+  const preview: Row[] = scope.emps.map((e) => {
+    const fp = salById.get(e.id)?.foreignPay;
+    const before = fp?.currency === currency ? fp.amount : 0;
+    let after = before;
+    if (mode === "set") after = value;
+    else if (fp?.currency === currency) after = mode === "addPct" ? Math.round(before * (1 + value / 100)) : Math.max(0, before + value);
+    return { id: e.id, name: e.name, before, after };
+  });
+  const affected = mode === "set" ? preview.length : preview.filter((r) => r.before > 0).length;
+  const doApply = () => {
+    if (!valid) return;
+    if (!confirm(`確定對「${scope.label}」${affected} 人套用外幣${mode === "set" ? "發放/設定" : "調整"}？`)) return;
+    applyBatchForeign({ employeeIds: scope.emps.map((e) => e.id), currency, mode, value, reason, scopeLabel: scope.label });
+    setReason("");
+    alert("已套用批次外幣薪資。");
+  };
+  const cols: Column<Row>[] = [
+    { key: "name", header: "員工", freeze: true, sortValue: (r) => r.name, cell: (r) => r.name },
+    { key: "before", header: `原 ${currency}`, numeric: true, sortValue: (r) => r.before, cell: (r) => foreignMoney(r.before, { symbol: cur?.symbol, decimals: cur?.decimals, code: currency }) },
+    { key: "after", header: `新 ${currency}`, numeric: true, sortValue: (r) => r.after, cell: (r) => <span className="font-medium">{foreignMoney(r.after, { symbol: cur?.symbol, decimals: cur?.decimals, code: currency })}</span> },
+    { key: "twd", header: "新台幣約當", numeric: true, sortValue: (r) => r.after, cell: (r) => rate > 0 ? `≈ ${ntd(Math.round(r.after * rate))}` : "—" },
+  ];
+  if (enabled.length === 0) return <div className="space-y-4">{scopePicker}<Callout variant="info" title="尚無啟用幣別">請先至「系統設定 → 幣別與匯率」新增並啟用幣別、設定匯率。</Callout></div>;
+  return (
+    <div className="space-y-4">
+      {scopePicker}
+      <div className="space-y-3 rounded-md border p-3">
+        <p className="text-sm font-medium">對族群發放／調整固定每月外幣</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div><label className="text-xs font-medium">幣別</label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="col-input h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>{enabled.map((c) => <SelectItem key={c.code} value={c.code}>{c.code}（{c.name}）</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div><label className="text-xs font-medium">方式</label>
+            <Select value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+              <SelectTrigger className="col-input h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="set">發放/設為固定金額</SelectItem>
+                <SelectItem value="addPct">調整既有 %（加/減）</SelectItem>
+                <SelectItem value="addAmt">調整既有定額（加/減）</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div><label className="text-xs font-medium">{mode === "addPct" ? "百分比（%）" : "金額"}</label>
+            <Input type="number" className="col-input h-9 text-right tabular-nums" value={value || ""} onChange={(e) => setValue(Number(e.target.value) || 0)} /></div>
+          <div><label className="text-xs font-medium">異動原因 *</label>
+            <Input className="col-input h-9" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="如：外派津貼調整" /></div>
+        </div>
+        <Callout variant="info" title="外幣獨立於勞健保">外幣與台幣分開計算、視作獎金，不計入投保級距與勞健保保費；是否計所得稅／二代健保補充保費依「幣別與匯率」政策。{rate <= 0 && "（本期尚未設匯率，台幣約當暫以 0 計。）"}</Callout>
+        <div className="flex justify-end"><Button onClick={doApply} disabled={!valid || locked}><Wallet /> 套用（{affected} 人）</Button></div>
+      </div>
+      <DataTable rows={preview} columns={cols} getRowKey={(r) => r.id} initialSort={{ key: "name", dir: "asc" }} pageSize={5} searchPlaceholder="搜尋員工…" />
     </div>
   );
 }
