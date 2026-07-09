@@ -199,7 +199,7 @@ function Layout() {
             "md:static md:z-auto md:w-auto md:translate-x-0 md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:transition-none",
           )}
         >
-          <nav className="space-y-3 md:sticky md:top-[64px]">
+          <nav className="space-y-3 md:sticky md:top-[64px]" data-tour="sidebar">
             <div className="mb-1 flex items-center justify-between md:hidden">
               <span className="flex items-center gap-2 text-sm font-bold"><Building2 className="size-5 text-primary" /> 選單</span>
               <button onClick={() => setOpen(false)} aria-label="關閉選單" className="rounded-md p-1.5 hover:bg-accent">

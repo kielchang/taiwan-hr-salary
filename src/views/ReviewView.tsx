@@ -125,7 +125,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
           </p>
         </div>
         {confirmed ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-tour="confirm-btn">
             <Badge variant="success">已於 {new Date(confirmed).toLocaleString("zh-TW")} 確認</Badge>
             <Button variant="outline" size="sm" onClick={() => unconfirmPeriod(currentPeriod)}>
               <Undo2 /> 取消確認
@@ -133,6 +133,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
           </div>
         ) : (
           <Button
+            data-tour="confirm-btn"
             onClick={doConfirm}
             disabled={errors.length > 0 || pendingTax.length > 0}
           >
