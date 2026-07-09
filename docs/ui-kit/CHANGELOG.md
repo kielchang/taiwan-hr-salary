@@ -3,6 +3,12 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.11.1] - 2026-07-09
+
+### 修正（DataTable 十字對準破壞凍結首欄／黏性表頭）
+- 十字對準 highlight 原以 `background-color`（`bg-primary/[0.06]`／`bg-primary/20`）上色，會**覆蓋**凍結首欄與黏性表頭儲存格的 `bg-background`，使被選到的黏性儲存格變半透明、露出捲動到後面的欄位（表現為「首欄凍結失效」——水平捲動時凍結首欄可看到後方資料透出）。
+- 改用 `background-image`（`bg-gradient-to-r from-primary/… to-primary/…`）：色塊疊在儲存格既有背景色之上、不覆蓋 `background-color`，故凍結/黏性儲存格維持不透明。一般（非黏性）儲存格視覺不變。全站表格同步修正。
+
 ## [0.11.0] - 2026-07-08
 
 ### 新增（Callout 狀態提示框）

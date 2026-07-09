@@ -206,8 +206,11 @@ export function DataTable<T>({
     saveBlob(new Blob([csvSerialize(csv.headers, sorted.map(csv.row))], { type: "text/csv;charset=utf-8" }), csv.fileName);
   };
 
-  const xline = "bg-primary/[0.06]";
-  const xcell = "bg-primary/20";
+  // 十字對準 highlight 用「背景圖層（gradient）」而非 background-color：
+  // 疊在儲存格既有 background-color 之上，不會覆蓋凍結首欄/黏性表頭的 bg-background，
+  // 否則被選到的黏性儲存格會變半透明、露出捲動到後面的欄位（首欄凍結看似失效）。
+  const xline = "bg-gradient-to-r from-primary/[0.06] to-primary/[0.06]";
+  const xcell = "bg-gradient-to-r from-primary/20 to-primary/20";
 
   const openFilterAt = (key: string, btn: HTMLElement) => {
     if (openFilter?.key === key) { setOpenFilter(null); return; }
