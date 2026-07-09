@@ -10,8 +10,10 @@
 - **脈動聚光環**：聚光框改為「挖洞暗罩 + 獨立脈動環」兩層，被圈元素外緣做呼吸式外擴光暈（`.tour-pulse-ring`＋`@keyframes tour-pulse`，於 `index.css`），把視線拉到該注意/該點的控制項；尊重 `prefers-reduced-motion`（降級為靜態粗環）。
 - **`actionHint?: ReactNode`**：需使用者實際點圈選處才前進的步驟，於卡片顯示脈動圓點＋提示（如「👆 點上方圈選處即可繼續」）。搭配 TourRunner 的 `advanceOn:"click"`（點到目標即自動前進）。
 - **`secondaryAction?: { label, onClick }`**：僅於末步在主鈕左側顯示 outline 次要鈕，用於上手導引「完成 → 接著看下一支」串接（系統總覽 → 每月結算 → 主檔情境）。仍純呈現、跳轉邏輯由 TourRunner glue 傳入。
-- **`TabPills`**：`TabPill` 新增選配 `dataTour?`，渲染到該分頁 `<button data-tour>`，讓導引能圈選並 advanceOn 點擊<strong>特定分頁</strong>（如設定頁「幣別與匯率／法定參數／資料與安全」）。向後相容、不傳即無屬性。
-- Storybook「元件 / 導引 Coachmark」新增「互動待點」「末步鏈結下一支」狀態。
+- **`TabPills`**：`TabPill` 新增選配 `dataTour?`，渲染到該分頁 `<button data-tour>`，讓導引能圈選並 advanceOn 點擊**特定分頁**（如設定頁「幣別與匯率／法定參數／資料與安全」）。向後相容、不傳即無屬性。
+- **鍵盤/焦點無障礙**：Coachmark 每步把焦點移入卡片（`tabIndex=-1`＋`aria-live="polite"` 讓報讀者唸出步驟）；卡片聚焦時 `←/→` 換步、`Esc` 略過、`Enter` 下一步（只在焦點在卡片本體、非內部按鈕時，避免重複觸發）；卡片顯示 `focus-visible` 外框與鍵盤提示「← → 換步 · Esc 略過」。
+- **`warning?: ReactNode`**：前置條件未滿足時的紅字提醒（如當期已確認、計薪情境被鎖）。搭配 TourRunner 讀 store 狀態注入。
+- Storybook「元件 / 導引 Coachmark」新增「互動待點」「狀態警示」「末步鏈結下一支」狀態。
 
 ## [0.13.0] - 2026-07-09
 

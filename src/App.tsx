@@ -148,7 +148,7 @@ function Layout() {
       <header className="sticky top-0 z-40 border-b bg-background print:hidden">
         <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <button className="rounded-md p-1.5 hover:bg-accent md:hidden" onClick={() => setOpen((v) => !v)} aria-label="選單">
+            <button data-tour="sidebar-toggle" className="rounded-md p-1.5 hover:bg-accent md:hidden" onClick={() => setOpen((v) => !v)} aria-label="選單">
               <Menu className="size-5" />
             </button>
             <Building2 className="size-6 text-primary" />

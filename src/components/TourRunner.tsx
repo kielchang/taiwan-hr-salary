@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { Coachmark } from "@/components/ui/coachmark";
-import { TOURS } from "@/content/tours";
+import { TOURS, type TourStep } from "@/content/tours";
+
+// 選有效目標：窄螢幕（<768，行動抽屜）優先用 mobileTarget（如側邊欄→左上選單鈕），否則用桌機 target。
+function pickTarget(step: TourStep, width: number): string | undefined {
+  return width < 768 && step.mobileTarget ? step.mobileTarget : step.target;
+}
 
 /**
  * 導引引擎（app glue，刻意不入元件庫 barrel；可 import store/router/content）。
@@ -13,6 +18,8 @@ export function TourRunner() {
   const activeTourId = usePayrollStore((s) => s.activeTourId);
   const endTour = usePayrollStore((s) => s.endTour);
   const startTour = usePayrollStore((s) => s.startTour);
+  const confirmations = usePayrollStore((s) => s.confirmations);
+  const currentPeriod = usePayrollStore((s) => s.currentPeriod);
   const navigate = useNavigate();
   const location = useLocation();
   const [stepIndex, setStepIndex] = useState(0);
@@ -41,13 +48,18 @@ export function TourRunner() {
     let tries = 0;
     setRect(null);
     const tick = () => {
-      const el = step.target ? document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`) : null;
+      const targetId = pickTarget(step, window.innerWidth);
+      const el = targetId ? document.querySelector<HTMLElement>(`[data-tour="${targetId}"]`) : null;
       if (el) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        // 只有目標不在視窗內才捲動，且用即時（非平滑）避免「先量到捲動前位置→聚光環跳一下」的競態
+        const r = el.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight) {
+          el.scrollIntoView({ block: "center", behavior: "auto" });
+        }
         setRect(el.getBoundingClientRect());
         return;
       }
-      if (step.target && tries < 90) { tries++; raf = requestAnimationFrame(tick); }
+      if (targetId && tries < 90) { tries++; raf = requestAnimationFrame(tick); }
       else setRect(null);
     };
     raf = requestAnimationFrame(tick);
@@ -57,10 +69,12 @@ export function TourRunner() {
   // 互動：此步標記 advanceOn:"click" 時，使用者實際點到圈選處即自動前進（會盯著你操作，而非只換頁）。
   // 用文件層委派監聽（capture），避免元素因重繪換節點而漏接；點在 [data-tour=target] 內即前進。
   useEffect(() => {
-    if (!tour || !step?.advanceOn || !step.target) return;
+    if (!tour || !step?.advanceOn) return;
+    const targetId = pickTarget(step, window.innerWidth);
+    if (!targetId) return;
     const onClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t?.closest(`[data-tour="${step.target}"]`)) {
+      if (t?.closest(`[data-tour="${targetId}"]`)) {
         // 讓 app 自身的點擊處理（換分頁/開對話框）先跑，再前進到下一步
         setTimeout(() => {
           setStepIndex((i) => {
@@ -76,10 +90,11 @@ export function TourRunner() {
 
   // 捲動/縮放時聚光框跟隨
   useEffect(() => {
-    if (!step?.target) return;
+    if (!step) return;
     const update = () => {
-      const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
-      if (el) setRect(el.getBoundingClientRect());
+      const targetId = pickTarget(step, window.innerWidth);
+      const el = targetId ? document.querySelector<HTMLElement>(`[data-tour="${targetId}"]`) : null;
+      setRect(el ? el.getBoundingClientRect() : null);
     };
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
@@ -100,6 +115,11 @@ export function TourRunner() {
   const actionHint = step.advanceOn === "click" && rect
     ? (step.actionHint ?? "👆 點上方圈選處即可繼續（或按「下一步」）")
     : undefined;
+  // 狀態感知：需可編輯前提的步驟，若當期示範月已確認（硬鎖定），先提示去取消確認，免得「照做卻沒反應」。
+  const locked = !!confirmations[currentPeriod];
+  const warning = step.requireUnconfirmed && locked
+    ? <>此示範月（{currentPeriod}）已確認，<strong>計薪相關情境會被鎖定</strong>：請先到「薪資結算 → 查核與確認」按<strong>取消本月確認</strong>再操作。</>
+    : undefined;
   return (
     <Coachmark
       targetRect={rect}
@@ -111,6 +131,7 @@ export function TourRunner() {
       isLast={isLast}
       secondaryAction={secondaryAction}
       actionHint={actionHint}
+      warning={warning}
       onPrev={() => setStepIndex((i) => Math.max(0, i - 1))}
       onNext={() => { if (isLast) endTour(tour.id, true); else setStepIndex((i) => i + 1); }}
       onSkip={() => endTour(tour.id, false)}

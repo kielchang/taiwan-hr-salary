@@ -12,6 +12,8 @@ export interface TourStep {
   route?: string; // 進入此步前自動導覽到此 hash 路由（如 "/settings"）
   advanceOn?: "click"; // 使用者實際點到圈選處（target）即自動前進；適用「切分頁/開面板」等點了自然帶到下一步的操作
   actionHint?: ReactNode; // 搭配 advanceOn 的互動提示文字（預設「👆 點上方圈選處即可繼續」）
+  mobileTarget?: string; // 窄螢幕（<768）改圈此 data-tour（如桌機圈側邊欄、手機圈左上選單鈕）
+  requireUnconfirmed?: boolean; // 此步需「當期未確認」才可操作；已確認時導引顯示紅字提醒先取消確認
 }
 export interface Tour {
   id: string;
@@ -63,7 +65,7 @@ export const TOURS: Record<string, Tour> = {
     steps: [
       { title: "調職／部門異動導覽", body: <>示範新的<strong>「調職／部門異動」</strong>情境：改部門/職稱/成本中心/專案。這些會影響成本分攤與報表分類，屬<strong>計薪相關</strong>。</> },
       { route: "/master", target: "master-emp-list", advanceOn: "click", title: "① 開啟員工檔案", body: <>在<strong>員工清單</strong>點任一員工（列）開啟檔案面板，稍後於「資料維護」按<strong>「調職／部門異動」</strong>。</> },
-      { route: "/master", title: "② 改部門並理解鎖定", body: <>改部門/成本中心→填<strong>異動原因</strong>→送出。<br/>若當月<strong>已確認結算</strong>，此情境會被<strong>鎖定</strong>（欄位唯讀），需先到「查核與確認」取消確認——防止期中調職回溯改動已凍結的成本分攤。<br/>（純聯絡資料改姓名/Email 則走「聯絡與識別」情境、不受鎖。）導覽完成！</> },
+      { route: "/master", requireUnconfirmed: true, title: "② 改部門並理解鎖定", body: <>改部門/成本中心→填<strong>異動原因</strong>→送出。<br/>若當月<strong>已確認結算</strong>，此情境會被<strong>鎖定</strong>（欄位唯讀），需先到「查核與確認」取消確認——防止期中調職回溯改動已凍結的成本分攤。<br/>（純聯絡資料改姓名/Email 則走「聯絡與識別」情境、不受鎖。）導覽完成！</> },
     ],
   },
 
@@ -89,7 +91,7 @@ export const TOURS: Record<string, Tour> = {
     nextLabel: "接著看：每月結算 →",
     steps: [
       { route: "/", title: "歡迎！系統總覽", body: <>用兩分鐘帶你認識主要功能與動線。這套系統依台灣法規，把勞健保/勞退/二代健保/所得稅到薪資條一次算完。</> },
-      { route: "/", target: "sidebar", title: "① 側邊欄＝功能地圖", body: <>左側分區：<strong>每月作業</strong>（工作台/薪資結算）、<strong>規劃與分析</strong>、<strong>報表與申報</strong>、<strong>主檔與設定</strong>。跟著側邊欄就能找到所有功能。<br/>（手機版側邊欄收在左上角選單鈕內。）</> },
+      { route: "/", target: "sidebar", mobileTarget: "sidebar-toggle", title: "① 側邊欄＝功能地圖", body: <>左側分區：<strong>每月作業</strong>（工作台/薪資結算）、<strong>規劃與分析</strong>、<strong>報表與申報</strong>、<strong>主檔與設定</strong>。跟著側邊欄就能找到所有功能。<br/>（手機版收在左上角<strong>選單鈕</strong>裡——就是圈起來這顆。）</> },
       { route: "/", target: "workbench-todos", title: "② 工作台＝本月待辦一頁看", body: <>首頁把本月要處理的事聚合成待辦卡——資料檢查、未填代扣稅、加退保、排程調薪——<strong>點卡片直達</strong>處理位置。</> },
       { route: "/", title: "③ 每月固定兩件事", body: <>① <strong>薪資結算</strong>：輸入異動→查核確認。② <strong>報表與申報</strong>：印薪資條、跑扣繳/繳費/加退保名冊。<br/>其餘（基本資料、系統設定）平時不太需要動。<br/>接著建議看「每月結算兩步」——按下方<strong>「接著看」</strong>直接續。</> },
     ],
@@ -118,7 +120,7 @@ export const TOURS: Record<string, Tour> = {
     steps: [
       { title: "基本資料＝情境化申請單", body: <>員工資料維護不是一張大表：而是<strong>挑「情境」</strong>（到職/離職/留停/復職/薪資調整/調職/眷屬/扣繳/聯絡），只填該情境欄位，每筆都留可稽核、可回復的紀錄。</> },
       { route: "/master", target: "master-emp-list", advanceOn: "click", title: "① 員工清單 → 挑情境", body: <>在<strong>「員工清單」</strong>點任一員工（列）開啟檔案面板，依要辦的事選情境按鈕（人員異動／資料維護兩組）。</> },
-      { route: "/master", title: "② 填該情境欄位＋原因", body: <>選情境後只出現<strong>相關欄位</strong>＋必填<strong>「異動原因」</strong>；送出前<strong>「變更摘要」</strong>看舊→新、可逐欄還原。送出即記一筆稽核。<br/>（計薪相關情境於當月已確認時會被鎖，需先取消確認；純聯絡資料不受限。）</> },
+      { route: "/master", requireUnconfirmed: true, title: "② 填該情境欄位＋原因", body: <>選情境後只出現<strong>相關欄位</strong>＋必填<strong>「異動原因」</strong>；送出前<strong>「變更摘要」</strong>看舊→新、可逐欄還原。送出即記一筆稽核。<br/>（計薪相關情境於當月已確認時會被鎖，需先取消確認；純聯絡資料不受限。）</> },
       { route: "/master", target: "master-tabs", title: "③ 異動紀錄可查可回復", body: <>第三個分頁<strong>「異動紀錄」</strong>可搜尋所有異動（員工/情境/原因），並對可回復者按「回復」。導覽完成！</> },
     ],
   },

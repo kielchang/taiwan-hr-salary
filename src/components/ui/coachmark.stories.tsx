@@ -58,7 +58,22 @@ export const 互動待點: S = {
   },
 };
 
-/** 無錨點（targetRect=null）＝置中歡迎卡。 */
+/** 狀態感知警示（warning）：前置條件未滿足（如當期已確認），卡片顯示紅字提醒先解鎖。 */
+export const 狀態警示: S = {
+  render: () => (
+    <div className="min-h-[60vh] p-10">
+      <Coachmark
+        targetRect={null} title="② 改部門並理解鎖定"
+        body={<>改部門/成本中心→填<strong>異動原因</strong>→送出。</>}
+        warning={<>此示範月（2026-06）已確認，<strong>計薪相關情境會被鎖定</strong>：請先到「薪資結算 → 查核與確認」按<strong>取消本月確認</strong>再操作。</>}
+        stepIndex={2} stepCount={3} isFirst={false} isLast
+        onPrev={() => {}} onNext={() => {}} onSkip={() => {}}
+      />
+    </div>
+  ),
+};
+
+/** 無錨點（targetRect=null）＝置中歡迎卡。鍵盤：卡片聚焦後 ←/→ 換步、Esc 略過、Enter 下一步。 */
 export const 置中歡迎卡: S = {
   render: () => (
     <div className="min-h-[60vh] p-10">

@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,8 @@ export interface CoachmarkProps {
   secondaryAction?: { label: string; onClick: () => void };
   /** 選配互動提示：此步需使用者實際點圈選處才前進時，於卡片顯示脈動指示（如「👆 點上方圈選的按鈕」）。 */
   actionHint?: ReactNode;
+  /** 選配警示（危險/前置條件未滿足，如「此示範月已確認，需先取消確認」）；以 danger 樣式顯示於說明下方。 */
+  warning?: ReactNode;
 }
 
 const PAD = 12;
@@ -38,10 +40,21 @@ const GAP = 12;
 const HOLE = 6; // 聚光洞比目標外擴的邊距
 
 export function Coachmark({
-  targetRect, title, body, stepIndex, stepCount, isFirst, isLast, onNext, onPrev, onSkip, finishLabel = "完成", secondaryAction, actionHint,
+  targetRect, title, body, stepIndex, stepCount, isFirst, isLast, onNext, onPrev, onSkip, finishLabel = "完成", secondaryAction, actionHint, warning,
 }: CoachmarkProps) {
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  // 無障礙：進入每一步把焦點移入卡片（螢幕報讀者會唸出 aria-live 的步驟內容），
+  // 並讓鍵盤操作（Esc/←/→/Enter）作用在卡片上——不搶輸入框焦點（只在換步時 focus 一次）。
+  useEffect(() => { popRef.current?.focus(); }, [stepIndex]);
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") { e.preventDefault(); onSkip(); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); onNext(); }
+    else if (e.key === "ArrowLeft") { if (!isFirst) { e.preventDefault(); onPrev(); } }
+    // Enter 只在焦點落在卡片本體（非內部按鈕）時前進，避免與按鈕預設行為重複觸發
+    else if (e.key === "Enter" && e.target === popRef.current) { e.preventDefault(); onNext(); }
+  };
 
   useLayoutEffect(() => {
     const el = popRef.current;
@@ -97,10 +110,13 @@ export function Coachmark({
       {/* 彈出框 */}
       <div
         ref={popRef}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        aria-live="polite"
         style={pos ? { top: pos.top, left: pos.left } : { opacity: 0 }}
         className={cn(
           // 卡片本身要能接收點擊（root 已 pointer-events-none 讓聚光洞可穿透點到真實控制項）
-          "pointer-events-auto fixed w-[min(340px,calc(100vw-24px))] rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg",
+          "pointer-events-auto fixed w-[min(340px,calc(100vw-24px))] rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg outline-none ring-1 ring-transparent focus-visible:ring-primary",
         )}
       >
         <div className="mb-1 flex items-start justify-between gap-2">
@@ -110,6 +126,9 @@ export function Coachmark({
           </button>
         </div>
         <div className="text-sm text-muted-foreground [&_strong]:text-foreground">{body}</div>
+        {warning && (
+          <p className="mt-2 rounded-md border border-danger/40 bg-danger/10 px-2 py-1.5 text-xs text-danger [&_strong]:text-danger">{warning}</p>
+        )}
         {actionHint && (
           <p className="mt-2 flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary">
             <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
@@ -117,7 +136,10 @@ export function Coachmark({
           </p>
         )}
         <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs tabular-nums text-muted-foreground">{stepIndex + 1} / {stepCount}</span>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {stepIndex + 1} / {stepCount}
+            <span className="ml-1.5 hidden text-[10px] text-muted-foreground/70 sm:inline" aria-hidden>· ← → 換步 · Esc 略過</span>
+          </span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={onSkip} className="text-[11px] text-muted-foreground underline underline-offset-2">略過</button>
             {!isFirst && <Button variant="outline" size="sm" onClick={onPrev}>上一步</Button>}
