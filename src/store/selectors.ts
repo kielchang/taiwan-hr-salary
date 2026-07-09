@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 import { calculatePayroll, type PayrollResult, leaveSegments, segmentRatio } from "@/lib/calc";
 import { companySupplementary } from "@/lib/calc";
-import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy } from "@/lib/types";
+import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy, Subsidy } from "@/lib/types";
 import type { Parameters } from "@/config/parameters";
 import type { InsuranceBrackets } from "@/config/brackets";
 import { usePayrollStore, blankEvent, DEFAULT_LEAVE_POLICY } from "./usePayrollStore";
@@ -75,15 +75,33 @@ export interface PayrollData {
   parameters: Parameters;
   brackets: InsuranceBrackets;
   leavePolicy?: LeavePolicy;
+  subsidies?: Subsidy[]; // 區間補貼（於本期生效者注入計薪）
 }
 
-/** 純函數：計算指定期間全體在職員工之薪資結算列（供 hook 與跨期重算共用） */
+/** 該員工於某期間生效的區間補貼（from≤period≤to 且命中族群）。 */
+function activeSubsidies(subsidies: Subsidy[], employeeId: string, period: string): Subsidy[] {
+  return subsidies.filter((s) => s.targetEmployeeIds.includes(employeeId) && s.from <= period && period <= s.to);
+}
+
+/**
+ * 純函數：計算指定期間全體在職員工之薪資結算列（供 hook 與跨期重算共用）。
+ * 區間補貼於此注入（不改計算核心簽章）：計入投保者→當臨時 customAllowance 併入月薪資總額（影響保費/加班/最低工資）；
+ * 不計投保者→加進 event.otherAddition（只進實發、不動級距）。無補貼＝結構不變（TC-9 逐位元不變）。
+ */
 export function buildPayrollRows(period: string, data: PayrollData): PayrollRow[] {
   const { employees, salaries, dependents, events, parameters, brackets } = data;
   const leavePolicy = data.leavePolicy ?? DEFAULT_LEAVE_POLICY;
+  const subsidies = data.subsidies ?? [];
   return employees.filter((emp) => isActiveInPeriod(emp, period, leavePolicy)).map((emp) => {
-    const salary = salaries.find((s) => s.employeeId === emp.id) ?? blankSalary(emp.id);
-    const event = events.find((e) => e.employeeId === emp.id && e.period === period) ?? blankEvent(emp.id, period);
+    let salary = salaries.find((s) => s.employeeId === emp.id) ?? blankSalary(emp.id);
+    let event = events.find((e) => e.employeeId === emp.id && e.period === period) ?? blankEvent(emp.id, period);
+    const active = activeSubsidies(subsidies, emp.id, period);
+    if (active.length) {
+      const insured = active.filter((s) => s.insured);
+      const nonInsured = active.filter((s) => !s.insured);
+      if (insured.length) salary = { ...salary, customAllowances: [...(salary.customAllowances ?? []), ...insured.map((s) => ({ id: `SUB${s.id}`, name: s.name, amount: s.amount }))] };
+      if (nonInsured.length) event = { ...event, otherAddition: event.otherAddition + nonInsured.reduce((a, s) => a + s.amount, 0) };
+    }
     const result = calculatePayroll(emp, salary, dependents, event, parameters, brackets, { period, leavePolicy });
     return { ...result, name: emp.name, department: emp.department, costCenter: emp.costCenter, project: emp.project };
   });
@@ -91,14 +109,14 @@ export function buildPayrollRows(period: string, data: PayrollData): PayrollRow[
 
 /** 計算當月（currentPeriod）全體員工薪資結算 */
 export function usePayrollRows(): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod, leavePolicy } = usePayrollStore();
-  return buildPayrollRows(currentPeriod, { employees, salaries, dependents, events, parameters, brackets, leavePolicy });
+  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod, leavePolicy, subsidies } = usePayrollStore();
+  return buildPayrollRows(currentPeriod, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies });
 }
 
 /** 計算指定期間全體員工薪資結算（檢視歷史/其他月份用） */
 export function usePayrollRowsFor(period: string): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets, leavePolicy } = usePayrollStore();
-  return buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets, leavePolicy });
+  const { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies } = usePayrollStore();
+  return buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies });
 }
 
 export interface Totals {
