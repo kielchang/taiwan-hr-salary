@@ -47,6 +47,30 @@ export const TOURS: Record<string, Tour> = {
       { route: "/settings", target: "legal-groups", title: "③ 改費率、切月驗證", body: <>改好新版本費率後，到<strong>薪資結算</strong>切換月份：新版本生效月之後用新費率、之前的已確認月維持原費率、扣繳憑單逐月各取其版本。導覽完成！</> },
     ],
   },
+
+  transfer: {
+    id: "transfer",
+    title: "調職／部門異動與計薪鎖（驗收導覽）",
+    audience: "acceptance",
+    summary: "調職＝改部門/成本中心，屬計薪相關，已確認月會被鎖，避免繞過月結凍結。",
+    steps: [
+      { title: "調職／部門異動導覽", body: <>示範新的<strong>「調職／部門異動」</strong>情境：改部門/職稱/成本中心/專案。這些會影響成本分攤與報表分類，屬<strong>計薪相關</strong>。</> },
+      { route: "/master", target: "master-tabs", title: "① 開啟員工檔案", body: <>在<strong>員工清單</strong>點任一員工開啟檔案面板，於「資料維護」按<strong>「調職／部門異動」</strong>。</> },
+      { route: "/master", title: "② 改部門並理解鎖定", body: <>改部門/成本中心→填<strong>異動原因</strong>→送出。<br/>若當月<strong>已確認結算</strong>，此情境會被<strong>鎖定</strong>（欄位唯讀），需先到「查核與確認」取消確認——防止期中調職回溯改動已凍結的成本分攤。<br/>（純聯絡資料改姓名/Email 則走「聯絡與識別」情境、不受鎖。）導覽完成！</> },
+    ],
+  },
+
+  safety: {
+    id: "safety",
+    title: "設定安全網（驗收導覽）",
+    audience: "acceptance",
+    summary: "改錯費率即時紅字擋＋危險操作紅框與備份還原分離，避免誤覆蓋資料。",
+    steps: [
+      { title: "設定安全網導覽", body: <>示範兩道防呆：①改法定費率量級打錯會<strong>即時紅字擋下</strong> ②覆蓋/清空類「危險操作」與「從備份還原」<strong>分區隔離</strong>。</> },
+      { route: "/settings", target: "settings-validation", title: "① 設定驗證", body: <>在<strong>法定參數</strong>頁，若把費率打錯量級（例如健保 5.17% 打成 <strong>5</strong>）、或投保級距沒排序，系統頂部會<strong>紅字列出問題</strong>，在算錯錢前先擋下。（目前設定正常時不顯示。）</> },
+      { route: "/settings", target: "settings-danger", title: "② 危險操作隔離", body: <>點<strong>「資料與安全」</strong>分頁：最下方<strong>紅框「危險操作」</strong>區（載入示範公司／清空員工資料）與上方「從備份還原」<strong>刻意分開</strong>，且改用紅色警示樣式，避免把「載入示範」誤當「還原備份」而覆蓋真實資料。導覽完成！</> },
+    ],
+  },
 };
 
 export const TOUR_LIST = Object.values(TOURS);

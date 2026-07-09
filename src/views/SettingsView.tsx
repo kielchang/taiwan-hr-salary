@@ -261,11 +261,11 @@ export function SettingsView() {
         const errs = issues.filter((i) => i.severity === "error");
         const warns = issues.filter((i) => i.severity === "warning");
         return (
-          <Callout variant={errs.length ? "danger" : "warning"} title={errs.length ? "系統設定有問題，會導致計算錯誤" : "系統設定提醒"}>
+          <div data-tour="settings-validation"><Callout variant={errs.length ? "danger" : "warning"} title={errs.length ? "系統設定有問題，會導致計算錯誤" : "系統設定提醒"}>
             <ul className="ml-4 list-disc space-y-0.5">
               {[...errs, ...warns].map((i, idx) => <li key={idx}>{i.message}</li>)}
             </ul>
-          </Callout>
+          </Callout></div>
         );
       })()}
 
@@ -467,7 +467,7 @@ export function SettingsView() {
         </CardContent>
       </Card>
 
-      <Card className="border-danger/40">
+      <Card className="border-danger/40" data-tour="settings-danger">
         <CardHeader className="pb-3">
           <CardTitle className="text-base text-danger">示範與重置（危險操作）</CardTitle>
           <CardDescription>以下操作會<strong>覆蓋或清除現有資料且無法復原</strong>，與上方「從備份檔還原」不同。若要保留現有資料，請先「匯出備份」。</CardDescription>

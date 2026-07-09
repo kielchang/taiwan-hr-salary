@@ -19,7 +19,7 @@ import { ntd, formatPeriod } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import {
   LayoutDashboard, AlertTriangle, FileText, UserPlus, UserMinus, Scale,
-  CheckCircle2, ArrowRight, CalendarClock, Banknote, TrendingUp, XCircle, PauseCircle,
+  CheckCircle2, ArrowRight, CalendarClock, Banknote, TrendingUp, XCircle, PauseCircle, Compass,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -61,6 +61,7 @@ export function DashboardView() {
     employees, salaries, dependents, events, parameterVersions, bracketVersions,
     currentPeriod, confirmations, allocations, declaredInsured,
     scheduledRaises, cancelScheduledRaise, applyScheduledRaise,
+    tourPromptSeen, completedTours, dismissTourPrompt,
   } = usePayrollStore();
   const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
   const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
@@ -101,6 +102,16 @@ export function DashboardView() {
 
   return (
     <div className="space-y-4">
+      {!tourPromptSeen && completedTours.length === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-info/40 bg-info/10 p-3">
+          <p className="flex items-center gap-2 text-sm text-info"><Compass className="size-4 shrink-0" />
+            第一次使用嗎？系統有<strong>互動導引</strong>，會在畫面上圈出「要點哪、輸入什麼、預期看到什麼」，一步步帶你走。</p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => navigate("/help")}><Compass /> 查看導引</Button>
+            <Button size="sm" variant="ghost" onClick={dismissTourPrompt}>不用了</Button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-lg font-bold">

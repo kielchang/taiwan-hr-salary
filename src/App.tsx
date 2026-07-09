@@ -49,7 +49,7 @@ import { VERSION_LABEL, COMMIT_URL, ENV_BADGE } from "@/version";
 import { FEATURES } from "@/config/features";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
-  FileText, FolderKanban, Menu, LayoutDashboard, X,
+  FileText, FolderKanban, Menu, LayoutDashboard, X, Compass,
 } from "lucide-react";
 
 type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算"; feature?: keyof typeof FEATURES };
@@ -170,6 +170,9 @@ function Layout() {
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <NavLink to="/help" className="tap-target flex items-center gap-1 rounded-md border px-2 py-1 font-medium text-foreground hover:bg-accent" title="互動導引教學">
+              <Compass className="size-3.5" /><span className="hidden sm:inline">導引</span>
+            </NavLink>
             <span className="hidden sm:inline">本月：{formatPeriod(currentPeriod)}</span>
             {errors > 0 ? <Badge variant="destructive">{errors} 項待處理</Badge> : <Badge variant="success">資料正常</Badge>}
             {confirmed ? <Badge variant="success">已確認</Badge> : <Badge variant="outline">未確認</Badge>}
