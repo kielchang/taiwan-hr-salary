@@ -193,7 +193,7 @@ export function MonthlyView({
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card data-tour="monthly-table">
           <CardContent className="pt-6">
             <DataTable
               rows={rows}

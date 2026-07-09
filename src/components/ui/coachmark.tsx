@@ -27,6 +27,8 @@ export interface CoachmarkProps {
   onSkip: () => void;
   /** 末步的主鈕文字（預設「完成」） */
   finishLabel?: string;
+  /** 選配次要動作（如末步「接著看下一支導覽」）；提供即在主鈕左側顯示一顆 outline 鈕 */
+  secondaryAction?: { label: string; onClick: () => void };
 }
 
 const PAD = 12;
@@ -34,7 +36,7 @@ const GAP = 12;
 const HOLE = 6; // 聚光洞比目標外擴的邊距
 
 export function Coachmark({
-  targetRect, title, body, stepIndex, stepCount, isFirst, isLast, onNext, onPrev, onSkip, finishLabel = "完成",
+  targetRect, title, body, stepIndex, stepCount, isFirst, isLast, onNext, onPrev, onSkip, finishLabel = "完成", secondaryAction,
 }: CoachmarkProps) {
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -97,6 +99,7 @@ export function Coachmark({
           <div className="flex items-center gap-2">
             <button type="button" onClick={onSkip} className="text-[11px] text-muted-foreground underline underline-offset-2">略過</button>
             {!isFirst && <Button variant="outline" size="sm" onClick={onPrev}>上一步</Button>}
+            {isLast && secondaryAction && <Button variant="outline" size="sm" onClick={secondaryAction.onClick}>{secondaryAction.label}</Button>}
             <Button size="sm" onClick={onNext}>{isLast ? finishLabel : "下一步"}</Button>
           </div>
         </div>

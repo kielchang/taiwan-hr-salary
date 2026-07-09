@@ -103,16 +103,34 @@ export function HelpView() {
           <CardTitle className="text-base">互動導引教學</CardTitle>
           <CardDescription>點「開始導覽」，系統會在畫面上圈出「要點哪裡、輸入什麼、預期看到什麼」，一步步帶你走。分頁/輸入由你自己操作，隨時可略過。</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {TOUR_LIST.map((t) => (
-            <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
-              <div>
-                <p className="text-sm font-medium">{t.title}{completedTours.includes(t.id) && <span className="ml-2 text-xs text-success">✓ 已完成</span>}</p>
-                <p className="text-xs text-muted-foreground">{t.summary}</p>
+        <CardContent className="space-y-4">
+          {([
+            ["onboarding", "新手上手", "第一次接觸這套系統，建議依序走完這三支，建立整體心智模型。"],
+            ["acceptance", "本季新功能驗收", "確認本季新增功能是否符合預期；熟悉系統後再看即可。"],
+          ] as const).map(([aud, label, desc]) => {
+            const list = TOUR_LIST.filter((t) => t.audience === aud);
+            if (!list.length) return null;
+            return (
+              <div key={aud} className="space-y-2">
+                <div>
+                  <p className="text-sm font-semibold">{label}</p>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </div>
+                {list.map((t, i) => (
+                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {aud === "onboarding" && <span className="mr-1 text-muted-foreground">{i + 1}.</span>}
+                        {t.title}{completedTours.includes(t.id) && <span className="ml-2 text-xs text-success">✓ 已完成</span>}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{t.summary}</p>
+                    </div>
+                    <Button size="sm" onClick={() => { navigate("/"); startTour(t.id); }}><Compass /> 開始導覽</Button>
+                  </div>
+                ))}
               </div>
-              <Button size="sm" onClick={() => { navigate("/"); startTour(t.id); }}><Compass /> 開始導覽</Button>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 

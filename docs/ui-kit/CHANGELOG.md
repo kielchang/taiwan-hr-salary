@@ -3,6 +3,12 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.14.0] - 2026-07-09
+
+### 新增（Coachmark：末步鏈結下一支導覽）
+- **`Coachmark`** 新增選配 `secondaryAction?: { label, onClick }`：僅於末步（`isLast`）在主鈕左側顯示一顆 outline 次要鈕。用於上手導引「完成 → 接著看下一支」的串接（如系統總覽 → 每月結算 → 主檔情境），讓三支柱從孤島變成一條學習路徑。仍純呈現、不含跳轉邏輯（由 TourRunner glue 傳入 onClick 呼叫 store.startTour）。
+- Storybook「元件 / 導引 Coachmark」新增「末步鏈結下一支」狀態。
+
 ## [0.13.0] - 2026-07-09
 
 ### 新增（Coachmark 導引聚光框）

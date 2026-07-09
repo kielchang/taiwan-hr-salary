@@ -48,3 +48,17 @@ export const 置中歡迎卡: S = {
     </div>
   ),
 };
+
+/** 末步鏈結下一支導覽（secondaryAction）：完成之外多一顆「接著看」outline 鈕。 */
+export const 末步鏈結下一支: S = {
+  render: () => (
+    <div className="min-h-[60vh] p-10">
+      <Coachmark
+        targetRect={null} title="系統總覽完成！" body={<>已認識側邊欄與工作台。接著建議看<strong>「每月結算兩步」</strong>——每月固定要做的核心流程。</>}
+        stepIndex={3} stepCount={4} isFirst={false} isLast
+        secondaryAction={{ label: "接著看：每月結算 →", onClick: () => {} }}
+        onPrev={() => {}} onNext={() => {}} onSkip={() => {}}
+      />
+    </div>
+  ),
+};

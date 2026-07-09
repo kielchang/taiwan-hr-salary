@@ -61,7 +61,7 @@ export function DashboardView() {
     employees, salaries, dependents, events, parameterVersions, bracketVersions,
     currentPeriod, confirmations, allocations, declaredInsured,
     scheduledRaises, cancelScheduledRaise, applyScheduledRaise,
-    tourPromptSeen, completedTours, dismissTourPrompt,
+    tourPromptSeen, completedTours, dismissTourPrompt, startTour,
   } = usePayrollStore();
   const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
   const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
@@ -107,7 +107,8 @@ export function DashboardView() {
           <p className="flex items-center gap-2 text-sm text-info"><Compass className="size-4 shrink-0" />
             第一次使用嗎？系統有<strong>互動導引</strong>，會在畫面上圈出「要點哪、輸入什麼、預期看到什麼」，一步步帶你走。</p>
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => navigate("/help")}><Compass /> 查看導引</Button>
+            <Button size="sm" onClick={() => { dismissTourPrompt(); startTour("overview"); }}><Compass /> 開始總覽</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigate("/help")}>所有導引</Button>
             <Button size="sm" variant="ghost" onClick={dismissTourPrompt}>不用了</Button>
           </div>
         </div>
@@ -151,7 +152,7 @@ export function DashboardView() {
       </div>
 
       {/* 本月待辦 */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div data-tour="workbench-todos" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <TodoCard
           icon={<AlertTriangle className="size-4" />} tone="error"
           title="資料檢查錯誤" count={errorCount}

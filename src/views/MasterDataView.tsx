@@ -430,7 +430,7 @@ export function MasterDataView() {
       /></div>
 
       {topTab === "list" && (
-        <Card>
+        <Card data-tour="master-emp-list">
           <CardContent className="pt-6">
             <DataTable
               rows={empRows} columns={empColumns} getRowKey={(r) => r.emp.id}

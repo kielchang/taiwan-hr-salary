@@ -17,6 +17,10 @@ export interface Tour {
   audience: "acceptance" | "onboarding";
   summary: string;
   steps: TourStep[];
+  /** 選配：末步「接著看」串接的下一支導引 id（上手三支柱串成一條學習路徑）。 */
+  next?: string;
+  /** 選配：末步「接著看」鈕文字（預設「接著看下一支 →」）。 */
+  nextLabel?: string;
 }
 
 export const TOURS: Record<string, Tour> = {
@@ -77,11 +81,13 @@ export const TOURS: Record<string, Tour> = {
     title: "系統總覽（新手上手）",
     audience: "onboarding",
     summary: "認識側邊欄分區、工作台待辦，與「每月固定做哪兩件事」。",
+    next: "monthly",
+    nextLabel: "接著看：每月結算 →",
     steps: [
       { route: "/", title: "歡迎！系統總覽", body: <>用兩分鐘帶你認識主要功能與動線。這套系統依台灣法規，把勞健保/勞退/二代健保/所得稅到薪資條一次算完。</> },
-      { route: "/", target: "sidebar", title: "① 側邊欄＝功能地圖", body: <>左側分區：<strong>每月作業</strong>（工作台/薪資結算）、<strong>規劃與分析</strong>、<strong>報表與申報</strong>、<strong>主檔與設定</strong>。跟著側邊欄就能找到所有功能。</> },
-      { route: "/", title: "② 工作台＝本月待辦一頁看", body: <>首頁把本月要處理的事聚合成待辦卡——資料檢查、未填代扣稅、加退保、排程調薪——<strong>點卡片直達</strong>處理位置。</> },
-      { route: "/", title: "③ 每月固定兩件事", body: <>① <strong>薪資結算</strong>：輸入異動→查核確認。② <strong>報表與申報</strong>：印薪資條、跑扣繳/繳費/加退保名冊。<br/>其餘（基本資料、系統設定）平時不太需要動。想深入可再跑「每月結算」與「主檔情境」導覽。完成！</> },
+      { route: "/", target: "sidebar", title: "① 側邊欄＝功能地圖", body: <>左側分區：<strong>每月作業</strong>（工作台/薪資結算）、<strong>規劃與分析</strong>、<strong>報表與申報</strong>、<strong>主檔與設定</strong>。跟著側邊欄就能找到所有功能。<br/>（手機版側邊欄收在左上角選單鈕內。）</> },
+      { route: "/", target: "workbench-todos", title: "② 工作台＝本月待辦一頁看", body: <>首頁把本月要處理的事聚合成待辦卡——資料檢查、未填代扣稅、加退保、排程調薪——<strong>點卡片直達</strong>處理位置。</> },
+      { route: "/", title: "③ 每月固定兩件事", body: <>① <strong>薪資結算</strong>：輸入異動→查核確認。② <strong>報表與申報</strong>：印薪資條、跑扣繳/繳費/加退保名冊。<br/>其餘（基本資料、系統設定）平時不太需要動。<br/>接著建議看「每月結算兩步」——按下方<strong>「接著看」</strong>直接續。</> },
     ],
   },
 
@@ -90,10 +96,12 @@ export const TOURS: Record<string, Tour> = {
     title: "每月結算兩步（新手上手）",
     audience: "onboarding",
     summary: "薪資結算輸入異動 → 查核 → 確認凍結。",
+    next: "master",
+    nextLabel: "接著看：主檔情境 →",
     steps: [
       { title: "每月結算兩步", body: <>每月固定：<strong>①輸入異動 → ②查核確認</strong>。固定薪資與四項保費系統已自動算好，你只補「變動」的部分。</> },
       { route: "/payroll/monthly", target: "period-picker", title: "① 選發薪月份", body: <>先選<strong>發薪月份</strong>。表格會列出全體員工的自動試算；沒有異動的人<strong>完全不用動</strong>。</> },
-      { route: "/payroll/monthly", title: "② 只編輯有異動的人", body: <>對「有加班／請假／獎金／需代扣稅」的員工按<strong>「編輯」</strong>→填當月異動→看即時試算（應發/代扣/實發）→送出前看變更摘要→儲存。（選「依扣繳稅額表」且達起扣點者會出現黃色提醒查表填稅。）</> },
+      { route: "/payroll/monthly", target: "monthly-table", title: "② 只編輯有異動的人", body: <>這張表列出全員試算。對「有加班／請假／獎金／需代扣稅」的人按該列<strong>「編輯」</strong>→填當月異動→看即時試算（應發/代扣/實發）→送出前看變更摘要→儲存。（選「依扣繳稅額表」且達起扣點者會出現黃色提醒查表填稅。）</> },
       { route: "/payroll/review", target: "confirm-btn", title: "③ 查核並確認凍結", body: <>第二步<strong>「查核與確認」</strong>：看全公司試算總覽＋統計查核（<strong>紅色必處理</strong>）。無誤後按<strong>「確認本月結算」</strong>留下確認紀錄並凍結。之後若再改任何資料，確認會自動解除、提醒重查。導覽完成！</> },
     ],
   },
@@ -105,7 +113,7 @@ export const TOURS: Record<string, Tour> = {
     summary: "挑情境→只填該情境欄位→必填原因→送出留稽核、可回復。",
     steps: [
       { title: "基本資料＝情境化申請單", body: <>員工資料維護不是一張大表：而是<strong>挑「情境」</strong>（到職/離職/留停/復職/薪資調整/調職/眷屬/扣繳/聯絡），只填該情境欄位，每筆都留可稽核、可回復的紀錄。</> },
-      { route: "/master", target: "master-tabs", title: "① 員工清單 → 挑情境", body: <>在<strong>「員工清單」</strong>點任一員工開啟檔案面板，依要辦的事選情境按鈕（人員異動／資料維護兩組）。</> },
+      { route: "/master", target: "master-emp-list", title: "① 員工清單 → 挑情境", body: <>在<strong>「員工清單」</strong>點任一員工開啟檔案面板，依要辦的事選情境按鈕（人員異動／資料維護兩組）。</> },
       { route: "/master", title: "② 填該情境欄位＋原因", body: <>選情境後只出現<strong>相關欄位</strong>＋必填<strong>「異動原因」</strong>；送出前<strong>「變更摘要」</strong>看舊→新、可逐欄還原。送出即記一筆稽核。<br/>（計薪相關情境於當月已確認時會被鎖，需先取消確認；純聯絡資料不受限。）</> },
       { route: "/master", target: "master-tabs", title: "③ 異動紀錄可查可回復", body: <>第三個分頁<strong>「異動紀錄」</strong>可搜尋所有異動（員工/情境/原因），並對可回復者按「回復」。導覽完成！</> },
     ],

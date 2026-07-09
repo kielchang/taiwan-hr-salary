@@ -12,6 +12,7 @@ import { TOURS } from "@/content/tours";
 export function TourRunner() {
   const activeTourId = usePayrollStore((s) => s.activeTourId);
   const endTour = usePayrollStore((s) => s.endTour);
+  const startTour = usePayrollStore((s) => s.startTour);
   const navigate = useNavigate();
   const location = useLocation();
   const [stepIndex, setStepIndex] = useState(0);
@@ -70,6 +71,11 @@ export function TourRunner() {
 
   if (!tour || !step) return null;
   const isLast = stepIndex === tour.steps.length - 1;
+  // 末步若有 next：先把本支記為完成，再啟動下一支（上手三支柱串成一條路徑）
+  const nextTour = tour.next && TOURS[tour.next];
+  const secondaryAction = isLast && nextTour
+    ? { label: tour.nextLabel ?? "接著看下一支 →", onClick: () => { endTour(tour.id, true); startTour(nextTour.id); } }
+    : undefined;
   return (
     <Coachmark
       targetRect={rect}
@@ -79,6 +85,7 @@ export function TourRunner() {
       stepCount={tour.steps.length}
       isFirst={stepIndex === 0}
       isLast={isLast}
+      secondaryAction={secondaryAction}
       onPrev={() => setStepIndex((i) => Math.max(0, i - 1))}
       onNext={() => { if (isLast) endTour(tour.id, true); else setStepIndex((i) => i + 1); }}
       onSkip={() => endTour(tour.id, false)}
