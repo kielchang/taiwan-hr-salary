@@ -269,7 +269,7 @@ export function SettingsView() {
         );
       })()}
 
-      <TabPills tabs={SEC_TABS.map(([k, label]) => ({ key: k, label }))} value={secTab} onChange={(k) => setSecTab(k as SecTab)} />
+      <div data-tour="settings-tabs"><TabPills tabs={SEC_TABS.map(([k, label]) => ({ key: k, label }))} value={secTab} onChange={(k) => setSecTab(k as SecTab)} /></div>
 
       {secTab === "company" && (
       <Card>
@@ -319,7 +319,7 @@ export function SettingsView() {
       </div>
 
       {paramVersionLocked && (
-        <Callout variant="warning" title="已有已確認月份 → 法定參數改用「新增生效版本」">
+        <div data-tour="new-version-banner"><Callout variant="warning" title="已有已確認月份 → 法定參數改用「新增生效版本」">
           直接修改會回溯改寫已確認／已申報月份的數字（費率/級距/免稅額等）。請新增一個「自指定月份起生效」的新版本來調整；先前月份維持原費率。
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="text-xs">自</span>
@@ -332,10 +332,10 @@ export function SettingsView() {
             </Button>
           </div>
           <p className="mt-1 text-[11px]">目前生效版本共 {parameterVersions.length} 個；新版本生效月須晚於最後已確認月（{maxC}）。</p>
-        </Callout>
+        </Callout></div>
       )}
 
-      <Card>
+      <Card data-tour="legal-groups">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">法定費率與金額（115 年度）</CardTitle>
         </CardHeader>
@@ -382,7 +382,7 @@ export function SettingsView() {
 
       {secTab === "company" && FEATURES.attendance && <AttendanceSettings />}
 
-      {secTab === "currency" && <CurrencyCenterCard locked={locked} />}
+      {secTab === "currency" && <div data-tour="currency-center"><CurrencyCenterCard locked={locked} /></div>}
 
       {secTab === "data" && (<>
       <Card>

@@ -2,7 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { FEATURES } from "@/config/features";
-import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings, BarChart3 } from "lucide-react";
+import { usePayrollStore } from "@/store/usePayrollStore";
+import { TOUR_LIST } from "@/content/tours";
+import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings, BarChart3, Compass } from "lucide-react";
 
 const ANALYTICS_GUIDE: [string, string][] = [
   ["成本結構", "看人事總成本由本薪/加給/加班/獎金/雇主負擔的組成、部門別比較與成本集中度（Pareto），抓結構失衡。"],
@@ -83,6 +85,8 @@ const FAQ: [string, string][] = [
 
 export function HelpView() {
   const navigate = useNavigate();
+  const startTour = usePayrollStore((s) => s.startTour);
+  const completedTours = usePayrollStore((s) => s.completedTours);
 
   return (
     <div className="space-y-4">
@@ -93,6 +97,24 @@ export function HelpView() {
           所得稅扣繳到薪資條一次完成。
         </p>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">互動導引教學</CardTitle>
+          <CardDescription>點「開始導覽」，系統會在畫面上圈出「要點哪裡、輸入什麼、預期看到什麼」，一步步帶你走。分頁/輸入由你自己操作，隨時可略過。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {TOUR_LIST.map((t) => (
+            <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+              <div>
+                <p className="text-sm font-medium">{t.title}{completedTours.includes(t.id) && <span className="ml-2 text-xs text-success">✓ 已完成</span>}</p>
+                <p className="text-xs text-muted-foreground">{t.summary}</p>
+              </div>
+              <Button size="sm" onClick={() => { navigate("/"); startTour(t.id); }}><Compass /> 開始導覽</Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

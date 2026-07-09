@@ -30,6 +30,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { TourRunner } from "@/components/TourRunner";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { validateAll } from "@/lib/validation";
 import { cn, formatPeriod } from "@/lib/utils";
@@ -245,6 +246,7 @@ function Layout() {
           <Outlet />
         </main>
       </div>
+      <TourRunner />
     </div>
   );
 }

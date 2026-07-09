@@ -53,7 +53,7 @@ export function ReportsHubView() {
           <p className="text-sm text-muted-foreground">對外（員工／主管機關）的實際報表都在這裡：月結報表與年度申報／名冊作業。規劃試算報表請見「規劃與分析」。</p>
         </div>
         {/* 期間可視可控：報表沿用全域月份，這裡醒目顯示並可直接切換，避免印錯月份 */}
-        <div className="space-y-1 print:hidden">
+        <div className="space-y-1 print:hidden" data-tour="report-period">
           <Label className="text-xs">報表月份</Label>
           <div className="flex items-center gap-2">
             <Input type="month" className="h-9 w-40 col-input" value={currentPeriod}

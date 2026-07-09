@@ -257,6 +257,12 @@ interface PayrollState {
   completeSetup: () => void;
   reopenSetup: () => void;
 
+  /** 導引器：已完成/略過的導引 id（持久化，避免重複煩）；activeTourId＝進行中導引（不持久，重載即清） */
+  completedTours: string[];
+  activeTourId: string | null;
+  startTour: (id: string) => void;
+  endTour: (id: string, completed: boolean) => void;
+
   /** 每月結算之人事確認紀錄：period → 確認時間（ISO）。已確認＝硬鎖定：需先取消確認才能異動薪資資料 */
   confirmations: Record<string, string>;
   confirmPeriod: (period: string) => void;
@@ -788,6 +794,15 @@ export const usePayrollStore = create<PayrollState>()(
       completeSetup: () => set({ setupCompleted: true }),
       reopenSetup: () => set({ setupCompleted: false }),
 
+      completedTours: [],
+      activeTourId: null,
+      startTour: (id) => set({ activeTourId: id }),
+      endTour: (id, completed) =>
+        set((st) => ({
+          activeTourId: null,
+          completedTours: completed && !st.completedTours.includes(id) ? [...st.completedTours, id] : st.completedTours,
+        })),
+
       confirmations: DEMO.confirmations,
       confirmPeriod: (period) =>
         set((st) => ({
@@ -1181,6 +1196,7 @@ export const usePayrollStore = create<PayrollState>()(
             snapshots: s.snapshots ?? st.snapshots,
             confirmations: s.confirmations ?? st.confirmations,
             setupCompleted: s.setupCompleted ?? st.setupCompleted,
+            completedTours: s.completedTours ?? st.completedTours,
             operatorName: s.operatorName ?? st.operatorName,
             declaredInsured: s.declaredInsured ?? st.declaredInsured,
             projects: s.projects ?? st.projects,
@@ -1254,6 +1270,8 @@ export const usePayrollStore = create<PayrollState>()(
           currencies: p.currencies ?? current.currencies,
           fxRates: p.fxRates ?? current.fxRates,
           fxPolicy: { ...DEFAULT_FX_POLICY, ...(p.fxPolicy ?? {}) },
+          completedTours: p.completedTours ?? current.completedTours,
+          activeTourId: null, // 不還原進行中導引（重載即清，避免開頁就跳導引）
         };
       },
     },

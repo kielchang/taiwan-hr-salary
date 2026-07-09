@@ -423,11 +423,11 @@ export function MasterDataView() {
         </div>
       </div>
 
-      <TabPills
+      <div data-tour="master-tabs"><TabPills
         tabs={[{ key: "list", label: "員工清單" }, { key: "batch", label: "批次薪資" }, { key: "log", label: `異動紀錄${logRows.length ? `（${logRows.length}）` : ""}` }]}
         value={topTab}
         onChange={(k) => setTopTab(k as TopTab)}
-      />
+      /></div>
 
       {topTab === "list" && (
         <Card>

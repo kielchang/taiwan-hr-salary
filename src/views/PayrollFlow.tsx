@@ -41,7 +41,7 @@ export function PayrollFlow({
               <h1 className="flex items-center gap-2 text-base font-bold">每月薪資作業（例行結算）<HelpHint id="payroll" /></h1>
               <p className="text-xs text-muted-foreground">兩步驟完成本月結算；報表與申報請至「報表與申報」。</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-tour="period-picker">
               <span className="text-xs text-muted-foreground">發薪月份</span>
               <Input
                 type="month"
