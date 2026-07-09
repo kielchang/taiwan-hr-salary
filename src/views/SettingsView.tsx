@@ -199,6 +199,7 @@ export function SettingsView() {
   };
   const navigate = useNavigate();
   const [showBrackets, setShowBrackets] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set()); // 法定參數群組收合（預設全開）
   const [secTab, setSecTab] = useState<SecTab>("legal");
 
   // 參數改「唯讀逐欄編輯＋送出」：本地草稿，改值標黃、底部黏著列一次套用（取代逐鍵即時寫入，
@@ -338,18 +339,25 @@ export function SettingsView() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">法定費率與金額（115 年度）</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5">
-          {LEGAL_GROUPS.map((g) => (
-            <div key={g.title}>
-              <div className="mb-2 flex items-center gap-2">
-                <p className="text-sm font-semibold">{g.title}</p>
-                {g.note && <Badge variant="warning">{g.note}</Badge>}
+        <CardContent className="space-y-3">
+          {LEGAL_GROUPS.map((g) => {
+            const open = !collapsedGroups.has(g.title);
+            return (
+              <div key={g.title} className="rounded-md border">
+                <button type="button"
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                  onClick={() => setCollapsedGroups((s) => { const n = new Set(s); n.has(g.title) ? n.delete(g.title) : n.add(g.title); return n; })}>
+                  <span className="flex items-center gap-2 text-sm font-semibold">{g.title}{g.note && <Badge variant="warning">{g.note}</Badge>}</span>
+                  {open ? <ChevronUp className="size-4 shrink-0" /> : <ChevronDown className="size-4 shrink-0" />}
+                </button>
+                {open && (
+                  <div className="grid gap-4 border-t p-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {g.fields.map((f) => renderField(f))}
+                  </div>
+                )}
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {g.fields.map((f) => renderField(f))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
