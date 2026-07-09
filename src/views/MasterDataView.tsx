@@ -71,11 +71,13 @@ const EMP_SPECS: FieldSpec[] = [
   { key: "exemptionFormReceivedDate", label: "免稅額申報表收件日", kind: "date" },
 ];
 const SAL_SPECS: FieldSpec[] = SALARY_ITEMS.map((it) => ({ key: it.key, label: it.label, kind: "money" as const }));
-const PAY_EMP_KEYS = new Set(["hireDate", "status", "leaveDate", "returnDate", "leavePaidRatio", "voluntaryPensionRate", "taxResidency", "withholdingMethod", "exemptionFormReceivedDate"]);
+// 調職欄位（部門/職稱/成本中心/專案）＝計薪相關（影響成本分攤/報表），納入當期確認鎖。
+const TRANSFER_KEYS = ["department", "title", "costCenter", "project"];
+const PAY_EMP_KEYS = new Set(["hireDate", "status", "leaveDate", "returnDate", "leavePaidRatio", "voluntaryPensionRate", "taxResidency", "withholdingMethod", "exemptionFormReceivedDate", ...TRANSFER_KEYS]);
 const LOCK_HINT = "本月已確認結算、此欄已鎖定；請先至「查核與確認」取消確認。";
 
 // 各情境涵蓋的員工欄位（供 ChangeSummary 只顯示該情境的變更）
-const CONTACT_KEYS = ["name", "department", "title", "costCenter", "project", "nationalId", "email", "note"];
+const CONTACT_KEYS = ["name", "nationalId", "email", "note"]; // 聯絡與識別（免鎖）
 const WITHHOLD_KEYS = ["taxResidency", "withholdingMethod", "exemptionFormReceivedDate", "voluntaryPensionRate"];
 
 const blankEmployee = (): Employee => ({
@@ -216,6 +218,8 @@ export function MasterDataView() {
       list.push(...empChanges.filter((c) => c.field === "status" || c.field === "leaveDate"));
     } else if (scenario === "contact") {
       list.push(...empChanges.filter((c) => CONTACT_KEYS.includes(c.field)));
+    } else if (scenario === "transfer") {
+      list.push(...empChanges.filter((c) => TRANSFER_KEYS.includes(c.field)));
     } else if (scenario === "withholding") {
       list.push(...empChanges.filter((c) => WITHHOLD_KEYS.includes(c.field)));
     }
@@ -493,9 +497,10 @@ export function MasterDataView() {
                   <p className="mb-1.5 text-xs font-medium text-muted-foreground">資料維護</p>
                   <div className="flex flex-wrap gap-2">
                     {scenarioBtn("salary", "薪資結構調整")}
+                    {scenarioBtn("transfer", "調職／部門異動")}
                     {scenarioBtn("dependents", "眷屬異動")}
                     {scenarioBtn("withholding", "扣繳設定")}
-                    {scenarioBtn("contact", "基本聯絡資料")}
+                    {scenarioBtn("contact", "聯絡與識別")}
                   </div>
                 </div>
               </div>
@@ -530,13 +535,21 @@ export function MasterDataView() {
                 </>
               )}
 
+              {scenario === "transfer" && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">調職／部門異動：部門、職稱、成本中心、專案別。<strong>影響成本分攤與匯總報表分類，屬計薪相關</strong>——當月已確認時鎖定，須先取消確認。</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {empField("department", { label: "部門", kind: "text" })}
+                    {empField("title", { label: "職稱", kind: "text" })}
+                    {empField("costCenter", { label: "成本中心（選填）", kind: "text", help: "供匯總報表分類" })}
+                    {empField("project", { label: "專案別（選填）", kind: "text", help: "供匯總報表分類" })}
+                  </div>
+                </div>
+              )}
+
               {scenario === "contact" && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {empField("name", { label: "姓名", kind: "text" })}
-                  {empField("department", { label: "部門", kind: "text" })}
-                  {empField("title", { label: "職稱", kind: "text" })}
-                  {empField("costCenter", { label: "成本中心（選填）", kind: "text", help: "供匯總報表分類" })}
-                  {empField("project", { label: "專案別（選填）", kind: "text", help: "供匯總報表分類" })}
                   {empField("nationalId", { label: "身分證字號", kind: "text", placeholder: "A123456789", help: "薪資條加密 PDF 密碼；英文大寫" })}
                   {empField("email", { label: "Email", kind: "text", placeholder: "name@example.com" })}
                   {empField("note", { label: "備註", kind: "text", nullable: true })}

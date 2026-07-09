@@ -339,7 +339,8 @@ export type ChangeScenario =
   | "salary"
   | "dependents"
   | "withholding"
-  | "contact";
+  | "transfer" // 調職／部門異動（部門/職稱/成本中心/專案）＝計薪相關，受當期確認鎖
+  | "contact"; // 聯絡與識別（姓名/身分證/Email/備註）＝免鎖
 
 export interface AuditEntry {
   id: string;

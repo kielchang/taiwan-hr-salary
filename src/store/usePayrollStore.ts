@@ -387,10 +387,11 @@ export const SCENARIO_LABEL: Record<ChangeScenario, string> = {
   salary: "薪資結構調整",
   dependents: "眷屬異動",
   withholding: "扣繳設定",
-  contact: "基本聯絡資料",
+  transfer: "調職／部門異動",
+  contact: "聯絡與識別",
 };
 
-/** 計薪相關情境（當期已確認時擋下）；contact 純聯絡資訊免鎖。 */
+/** 計薪相關情境（當期已確認時擋下）；contact 純聯絡/識別資訊免鎖（調職 transfer 屬計薪相關、受鎖）。 */
 const isPayScenario = (s: ChangeScenario): boolean => s !== "contact";
 const clampPensionRate = (r: number): number => Math.min(0.06, Math.max(0, r));
 
