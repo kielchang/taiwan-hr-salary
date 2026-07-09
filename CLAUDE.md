@@ -55,6 +55,11 @@ storage undefined 時先想到這裡，不要改測試本身。
    **逐欄編輯類（salary/employee/dependent/event）的更新**須附結構化 `before/after`＋`restoreKind`（見 `AuditEntry`），
    讓「回復」（`restoreAudit`，設定頁稽核表的「回復」鈕）能把記錄還原成變更前值；回復受硬鎖定守衛（已確認期間 no-op）、
    本身另記一筆稽核（`restoredFrom`）。新增/刪除/批次/確認類**不附** before/after ＝不可回復（`auditRestorable` 判定）。
+   **基本資料維護＝情境化申請單**（使用者拍板）：MasterDataView 挑情境（`ChangeScenario` 8 種：onboard/terminate/leave/
+   reinstate/salary/dependents/withholding/contact）→只填該情境欄位＋必填「異動原因」→`applyChangeTicket` **一律**記一筆帶
+   `scenario`/`reason` 的結構化稽核（可回復；onboard 插入不可回復）；計薪情境於已確認月 no-op、contact 免鎖。異動紀錄＝
+   MasterDataView「異動紀錄」分頁＝`auditLog.filter(scenario)` 透鏡（回復沿用既有機制）；`AuditRestoreKind` 增 `dependents`
+   （整份眷屬名冊回復）。**這是與稽核整合、非平行資料源**——不要另建 ticket slice。
 8. 「帶入上月異動」**不帶獎金與代扣稅**（使用者拍板，防誤重發）；累計獎金由 `ytdBonusBefore` 自動帶入。
 9. **元件庫邊界不可耦合 app**（使用者拍板：未來要切成共用套件統一介面風格）：`src/components/{ui,form,charts}`＋
    `NumberInput/Stepper/ErrorBoundary`＋支撐工具（`lib/utils`・`useSort`・`csv`・`forms/diff`・`download`）**只能**依賴設計 token
@@ -90,7 +95,7 @@ src/
     ├── ReportsHubView /reports：月結報表(ReportsView)＋申報名冊(FilingView)；?tab= 深連結；頂部月份選擇器
     ├── AnalyticsView  月報/規劃試算(沙盒)/年報 兩層分組；RaiseTab 含生效月排程
     ├── ProjectsView   專案之家（主檔+工時分攤+成本/EAC）
-    └── MasterDataView(狀態5種＋生效日/復職日/給薪比例＋自訂津貼)/AttendanceView/
+    └── MasterDataView(情境化申請單：員工清單/異動紀錄兩分頁＋員工檔案面板挑情境→聚焦表單＋原因→applyChangeTicket)/AttendanceView/
         SettingsView(公司分頁含 LeavePolicyCard 非在職給薪比例＋SalaryDefaultsCard 新進預設)/SetupWizard/HelpView/SourcesView
 ```
 
