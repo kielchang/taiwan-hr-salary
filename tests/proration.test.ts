@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { payFactor, employmentDaysFactor, monthlySalaryTotal } from "../src/lib/calc/wage";
+import { payFactor, employmentDaysFactor, monthlySalaryTotal, leaveSegments } from "../src/lib/calc/wage";
+import { backfillLeaveRecords } from "../src/store/usePayrollStore";
+import type { Employee } from "../src/lib/types";
 import { calculatePayroll } from "../src/lib/calc";
 import { DEFAULT_PARAMETERS as P } from "../src/config/parameters";
 import { DEFAULT_BRACKETS as B } from "../src/config/brackets";
@@ -47,6 +49,28 @@ describe("payFactor 破月（多段生效日＋復職日＋給薪比例）", () 
   });
   it("段落給薪比例空 → 採公司政策（停職政策 0.5）", () => {
     expect(payFactor("2026-03", "2020-01-01", null, [{ status: "停職", from: "2026-03-16", to: null, paidRatio: null }], { 留停: 0, 停職: 0.5, 暫離: 0 })).toBeCloseTo(23 / 31, 6);
+  });
+});
+
+describe("backfillLeaveRecords 遷移 v2→v3（舊單段 → leaveRecords）", () => {
+  const base = { id: "X", name: "x", department: "", title: "", hireDate: "2020-01-01", costCenter: "", project: "", taxResidency: "居住者", withholdingMethod: "固定5%", exemptionFormReceivedDate: null, voluntaryPensionRate: 0, nationalId: "", email: "" } as unknown as Employee;
+  it("舊單段留停（有生效日）→ 轉成一段 leaveRecords", () => {
+    const [e] = backfillLeaveRecords([{ ...base, status: "留停", leaveDate: "2026-03-10", returnDate: "2026-04-01", leavePaidRatio: 0.5 }]);
+    expect(e.leaveRecords).toEqual([{ status: "留停", from: "2026-03-10", to: "2026-04-01", paidRatio: 0.5 }]);
+  });
+  it("在職員工不動、無 leaveRecords（TC-9／示範公司逐位元不變）", () => {
+    const emp = { ...base, status: "在職" as const };
+    expect(backfillLeaveRecords([emp])[0]).toBe(emp); // 同一參考＝未複製
+  });
+  it("已是新模型（有 leaveRecords）→ 原樣返回", () => {
+    const emp = { ...base, status: "留停" as const, leaveRecords: [{ status: "留停" as const, from: "2026-01-01", to: null, paidRatio: null }] };
+    expect(backfillLeaveRecords([emp])[0]).toBe(emp);
+  });
+  it("留停但缺生效日 → 不亂造段（維持回退語意，交由 leaveSegments 處理）", () => {
+    const emp = { ...base, status: "留停" as const, leaveDate: null };
+    const [e] = backfillLeaveRecords([emp]);
+    expect(e.leaveRecords).toBeUndefined();
+    expect(leaveSegments(e).length).toBe(1); // 回退為開放段
   });
 });
 

@@ -78,6 +78,22 @@ const DEMO = buildDemoCompany();
 export const STORAGE_KEY = `taiwan-hr-salary:v1${APP_ENV === "stage" ? ":stage" : APP_ENV === "dev" ? ":dev" : ""}`;
 export const STORE_VERSION = 3; // 資料結構版本（v2：專案主檔＋工時分攤；v3：留停/停職/暫離改多段 leaveRecords）
 
+/**
+ * B-1 遷移（v2→v3）：把舊單段留停/停職/暫離（status＋leaveDate＋returnDate＋leavePaidRatio）
+ * 轉成 `leaveRecords` 陣列（新權威來源）。已是新模型（有 leaveRecords）或非在假/缺生效日者原樣返回，
+ * 故舊資料與 TC-9／示範公司皆逐位元不變（純函數，供 migrate 與測試共用）。
+ */
+export function backfillLeaveRecords(employees: Employee[]): Employee[] {
+  const LEAVE = ["留停", "停職", "暫離"];
+  return employees.map((e) => {
+    if (e.leaveRecords && e.leaveRecords.length) return e; // 已是新模型
+    if (e.status && LEAVE.includes(e.status) && e.leaveDate) {
+      return { ...e, leaveRecords: [{ status: e.status as "留停" | "停職" | "暫離", from: e.leaveDate, to: e.returnDate ?? null, paidRatio: e.leavePaidRatio ?? null }] };
+    }
+    return e;
+  });
+}
+
 const DEFAULT_ATTENDANCE: AttendanceConfig = {
   companyLat: null,
   companyLng: null,
@@ -825,14 +841,7 @@ export const usePayrollStore = create<PayrollState>()(
           st.allocations = st.allocations ?? [];
         }
         if (Array.isArray(st.employees)) {
-          const LEAVE = ["留停", "停職", "暫離"];
-          st.employees = st.employees.map((e) => {
-            if (e.leaveRecords && e.leaveRecords.length) return e; // 已是新模型
-            if (e.status && LEAVE.includes(e.status) && e.leaveDate) {
-              return { ...e, leaveRecords: [{ status: e.status as "留停" | "停職" | "暫離", from: e.leaveDate, to: e.returnDate ?? null, paidRatio: e.leavePaidRatio ?? null }] };
-            }
-            return e;
-          });
+          st.employees = backfillLeaveRecords(st.employees); // v2→v3：舊單段 → leaveRecords
         }
         return st as PayrollState;
       },

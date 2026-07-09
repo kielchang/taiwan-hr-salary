@@ -95,9 +95,12 @@ src/
 ```
 
 **員工生命週期**（使用者拍板）：`EmployeeStatus` 5 種＝在職/離職/留停/停職/暫離。
-`leaveDate` 語意＝離職日（離職）或**生效日(起)**（留停/停職/暫離）；`returnDate`＝復職日（空＝尚未復職）；
-`leavePaidRatio`＝逐案覆寫給薪比例（空＝採公司 `leavePolicy` 該狀態預設 0/0/0）。破月用 `payFactor`（逐日加權），
-勞保費到/離職當月按 `employmentDaysFactor`（在職天數）比例、健保與勞退整月。復職＝補填復職日，之後自動全薪（不必改回在職）。
+離職＝`leaveDate`（離職日）。**留停/停職/暫離改用 `leaveRecords: LeaveSegment[]`（B-1 多段歷史，權威來源）**：
+每段 `{status, from(生效日), to(復職日, null＝尚未復職), paidRatio(逐案給薪比例, null＝採公司 `leavePolicy` 預設)}`，
+支援同員多段（多次留停/復職）。破月用 `payFactor(period, hireDate, terminationDate, segments, policy)`（逐日加權掃描各段），
+`leaveSegments(emp)` 為單一入口（無 `leaveRecords` 時回退舊單段欄位 `leaveDate/returnDate/leavePaidRatio`，
+舊資料與 TC-9 逐位元不變；store `migrate` v2→v3 已自動回填）。勞保費到/離職當月按 `employmentDaysFactor`（在職天數）比例、
+健保與勞退整月。復職＝補填該段復職日，之後自動全薪（不必改回在職）。**主檔基本分頁下方「區間紀錄」逐段編輯**。
 
 側邊欄 IA（App.tsx `NAV_SECTIONS`）：每月作業（工作台/薪資結算/出勤）／規劃與分析／專案／報表與申報／主檔與設定／說明。
 
@@ -132,7 +135,8 @@ src/
 
 ## 已知可續作（backlog，未做）
 
-- **留停/停職多段歷史**：目前每員單一 `leaveDate`+`returnDate` 區間（同月僅一段），多次留停/復職的歷史未建模（使用者已知的取捨，避免 migration）。若要做需改 leaveRecords 陣列。
+- ~~留停/停職多段歷史~~（**已完成，B-1**）：改用 `leaveRecords: LeaveSegment[]`（多段、每段獨立生效日/復職日/給薪比例），
+  `leaveSegments()` 單一入口＋舊單段回退＋store migrate v2→v3；主檔「區間紀錄」編輯器逐段增刪。
 - **停保/復保為提醒性質**：名冊列出加退保/停保/復保供人工辦理，系統**不自動改保費**（健保續保自費等依公司規定）。
 - 出勤→加班「自動分級回填」（目前僅顯示參考工時，使用者要求不自動回填 — 若要做需先確認規則）。
 - 投保級距主檔改「可編輯」（現為刻意唯讀檢視＝設定頁明示文案；要做需使用者確認年度更新流程與稽核）。

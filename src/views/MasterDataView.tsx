@@ -17,8 +17,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePayrollStore } from "@/store/usePayrollStore";
-import type { Employee, SalaryStructure, Dependent } from "@/lib/types";
-import { monthlySalaryTotal, lookupInsuredAmounts, seniorityMonths, formatSeniority, annualLeaveDays } from "@/lib/calc";
+import type { Employee, SalaryStructure, Dependent, LeaveSegment, LeaveStatus } from "@/lib/types";
+import { monthlySalaryTotal, lookupInsuredAmounts, seniorityMonths, formatSeniority, annualLeaveDays, isLeaveStatus } from "@/lib/calc";
 import { saveBlob } from "@/lib/payslipPdf";
 import { csvSerialize } from "@/lib/csv";
 import { parseEmployeeCsv, IMPORT_COLUMNS, type ImportPreview } from "@/lib/import/employeeCsv";
@@ -185,6 +185,7 @@ export function MasterDataView() {
       const PAY_KEYS = ["hireDate", "status", "leaveDate", "returnDate", "leavePaidRatio", "voluntaryPensionRate", "taxResidency", "withholdingMethod", "exemptionFormReceivedDate"] as const;
       const payChanged =
         !prev || PAY_KEYS.some((k) => (prev[k] ?? null) !== (draftEmp[k] ?? null)) ||
+        segKey(currentSegs(prev)) !== segKey(draftSegs) || // 區間紀錄亦屬計薪資料
         JSON.stringify(prevSalary ?? blankSalary(id)) !== JSON.stringify({ ...draftSalary, employeeId: id }) ||
         JSON.stringify(prevDeps) !== JSON.stringify(draftDeps.map((d) => ({ ...d, employeeId: id })));
       if (payChanged) {
@@ -201,8 +202,27 @@ export function MasterDataView() {
   const setEmp = <K extends keyof Employee>(k: K, v: Employee[K]) =>
     setDraftEmp((d) => ({ ...d, [k]: v }));
 
-  const isLeave = draftEmp.status != null && LEAVE_STATUSES.includes(draftEmp.status); // 留停/停職/暫離
-  const policyRatio = isLeave ? leavePolicy[draftEmp.status as "留停" | "停職" | "暫離"] : 0; // 該狀態公司預設比例
+  const isLeave = draftEmp.status != null && LEAVE_STATUSES.includes(draftEmp.status); // 目前為留停/停職/暫離
+
+  // B-1 多段區間：有 leaveRecords 直接採用；否則由舊單段欄位回退（顯示用 "" 不用哨兵日期，提示使用者補填）。
+  // 所有異動一律寫回 leaveRecords（materialize）＝之後以陣列為權威來源。
+  const currentSegs = (e: Employee): LeaveSegment[] =>
+    e.leaveRecords ??
+    (isLeaveStatus(e.status)
+      ? [{ status: e.status, from: e.leaveDate ?? "", to: e.returnDate ?? null, paidRatio: e.leavePaidRatio ?? null }]
+      : []);
+  const draftSegs = currentSegs(draftEmp);
+  // 目前在假、或曾有區間紀錄（已復職員工的歷史）皆顯示編輯器
+  const showLeaveEditor = isLeave || (draftEmp.leaveRecords?.length ?? 0) > 0;
+  const setSegs = (updater: (segs: LeaveSegment[]) => LeaveSegment[]) =>
+    setDraftEmp((d) => ({ ...d, leaveRecords: updater(currentSegs(d)) }));
+  const updateSeg = (i: number, patch: Partial<LeaveSegment>) => setSegs((segs) => segs.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const removeSeg = (i: number) => setSegs((segs) => segs.filter((_, j) => j !== i));
+  const addSeg = () =>
+    setSegs((segs) => [
+      ...segs,
+      { status: (isLeaveStatus(draftEmp.status) ? draftEmp.status : "留停") as LeaveStatus, from: new Date().toISOString().slice(0, 10), to: null, paidRatio: null },
+    ]);
 
   // 原始記錄（編輯模式）：供逐欄比對、標色與還原
   const origEmp = isNew ? undefined : employees.find((e) => e.id === draftEmp.id);
@@ -210,6 +230,7 @@ export function MasterDataView() {
   const origDeps = isNew ? [] : dependents.filter((d) => d.employeeId === draftEmp.id);
   const lockEmp = (k: string) => locked && !isNew && PAY_EMP_KEYS.has(k);
   const lockSal = locked && !isNew;
+  const lockLeave = locked && !isNew; // 區間紀錄影響計薪＝屬 PAY_KEYS，鎖定期不可改
 
   // 送出前變更摘要（純量欄位 + 陣列變更旗標）
   const empChanges = origEmp ? diffRecord(origEmp as unknown as Record<string, unknown>, draftEmp as unknown as Record<string, unknown>, EMP_SPECS) : [];
@@ -218,13 +239,17 @@ export function MasterDataView() {
   const caChanged = !isNew && caKey(origSalary?.customAllowances) !== caKey(draftSalary.customAllowances);
   const depKey = (ds: Dependent[]) => JSON.stringify(ds.map((d) => ({ name: d.name, relationship: d.relationship, hi: d.enrolledInHealthInsurance, tax: d.taxDependent })));
   const depsChanged = !isNew && depKey(origDeps) !== depKey(draftDeps);
+  const segKey = (segs: LeaveSegment[]) => JSON.stringify(segs.map((s) => ({ s: s.status, f: s.from, t: s.to ?? null, r: s.paidRatio ?? null })));
+  const leaveChanged = !isNew && !!origEmp && segKey(currentSegs(origEmp)) !== segKey(draftSegs);
   const changes: Change[] = [...empChanges, ...salChanges];
   if (caChanged) changes.push({ field: "__ca__", label: "自訂津貼", before: null, after: null, beforeText: `${origSalary?.customAllowances?.length ?? 0} 項`, afterText: `${draftSalary.customAllowances?.length ?? 0} 項` });
   if (depsChanged) changes.push({ field: "__deps__", label: "眷屬名單", before: null, after: null, beforeText: `${origDeps.length} 人`, afterText: `${draftDeps.length} 人` });
+  if (leaveChanged) changes.push({ field: "__leave__", label: "留停/停職/暫離 區間", before: null, after: null, beforeText: `${currentSegs(origEmp).length} 段`, afterText: `${draftSegs.length} 段` });
 
   const revertField = (field: string) => {
     if (field === "__ca__") { setDraftSalary((s) => ({ ...s, customAllowances: origSalary?.customAllowances?.map((c) => ({ ...c })) })); return; }
     if (field === "__deps__") { setDraftDeps(origDeps.map((d) => ({ ...d }))); return; }
+    if (field === "__leave__") { setDraftEmp((d) => ({ ...d, leaveRecords: origEmp?.leaveRecords })); return; }
     if (SAL_SPECS.some((s) => s.key === field)) { setDraftSalary((s) => ({ ...s, [field]: (origSalary as Record<string, unknown> | undefined)?.[field] ?? 0 })); return; }
     setDraftEmp((d) => ({ ...d, [field]: (origEmp as Record<string, unknown> | undefined)?.[field] ?? null }));
   };
@@ -414,37 +439,90 @@ export function MasterDataView() {
           />
 
           {tab === "basic" && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <EditableField label="員工編號 *" kind="text" value={draftEmp.id} alwaysEdit={isNew} disabled={!isNew} lockHint="員工編號建立後不可變更" trackChanges={false} onChange={(v) => setEmp("id", String(v))} />
-              {empField("name", { label: "姓名 *", kind: "text" })}
-              {empField("department", { label: "部門", kind: "text" })}
-              {empField("title", { label: "職稱", kind: "text" })}
-              {empField("hireDate", { label: "到職日", kind: "date", help: "用於年資與特休；到職當月固定薪資按比例（破月）" })}
-              {empField("status", { label: "任職狀態", kind: "select", options: STATUS_OPTS, help: "離職＝計至離職日；留停/停職/暫離＝可復職之非在職區間，依給薪比例計薪" })}
-              {draftEmp.status === "離職" && empField("leaveDate", { label: "離職日", kind: "date", nullable: true, help: "計至此日（含）；當月按在職天數破月、辦理退保" })}
-              {isLeave && (
-                <>
-                  {empField("leaveDate", { label: `${draftEmp.status}生效日`, kind: "date", nullable: true, help: "區間起日；此日起依給薪比例計薪、辦理停保" })}
-                  {empField("returnDate", { label: "復職日（空＝尚未復職）", kind: "date", nullable: true, help: "復職日起恢復全額計薪並辦理復保" })}
-                  <EditableField
-                    label="給薪比例" kind="radio"
-                    value={draftEmp.leavePaidRatio == null ? "policy" : String(draftEmp.leavePaidRatio)}
-                    original={!origEmp ? undefined : origEmp.leavePaidRatio == null ? "policy" : String(origEmp.leavePaidRatio)}
-                    alwaysEdit={isNew} trackChanges={!isNew}
-                    disabled={lockEmp("leavePaidRatio")} lockHint={LOCK_HINT}
-                    options={[{ value: "policy", label: `沿用公司政策（${Math.round(policyRatio * 100)}%）` }, { value: "0", label: "無給（0%）" }, { value: "0.5", label: "半薪（50%）" }, { value: "1", label: "全薪（100%）" }]}
-                    format={ratioLabel}
-                    help="留白＝沿用公司政策；可逐案覆寫"
-                    onChange={(v) => setEmp("leavePaidRatio", v === "policy" ? null : Number(v))}
-                    onRevert={() => setEmp("leavePaidRatio", origEmp?.leavePaidRatio ?? null)}
-                  />
-                </>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <EditableField label="員工編號 *" kind="text" value={draftEmp.id} alwaysEdit={isNew} disabled={!isNew} lockHint="員工編號建立後不可變更" trackChanges={false} onChange={(v) => setEmp("id", String(v))} />
+                {empField("name", { label: "姓名 *", kind: "text" })}
+                {empField("department", { label: "部門", kind: "text" })}
+                {empField("title", { label: "職稱", kind: "text" })}
+                {empField("hireDate", { label: "到職日", kind: "date", help: "用於年資與特休；到職當月固定薪資按比例（破月）" })}
+                {empField("status", { label: "任職狀態", kind: "select", options: STATUS_OPTS, help: "離職＝計至離職日；留停/停職/暫離＝可復職之非在職區間，於下方「區間紀錄」逐段登記" })}
+                {draftEmp.status === "離職" && empField("leaveDate", { label: "離職日", kind: "date", nullable: true, help: "計至此日（含）；當月按在職天數破月、辦理退保" })}
+                {empField("voluntaryPensionRate", { label: "勞退自願提繳率", kind: "rate", help: "0～6%，此金額免稅" })}
+                {empField("costCenter", { label: "成本中心（選填）", kind: "text", help: "供匯總報表分類" })}
+                {empField("project", { label: "專案別（選填）", kind: "text", help: "供匯總報表分類" })}
+                {empField("nationalId", { label: "身分證字號", kind: "text", placeholder: "A123456789", help: "薪資條加密 PDF 密碼；英文大寫" })}
+                {empField("email", { label: "Email", kind: "text", placeholder: "name@example.com", help: "薪資條 email 通知收件人" })}
+              </div>
+
+              {/* B-1：留停/停職/暫離「多段」區間紀錄（每段獨立生效日/復職日/給薪比例；破月計薪與停復保名冊逐段計算） */}
+              {showLeaveEditor && (
+                <div>
+                  <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">留停／停職／暫離 區間紀錄</p>
+                      <p className="text-xs text-muted-foreground">
+                        可登記多段非在職期間，每段各自的類別、生效日、復職日與給薪比例；破月計薪與停保/復保名冊皆逐段計算。
+                        復職日留白＝尚未復職（開放區間，至多一段）。
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={addSeg} disabled={lockLeave}>
+                      <Plus /> 新增區間
+                    </Button>
+                  </div>
+                  {draftSegs.length === 0 ? (
+                    <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+                      尚無區間。若此員工目前或曾經留停/停職/暫離，按「新增區間」建立；每段可分別設定生效日與復職日。
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {draftSegs.map((seg, i) => (
+                        <div key={i} className="rounded-md border p-2">
+                          <div className="flex flex-wrap items-end gap-2">
+                            <label className="text-xs">
+                              <span className="mb-0.5 block text-muted-foreground">類別</span>
+                              <Select value={seg.status} disabled={lockLeave} onValueChange={(v) => updateSeg(i, { status: v as LeaveStatus })}>
+                                <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {LEAVE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </label>
+                            <label className="text-xs">
+                              <span className="mb-0.5 block text-muted-foreground">生效日</span>
+                              <Input type="date" className="col-input h-8 w-36" disabled={lockLeave}
+                                value={seg.from} onChange={(e) => updateSeg(i, { from: e.target.value })} />
+                            </label>
+                            <label className="text-xs">
+                              <span className="mb-0.5 block text-muted-foreground">復職日（空＝尚未復職）</span>
+                              <Input type="date" className="col-input h-8 w-36" disabled={lockLeave}
+                                value={seg.to ?? ""} onChange={(e) => updateSeg(i, { to: e.target.value || null })} />
+                            </label>
+                            <label className="text-xs">
+                              <span className="mb-0.5 block text-muted-foreground">給薪比例</span>
+                              <Select value={seg.paidRatio == null ? "policy" : String(seg.paidRatio)} disabled={lockLeave}
+                                onValueChange={(v) => updateSeg(i, { paidRatio: v === "policy" ? null : Number(v) })}>
+                                <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="policy">沿用公司政策（{Math.round(leavePolicy[seg.status] * 100)}%）</SelectItem>
+                                  <SelectItem value="0">無給（0%）</SelectItem>
+                                  <SelectItem value="0.5">半薪（50%）</SelectItem>
+                                  <SelectItem value="1">全薪（100%）</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </label>
+                            <Button variant="ghost" size="icon" className="ml-auto size-7 text-destructive" disabled={lockLeave}
+                              onClick={() => removeSeg(i)}>
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {lockLeave && <p className="mt-1 text-xs text-muted-foreground">{LOCK_HINT}</p>}
+                </div>
               )}
-              {empField("voluntaryPensionRate", { label: "勞退自願提繳率", kind: "rate", help: "0～6%，此金額免稅" })}
-              {empField("costCenter", { label: "成本中心（選填）", kind: "text", help: "供匯總報表分類" })}
-              {empField("project", { label: "專案別（選填）", kind: "text", help: "供匯總報表分類" })}
-              {empField("nationalId", { label: "身分證字號", kind: "text", placeholder: "A123456789", help: "薪資條加密 PDF 密碼；英文大寫" })}
-              {empField("email", { label: "Email", kind: "text", placeholder: "name@example.com", help: "薪資條 email 通知收件人" })}
             </div>
           )}
 
