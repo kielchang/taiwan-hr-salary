@@ -29,6 +29,8 @@ export interface CoachmarkProps {
   finishLabel?: string;
   /** 選配次要動作（如末步「接著看下一支導覽」）；提供即在主鈕左側顯示一顆 outline 鈕 */
   secondaryAction?: { label: string; onClick: () => void };
+  /** 選配互動提示：此步需使用者實際點圈選處才前進時，於卡片顯示脈動指示（如「👆 點上方圈選的按鈕」）。 */
+  actionHint?: ReactNode;
 }
 
 const PAD = 12;
@@ -36,7 +38,7 @@ const GAP = 12;
 const HOLE = 6; // 聚光洞比目標外擴的邊距
 
 export function Coachmark({
-  targetRect, title, body, stepIndex, stepCount, isFirst, isLast, onNext, onPrev, onSkip, finishLabel = "完成", secondaryAction,
+  targetRect, title, body, stepIndex, stepCount, isFirst, isLast, onNext, onPrev, onSkip, finishLabel = "完成", secondaryAction, actionHint,
 }: CoachmarkProps) {
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -62,19 +64,32 @@ export function Coachmark({
   }, [targetRect, title, body, stepIndex, stepCount]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[200]" role="dialog" aria-modal="false" aria-label="操作導引">
+    <div className="pointer-events-none fixed inset-0 z-[200]" role="dialog" aria-modal="false" aria-label="操作導引">
       {/* 暗罩＋聚光挖洞（洞可穿透點擊到被標示的元素） */}
       {targetRect ? (
-        <div
-          className="pointer-events-none fixed rounded-md ring-2 ring-primary"
-          style={{
-            top: targetRect.top - HOLE,
-            left: targetRect.left - HOLE,
-            width: targetRect.width + HOLE * 2,
-            height: targetRect.height + HOLE * 2,
-            boxShadow: "0 0 0 9999px rgba(15,23,42,0.55)",
-          }}
-        />
+        <>
+          {/* 挖洞暗罩：巨大 spread box-shadow 罩住洞外；洞本身透明可點穿 */}
+          <div
+            className="pointer-events-none fixed rounded-md"
+            style={{
+              top: targetRect.top - HOLE,
+              left: targetRect.left - HOLE,
+              width: targetRect.width + HOLE * 2,
+              height: targetRect.height + HOLE * 2,
+              boxShadow: "0 0 0 9999px rgba(15,23,42,0.55)",
+            }}
+          />
+          {/* 脈動環：呼吸式外擴光暈，把視線拉到「該注意/該點」的控制項 */}
+          <div
+            className="tour-pulse-ring pointer-events-none fixed rounded-md"
+            style={{
+              top: targetRect.top - HOLE,
+              left: targetRect.left - HOLE,
+              width: targetRect.width + HOLE * 2,
+              height: targetRect.height + HOLE * 2,
+            }}
+          />
+        </>
       ) : (
         <div className="pointer-events-none fixed inset-0 bg-slate-900/55" />
       )}
@@ -84,7 +99,8 @@ export function Coachmark({
         ref={popRef}
         style={pos ? { top: pos.top, left: pos.left } : { opacity: 0 }}
         className={cn(
-          "fixed w-[min(340px,calc(100vw-24px))] rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg",
+          // 卡片本身要能接收點擊（root 已 pointer-events-none 讓聚光洞可穿透點到真實控制項）
+          "pointer-events-auto fixed w-[min(340px,calc(100vw-24px))] rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg",
         )}
       >
         <div className="mb-1 flex items-start justify-between gap-2">
@@ -94,6 +110,12 @@ export function Coachmark({
           </button>
         </div>
         <div className="text-sm text-muted-foreground [&_strong]:text-foreground">{body}</div>
+        {actionHint && (
+          <p className="mt-2 flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary">
+            <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
+            {actionHint}
+          </p>
+        )}
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs tabular-nums text-muted-foreground">{stepIndex + 1} / {stepCount}</span>
           <div className="flex items-center gap-2">

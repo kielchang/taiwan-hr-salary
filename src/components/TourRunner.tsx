@@ -54,6 +54,26 @@ export function TourRunner() {
     return () => cancelAnimationFrame(raf);
   }, [tour, step, stepIndex, location.pathname]);
 
+  // 互動：此步標記 advanceOn:"click" 時，使用者實際點到圈選處即自動前進（會盯著你操作，而非只換頁）。
+  // 用文件層委派監聽（capture），避免元素因重繪換節點而漏接；點在 [data-tour=target] 內即前進。
+  useEffect(() => {
+    if (!tour || !step?.advanceOn || !step.target) return;
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(`[data-tour="${step.target}"]`)) {
+        // 讓 app 自身的點擊處理（換分頁/開對話框）先跑，再前進到下一步
+        setTimeout(() => {
+          setStepIndex((i) => {
+            if (i === tour.steps.length - 1) { endTour(tour.id, true); return i; }
+            return i + 1;
+          });
+        }, 0);
+      }
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [tour, step, stepIndex, endTour]);
+
   // 捲動/縮放時聚光框跟隨
   useEffect(() => {
     if (!step?.target) return;
@@ -76,6 +96,10 @@ export function TourRunner() {
   const secondaryAction = isLast && nextTour
     ? { label: tour.nextLabel ?? "接著看下一支 →", onClick: () => { endTour(tour.id, true); startTour(nextTour.id); } }
     : undefined;
+  // 需點圈選處才前進的步驟，且目標已量到 rect：顯示互動提示（否則只是投影片）
+  const actionHint = step.advanceOn === "click" && rect
+    ? (step.actionHint ?? "👆 點上方圈選處即可繼續（或按「下一步」）")
+    : undefined;
   return (
     <Coachmark
       targetRect={rect}
@@ -86,6 +110,7 @@ export function TourRunner() {
       isFirst={stepIndex === 0}
       isLast={isLast}
       secondaryAction={secondaryAction}
+      actionHint={actionHint}
       onPrev={() => setStepIndex((i) => Math.max(0, i - 1))}
       onNext={() => { if (isLast) endTour(tour.id, true); else setStepIndex((i) => i + 1); }}
       onSkip={() => endTour(tour.id, false)}

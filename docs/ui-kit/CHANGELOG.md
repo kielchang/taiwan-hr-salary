@@ -5,9 +5,13 @@
 
 ## [0.14.0] - 2026-07-09
 
-### 新增（Coachmark：末步鏈結下一支導覽）
-- **`Coachmark`** 新增選配 `secondaryAction?: { label, onClick }`：僅於末步（`isLast`）在主鈕左側顯示一顆 outline 次要鈕。用於上手導引「完成 → 接著看下一支」的串接（如系統總覽 → 每月結算 → 主檔情境），讓三支柱從孤島變成一條學習路徑。仍純呈現、不含跳轉邏輯（由 TourRunner glue 傳入 onClick 呼叫 store.startTour）。
-- Storybook「元件 / 導引 Coachmark」新增「末步鏈結下一支」狀態。
+### 新增（Coachmark 互動化：脈動聚光＋互動提示＋末步鏈結；TabPills 可錨定分頁）
+- 使用者回報導引「只換頁、沒標記該注意哪、該按什麼」。三項互動強化：
+- **脈動聚光環**：聚光框改為「挖洞暗罩 + 獨立脈動環」兩層，被圈元素外緣做呼吸式外擴光暈（`.tour-pulse-ring`＋`@keyframes tour-pulse`，於 `index.css`），把視線拉到該注意/該點的控制項；尊重 `prefers-reduced-motion`（降級為靜態粗環）。
+- **`actionHint?: ReactNode`**：需使用者實際點圈選處才前進的步驟，於卡片顯示脈動圓點＋提示（如「👆 點上方圈選處即可繼續」）。搭配 TourRunner 的 `advanceOn:"click"`（點到目標即自動前進）。
+- **`secondaryAction?: { label, onClick }`**：僅於末步在主鈕左側顯示 outline 次要鈕，用於上手導引「完成 → 接著看下一支」串接（系統總覽 → 每月結算 → 主檔情境）。仍純呈現、跳轉邏輯由 TourRunner glue 傳入。
+- **`TabPills`**：`TabPill` 新增選配 `dataTour?`，渲染到該分頁 `<button data-tour>`，讓導引能圈選並 advanceOn 點擊<strong>特定分頁</strong>（如設定頁「幣別與匯率／法定參數／資料與安全」）。向後相容、不傳即無屬性。
+- Storybook「元件 / 導引 Coachmark」新增「互動待點」「末步鏈結下一支」狀態。
 
 ## [0.13.0] - 2026-07-09
 

@@ -36,6 +36,28 @@ export const 錨定元素: S = {
   },
 };
 
+/** 互動步驟：脈動環＋卡片內「👆 點圈選處繼續」互動提示（advanceOn 步驟用）。 */
+export const 互動待點: S = {
+  render: () => {
+    const ref = useRef<HTMLButtonElement>(null);
+    const [rect, setRect] = useState<DOMRect | null>(null);
+    useEffect(() => { if (ref.current) setRect(ref.current.getBoundingClientRect()); }, []);
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-10">
+        <Button ref={ref}>幣別與匯率</Button>
+        {rect && (
+          <Coachmark
+            targetRect={rect} title="① 開啟「幣別與匯率」分頁" body={<>點圈起來的<strong>「幣別與匯率」</strong>分頁。</>}
+            actionHint="👆 點上方圈選處即可繼續（或按「下一步」）"
+            stepIndex={1} stepCount={6} isFirst={false} isLast={false}
+            onPrev={() => {}} onNext={() => {}} onSkip={() => setRect(null)}
+          />
+        )}
+      </div>
+    );
+  },
+};
+
 /** 無錨點（targetRect=null）＝置中歡迎卡。 */
 export const 置中歡迎卡: S = {
   render: () => (

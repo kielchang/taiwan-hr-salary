@@ -269,7 +269,7 @@ export function SettingsView() {
         );
       })()}
 
-      <div data-tour="settings-tabs"><TabPills tabs={SEC_TABS.map(([k, label]) => ({ key: k, label }))} value={secTab} onChange={(k) => setSecTab(k as SecTab)} /></div>
+      <div data-tour="settings-tabs"><TabPills tabs={SEC_TABS.map(([k, label]) => ({ key: k, label, dataTour: `settings-tab-${k}` }))} value={secTab} onChange={(k) => setSecTab(k as SecTab)} /></div>
 
       {secTab === "company" && (
       <Card>
@@ -823,7 +823,7 @@ function CurrencyCenterCard({ locked }: { locked: boolean }) {
         <div className="space-y-2">
           <p className="text-sm font-medium">政策</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <PolicyToggle label="啟用多幣別" hint="關閉時全站不顯示外幣欄位、計算完全不含外幣。" checked={fxPolicy.enabled} disabled={locked} onChange={(v) => setFxPolicy({ enabled: v })} />
+            <div data-tour="fx-enable-toggle"><PolicyToggle label="啟用多幣別" hint="關閉時全站不顯示外幣欄位、計算完全不含外幣。" checked={fxPolicy.enabled} disabled={locked} onChange={(v) => setFxPolicy({ enabled: v })} /></div>
             <PolicyToggle label="外幣計所得稅" hint="開啟＝外幣台幣約當併入獎金代扣所得稅建議與扣繳憑單。" checked={fxPolicy.incomeTax} disabled={locked || !fxPolicy.enabled} onChange={(v) => setFxPolicy({ incomeTax: v })} />
             <PolicyToggle label="外幣計二代健保補充保費" hint="開啟＝外幣台幣約當併入二代健保補充保費基數。" checked={fxPolicy.supplementary} disabled={locked || !fxPolicy.enabled} onChange={(v) => setFxPolicy({ supplementary: v })} />
           </div>

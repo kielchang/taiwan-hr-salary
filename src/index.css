@@ -224,3 +224,20 @@
     display: block;
   }
 }
+
+/* 導引聚光脈動環（TourRunner/Coachmark 用）：不影響版面，只在被圈選元素外緣做呼吸式外擴光暈，
+   吸引視線到「該注意/該點」的控制項。降級尊重使用者的減少動態偏好。 */
+@keyframes tour-pulse {
+  0%   { box-shadow: 0 0 0 2px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary) / 0.35); }
+  70%  { box-shadow: 0 0 0 3px hsl(var(--primary)), 0 0 0 14px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 2px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary) / 0); }
+}
+.tour-pulse-ring {
+  animation: tour-pulse 1.5s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-pulse-ring {
+    animation: none;
+    box-shadow: 0 0 0 3px hsl(var(--primary)), 0 0 0 6px hsl(var(--primary) / 0.3);
+  }
+}

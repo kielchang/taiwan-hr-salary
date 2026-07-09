@@ -214,7 +214,7 @@ export function MonthlyView({
                 { key: "gross", header: "應發", numeric: true, sortValue: ({ r }) => r.grossPay, cell: ({ r }) => ntd(r.grossPay), total: (rs) => ntd(rs.reduce((a, { r }) => a + r.grossPay, 0)) },
                 { key: "ded", header: "代扣合計", numeric: true, sortValue: ({ r }) => r.totalDeductions, cell: ({ r }) => <span className="text-muted-foreground">−{ntd(r.totalDeductions)}</span>, total: (rs) => `−${ntd(rs.reduce((a, { r }) => a + r.totalDeductions, 0))}` },
                 { key: "net", header: "實發", numeric: true, sortValue: ({ r }) => r.netPay, cell: ({ r }) => <span className={cn("font-semibold", r.netPay < 0 && "text-danger")}>{r.netPay < 0 ? `(${ntd(-r.netPay)})` : ntd(r.netPay)}</span>, total: (rs) => { const t = rs.reduce((a, { r }) => a + r.netPay, 0); return <span className={cn("font-bold", t < 0 && "text-danger")}>{t < 0 ? `(${ntd(-t)})` : ntd(t)}</span>; } },
-                { key: "ops", header: "", headerClassName: "w-24", cell: ({ emp }) => <Button variant="outline" size="sm" disabled={locked} title={locked ? "本月已確認鎖定" : undefined} onClick={() => openEdit(emp.id)}><Pencil className="size-3.5" /> 編輯</Button> },
+                { key: "ops", header: "", headerClassName: "w-24", cell: ({ emp }) => <Button data-tour="row-edit" variant="outline" size="sm" disabled={locked} title={locked ? "本月已確認鎖定" : undefined} onClick={() => openEdit(emp.id)}><Pencil className="size-3.5" /> 編輯</Button> },
               ]}
             />
 
