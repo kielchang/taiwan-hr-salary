@@ -61,12 +61,16 @@ import type {
   ScheduledSalaryChange,
   Subsidy,
   LeavePolicy,
+  Currency,
+  FxPolicy,
 } from "@/lib/types";
 import { applyBatchOp, batchOpLabel, monthlySalaryTotal } from "@/lib/calc";
 
 /** 新進員工預設固定薪資範本（8 標準欄 partial ＋ 自訂津貼範本） */
-export type SalaryDefaults = { standard: Partial<Omit<SalaryStructure, "employeeId" | "customAllowances">>; custom: { name: string; amount: number }[] };
+export type SalaryDefaults = { standard: Partial<Omit<SalaryStructure, "employeeId" | "customAllowances" | "foreignPay">>; custom: { name: string; amount: number }[] };
 export const DEFAULT_LEAVE_POLICY: LeavePolicy = { 留停: 0, 停職: 0, 暫離: 0 };
+/** 外幣政策預設：全關＝外幣功能未啟用、完全獨立於法定計算與申報（符合「不納入勞健保申報」） */
+export const DEFAULT_FX_POLICY: FxPolicy = { enabled: false, incomeTax: false, supplementary: false };
 export const EMPTY_SALARY_DEFAULTS: SalaryDefaults = { standard: {}, custom: [] };
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { serializeState, type BackupEnvelope } from "@/lib/backup";
@@ -159,6 +163,17 @@ interface PayrollState {
   /** 新進員工預設固定薪資/津貼範本（openNew 帶入；可再改） */
   salaryDefaults: SalaryDefaults;
   setSalaryDefaults: (v: SalaryDefaults) => void;
+
+  /** 多幣別：公司定義的額外薪資幣別清單（TWD 為隱含本位、不入此清單） */
+  currencies: Currency[];
+  /** 匯率表：幣別代碼 → 期別(yyyy-mm) → 對台幣匯率 */
+  fxRates: Record<string, Record<string, number>>;
+  /** 外幣政策（啟用/所得稅/補充保費，預設全關） */
+  fxPolicy: FxPolicy;
+  upsertCurrency: (c: Currency) => void;
+  setCurrencyEnabled: (code: string, enabled: boolean) => void;
+  setFxRate: (code: string, period: string, rate: number) => void;
+  setFxPolicy: (patch: Partial<FxPolicy>) => void;
 
   /** 出勤打卡（額外模組） */
   attendance: AttendanceConfig;
@@ -748,6 +763,43 @@ export const usePayrollStore = create<PayrollState>()(
           auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter", "更新新進員工預設固定薪資/津貼")),
         })),
 
+      // ── 多幣別（幣別與匯率維護中心） ─────────────────────────────
+      currencies: [],
+      fxRates: {},
+      fxPolicy: DEFAULT_FX_POLICY,
+      upsertCurrency: (c) =>
+        set((st) => {
+          const code = c.code.trim().toUpperCase();
+          if (!code) return st;
+          const exists = st.currencies.some((x) => x.code === code);
+          const next = { ...c, code };
+          return {
+            currencies: exists
+              ? st.currencies.map((x) => (x.code === code ? next : x))
+              : [...st.currencies, next],
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+              `${exists ? "更新" : "新增"}薪資幣別 ${code}（${c.name}）`)),
+          };
+        }),
+      setCurrencyEnabled: (code, enabled) =>
+        set((st) => ({
+          currencies: st.currencies.map((x) => (x.code === code ? { ...x, enabled } : x)),
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+            `${enabled ? "啟用" : "停用"}薪資幣別 ${code}`)),
+        })),
+      setFxRate: (code, period, rate) =>
+        set((st) => ({
+          fxRates: { ...st.fxRates, [code]: { ...(st.fxRates[code] ?? {}), [period]: rate } },
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+            `設定 ${code} ${period} 匯率＝${rate}`)),
+        })),
+      setFxPolicy: (patch) =>
+        set((st) => ({
+          fxPolicy: { ...st.fxPolicy, ...patch },
+          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+            `更新外幣政策：${Object.entries(patch).map(([k, v]) => `${k}=${v}`).join("、")}`)),
+        })),
+
       upsertEmployee: (raw) =>
         set((st) => {
           // 自提率超界防呆（匯入/還原路徑也經此收斂）
@@ -1015,6 +1067,9 @@ export const usePayrollStore = create<PayrollState>()(
             subsidies: s.subsidies ?? st.subsidies,
             leavePolicy: { ...DEFAULT_LEAVE_POLICY, ...(s.leavePolicy ?? {}) },
             salaryDefaults: s.salaryDefaults ?? st.salaryDefaults,
+            currencies: s.currencies ?? st.currencies,
+            fxRates: s.fxRates ?? st.fxRates,
+            fxPolicy: { ...DEFAULT_FX_POLICY, ...(s.fxPolicy ?? {}) },
             auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
           };
         }),
@@ -1063,6 +1118,9 @@ export const usePayrollStore = create<PayrollState>()(
           allocations: p.allocations ?? current.allocations,
           scheduledSalaryChanges: p.scheduledSalaryChanges ?? current.scheduledSalaryChanges,
           subsidies: p.subsidies ?? current.subsidies,
+          currencies: p.currencies ?? current.currencies,
+          fxRates: p.fxRates ?? current.fxRates,
+          fxPolicy: { ...DEFAULT_FX_POLICY, ...(p.fxPolicy ?? {}) },
         };
       },
     },

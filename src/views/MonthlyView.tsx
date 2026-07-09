@@ -21,7 +21,8 @@ import { monthWorkedHours } from "@/lib/attendance";
 import { ytdBonusBefore } from "@/store/selectors";
 import { addMonths as addMonthsStr } from "@/data/seed";
 import type { MonthlyEvent } from "@/lib/types";
-import { cn, ntd, formatPeriod } from "@/lib/utils";
+import { cn, ntd, formatPeriod, foreignMoney } from "@/lib/utils";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { AllocationEditor } from "@/views/AllocationEditor";
 import { FEATURES } from "@/config/features";
 import { Pencil, ArrowRight, Wand2, Info } from "lucide-react";
@@ -49,7 +50,7 @@ export function MonthlyView({
   const {
     employees, dependents, events, parameters, brackets,
     currentPeriod, setCurrentPeriod, upsertEvent, getSalary, confirmations,
-    attendance, punches,
+    attendance, punches, fxPolicy, currencies, fxRates,
   } = usePayrollStore();
   const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：已確認月份禁止異動
 
@@ -320,6 +321,40 @@ export function MonthlyView({
                     )}
                   </div>
                 </section>
+
+                {fxPolicy.enabled && (() => {
+                  const fixed = getSalary(editingEmp.id).foreignPay ?? null;
+                  const eff = draft.foreignOverride ?? fixed;
+                  const cur = eff ? currencies.find((c) => c.code === eff.currency) : undefined;
+                  const rate = eff ? (fxRates[eff.currency]?.[currentPeriod] ?? 0) : 0;
+                  if (!fixed && !draft.foreignOverride && !currencies.some((c) => c.enabled)) return null;
+                  return (
+                    <section>
+                      <p className="mb-2 text-sm font-semibold">外幣給付（與台幣分開、視作獎金，不進勞健保）</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Select value={eff?.currency ?? "__none"}
+                          onValueChange={(v) => patchDraft({ foreignOverride: v === "__none" ? null : { currency: v, amount: eff?.amount ?? 0 } })}>
+                          <SelectTrigger className="col-input h-8 w-40"><SelectValue placeholder="無外幣" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none">無外幣</SelectItem>
+                            {currencies.filter((c) => c.enabled || c.code === eff?.currency).map((c) => <SelectItem key={c.code} value={c.code}>{c.code}（{c.name}）</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        {eff && (
+                          <Input type="number" className="col-input h-8 w-36 text-right tabular-nums" placeholder="本月金額"
+                            value={eff.amount || ""}
+                            onChange={(e) => patchDraft({ foreignOverride: { currency: eff.currency, amount: Number(e.target.value) || 0 } })} />
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {fixed ? <>固定每月 {foreignMoney(fixed.amount, { symbol: cur?.symbol, decimals: cur?.decimals, code: fixed.currency })}；此處填值＝本月覆寫。</> : "此員工未設固定外幣；於此填入即為本月一次性外幣給付。"}
+                        {eff && eff.amount > 0 && (rate > 0
+                          ? <>　台幣約當 ≈ {ntd(Math.round(eff.amount * rate))} 元（匯率 {rate}）。</>
+                          : <>　<Badge variant="warning">未設本期匯率</Badge> 請至「系統設定 → 幣別與匯率」設定。</>)}
+                      </p>
+                    </section>
+                  );
+                })()}
 
                 <section>
                   <p className="mb-2 text-sm font-semibold">其他調整</p>

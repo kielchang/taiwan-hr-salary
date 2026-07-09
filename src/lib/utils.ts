@@ -10,6 +10,17 @@ export function ntd(value: number): string {
   return Math.round(value).toLocaleString("zh-TW");
 }
 
+/**
+ * 外幣金額顯示：依幣別符號與小數位（如 US$ 1,200.00、¥ 12,000）。
+ * symbol/decimals 由幣別維護中心（Currency）提供；未知幣別退回代碼前綴、2 位小數。
+ */
+export function foreignMoney(value: number, opts?: { symbol?: string; decimals?: number; code?: string }): string {
+  const decimals = opts?.decimals ?? 2;
+  const num = value.toLocaleString("zh-TW", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const prefix = opts?.symbol || opts?.code || "";
+  return prefix ? `${prefix} ${num}` : num;
+}
+
 /** 百分比顯示（去尾零；保留給既有呼叫者） */
 export function pct(value: number): string {
   return `${(value * 100).toFixed(2).replace(/\.?0+$/, "")}%`;

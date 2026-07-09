@@ -8,6 +8,7 @@ import type {
   Dependent,
   MonthlyEvent,
   LeavePolicy,
+  FxPolicy,
 } from "@/lib/types";
 import { round } from "@/lib/rounding";
 import { lookupInsuredAmounts, type InsuredAmounts } from "./brackets";
@@ -55,6 +56,16 @@ export interface PayrollResult {
   withholdingSuggestion: WithholdingSuggestion; // 建議代扣稅額
   // 檢核
   belowMinWage: boolean; // V1：月薪資總額 < 最低工資
+  // 外幣（獨立金流，**不進** grossPay/netPay/taxable/insured/premiums；僅顯示與獨立加總）
+  foreignPay?: ForeignPayResult;
+}
+
+/** 當月外幣結算結果（原幣別/原額/當期匯率/台幣約當） */
+export interface ForeignPayResult {
+  currency: string;
+  amount: number;
+  rate: number; // USD→TWD 當期匯率（0＝未設匯率）
+  twd: number; // 台幣約當＝round(amount×rate)
 }
 
 export function calculatePayroll(
@@ -64,7 +75,9 @@ export function calculatePayroll(
   event: MonthlyEvent,
   p: Parameters,
   brackets: InsuranceBrackets,
-  opts?: { period?: string; leavePolicy?: LeavePolicy }, // 提供 period 才啟用破月（全月者比例＝1，結果與不傳完全相同）
+  // 提供 period 才啟用破月（全月者比例＝1，結果與不傳完全相同）；
+  // 提供 fx 才啟用外幣（不傳＝完全無外幣分支，逐位元與原本相同，保 TC-9）。
+  opts?: { period?: string; leavePolicy?: LeavePolicy; fx?: { currency: string; amount: number; rate: number; policy: FxPolicy } },
 ): PayrollResult {
   const salaryTotal = monthlySalaryTotal(salary);
   const insured = lookupInsuredAmounts(brackets, salaryTotal);
@@ -103,9 +116,18 @@ export function calculatePayroll(
         laborEmployer: round(fullPremiums.laborEmployer * empFactor),
         occupationalEmployer: round(fullPremiums.occupationalEmployer * empFactor),
       };
+  // 外幣（獨立金流）：一律回填顯示欄；台幣 grossPay/netPay 不含。無 opts.fx＝短路、逐位元不變。
+  const fx = opts?.fx;
+  const foreignTwd = fx ? round(fx.amount * fx.rate) : 0;
+  const foreignPayResult: ForeignPayResult | undefined = fx
+    ? { currency: fx.currency, amount: fx.amount, rate: fx.rate, twd: foreignTwd }
+    : undefined;
+  // 補充保費政策閘門（預設關）：開時把外幣台幣約當當額外獎金併入補充保費基數。
+  const suppBonus = fx?.policy.supplementary ? event.monthlyBonus + foreignTwd : event.monthlyBonus;
+  const suppCumulative = fx?.policy.supplementary ? event.cumulativeBonus + foreignTwd : event.cumulativeBonus;
   const personalSupp = personalSupplementary(
-    event.monthlyBonus,
-    event.cumulativeBonus,
+    suppBonus,
+    suppCumulative,
     insured.health,
     p,
   );
@@ -172,5 +194,6 @@ export function calculatePayroll(
     estimatedTaxThreshold: threshold,
     withholdingSuggestion: suggestion,
     belowMinWage: salaryTotal < p.minWageMonthly,
+    foreignPay: foreignPayResult,
   };
 }

@@ -30,7 +30,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
   const {
     employees, salaries, dependents, events, parameters, brackets,
     currentPeriod, confirmations, confirmPeriod, unconfirmPeriod,
-    snapshots, saveSnapshot, analytics, allocations, projects,
+    snapshots, saveSnapshot, analytics, allocations, projects, fxPolicy,
   } = usePayrollStore();
   const [tab, setTab] = useState<Tab>("overview");
   const navigate = useNavigate();
@@ -107,6 +107,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
     num("other", "請假/其他", (o) => o.other),
     num("net", "實發", (o) => o.r.netPay, { total: true, className: "font-semibold" }),
     num("employer", "公司成本", (o) => o.r.employerTotalCost, { total: true, className: "text-muted-foreground" }),
+    ...(fxPolicy.enabled ? [num("fxtwd", "外幣(折台)", (o) => o.r.foreignPay?.twd ?? 0, { total: true, className: "text-muted-foreground" })] : []),
   ];
 
   return (

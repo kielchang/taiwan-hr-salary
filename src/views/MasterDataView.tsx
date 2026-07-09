@@ -35,7 +35,7 @@ import { Plus, Trash2, UserPlus, Upload, FileDown, Download, RotateCcw, LogOut, 
 const LEAVE_STATUSES = ["留停", "停職", "暫離"];
 const today = () => new Date().toISOString().slice(0, 10);
 
-export type SalaryNumKey = Exclude<keyof Omit<SalaryStructure, "employeeId">, "customAllowances">;
+export type SalaryNumKey = Exclude<keyof Omit<SalaryStructure, "employeeId">, "customAllowances" | "foreignPay">;
 export const SALARY_ITEMS: { key: SalaryNumKey; label: string; help?: string }[] = [
   { key: "baseSalary", label: "本薪" },
   { key: "managerAllowance", label: "主管加給" },
@@ -102,7 +102,7 @@ export function MasterDataView() {
     employees, salaries, dependents, parameters, brackets,
     applyChangeTicket, removeEmployee, importEmployees,
     currentPeriod, confirmations, leavePolicy, salaryDefaults,
-    auditLog, restoreAudit,
+    auditLog, restoreAudit, fxPolicy, currencies,
   } = usePayrollStore();
   const locked = Boolean(confirmations[currentPeriod]); // 硬鎖定：當期已確認
 
@@ -669,6 +669,29 @@ export function MasterDataView() {
             </div>
           )}
         </div>
+        {fxPolicy.enabled && currencies.some((c) => c.enabled) && (
+          <div className="space-y-2 rounded-md border p-3">
+            <div>
+              <p className="text-sm font-medium">固定每月外幣（選填）</p>
+              <p className="text-xs text-muted-foreground">與台幣分開計算、視作獎金；<strong>不計入月薪資總額與勞健保投保</strong>。每月自動帶入，可於月結逐月微調。</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={draftSalary.foreignPay?.currency ?? "__none"} disabled={lockSal}
+                onValueChange={(v) => setDraftSalary((s) => ({ ...s, foreignPay: v === "__none" ? undefined : { currency: v, amount: s.foreignPay?.amount ?? 0 } }))}>
+                <SelectTrigger className="col-input h-8 w-40"><SelectValue placeholder="無外幣" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">無外幣</SelectItem>
+                  {currencies.filter((c) => c.enabled).map((c) => <SelectItem key={c.code} value={c.code}>{c.code}（{c.name}）</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {draftSalary.foreignPay && (
+                <Input type="number" className="col-input h-8 w-36 text-right tabular-nums" placeholder="每月金額" disabled={lockSal}
+                  value={draftSalary.foreignPay.amount || ""}
+                  onChange={(e) => setDraftSalary((s) => ({ ...s, foreignPay: { currency: s.foreignPay?.currency ?? "", amount: Number(e.target.value) || 0 } }))} />
+              )}
+            </div>
+          </div>
+        )}
         <div className="rounded-md border bg-muted/40 p-3 text-sm">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
             <span>月薪資總額：<span className="font-bold tabular-nums">{ntd(draftTotal)}</span> 元</span>

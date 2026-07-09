@@ -14,7 +14,7 @@ import { PrintHeader } from "@/components/PrintHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePayrollStore, blankEvent } from "@/store/usePayrollStore";
 import { usePayrollRows, useCompanySupplementary, type PayrollRow } from "@/store/selectors";
-import { cn, ntd, pctOf, formatPeriod } from "@/lib/utils";
+import { cn, ntd, pctOf, formatPeriod, foreignMoney } from "@/lib/utils";
 import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
 import { buildPayslipMailto } from "@/lib/payslipEmail";
 import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
@@ -73,7 +73,7 @@ export function ReportsView({ initialTab }: { initialTab?: ReportsTab } = {}) {
 
 function SummaryReport() {
   const rows = usePayrollRows();
-  const { events, currentPeriod } = usePayrollStore();
+  const { events, currentPeriod, fxPolicy, currencies } = usePayrollStore();
   const companySupp = useCompanySupplementary(rows);
   const bonusOf = (id: string) =>
     events.find((e) => e.employeeId === id && e.period === currentPeriod)?.monthlyBonus ?? 0;
@@ -120,6 +120,25 @@ function SummaryReport() {
         return <GroupTable key={dim.key} title={dim.title} entries={entries} grand={grand} />;
       })}
       {FEATURES.projects && <ProjectPnL rows={rows} bonusOf={bonusOf} />}
+      {fxPolicy.enabled && (() => {
+        const byCur = new Map<string, number>();
+        for (const r of rows) if (r.foreignPay?.amount) byCur.set(r.foreignPay.currency, (byCur.get(r.foreignPay.currency) ?? 0) + r.foreignPay.amount);
+        const fxTwd = rows.reduce((a, r) => a + (r.foreignPay?.twd ?? 0), 0);
+        if (byCur.size === 0) return null;
+        return (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base">外幣給付彙總（與台幣分開，不含於上方應發/成本）</CardTitle></CardHeader>
+            <CardContent className="space-y-1.5 text-sm">
+              {[...byCur.entries()].map(([code, amt]) => {
+                const cur = currencies.find((c) => c.code === code);
+                return <div key={code} className="flex justify-between"><span className="text-muted-foreground">{cur?.name ?? code}</span><span className="font-medium tabular-nums">{foreignMoney(amt, { symbol: cur?.symbol, decimals: cur?.decimals, code })}</span></div>;
+              })}
+              <div className="flex justify-between border-t pt-1.5"><span className="text-muted-foreground">外幣台幣約當合計</span><span className="tabular-nums">≈ {ntd(fxTwd)} 元</span></div>
+              <div className="flex justify-between font-semibold"><span>含外幣約當之公司總成本</span><span className="tabular-nums">{ntd(grand.cost + fxTwd)} 元</span></div>
+            </CardContent>
+          </Card>
+        );
+      })()}
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
           <span>

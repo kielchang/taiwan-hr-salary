@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Employee } from "@/lib/types";
 import type { PayrollRow } from "@/store/selectors";
-import { ntd, formatPeriod } from "@/lib/utils";
+import { ntd, formatPeriod, foreignMoney } from "@/lib/utils";
+import { usePayrollStore } from "@/store/usePayrollStore";
 
 /**
  * 薪資明細表卡片（單一員工）。抽成獨立元件供「畫面檢視」「下載加密 PDF」
@@ -12,6 +13,9 @@ import { ntd, formatPeriod } from "@/lib/utils";
 export const PayslipCard = forwardRef<HTMLDivElement, { emp: Employee; r: PayrollRow; period: string }>(
   ({ emp, r, period }, ref) => {
     const monthlyBonus = r.grossPay - r.salaryTotal - r.overtimePay;
+    const currencies = usePayrollStore((s) => s.currencies);
+    const fp = r.foreignPay;
+    const cur = fp ? currencies.find((c) => c.code === fp.currency) : undefined;
     return (
       <Card ref={ref} className="bg-card">
         <CardHeader>
@@ -55,9 +59,22 @@ export const PayslipCard = forwardRef<HTMLDivElement, { emp: Employee; r: Payrol
           </div>
 
           <div className="flex items-center justify-between rounded-md border-2 border-primary/20 bg-primary/5 p-4">
-            <span className="text-lg font-semibold">實發金額</span>
+            <span className="text-lg font-semibold">實發金額（台幣）</span>
             <span className="text-2xl font-bold tabular-nums">{ntd(r.netPay)} 元</span>
           </div>
+
+          {fp && fp.amount > 0 && (
+            <div className="rounded-md border p-3 text-sm">
+              <p className="mb-2 font-medium">外幣給付（另行給付，不含於上方台幣應發／實發）</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted-foreground">{cur?.name ?? fp.currency}</span>
+                <span className="text-lg font-bold tabular-nums">{foreignMoney(fp.amount, { symbol: cur?.symbol, decimals: cur?.decimals, code: fp.currency })}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {fp.rate > 0 ? <>台幣約當 ≈ {ntd(fp.twd)} 元（匯率 {fp.rate}）</> : <>尚未設定本期匯率，台幣約當暫以 0 計。</>}
+              </p>
+            </div>
+          )}
 
           <div className="rounded-md border p-3 text-sm">
             <p className="mb-2 font-medium text-muted-foreground">公司另行負擔（不從薪資扣除）</p>

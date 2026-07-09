@@ -6,7 +6,7 @@
 //    app 版號/commit/建置時間（對回部署版本）。敏感異動皆入稽核。
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { SALARY_ITEMS, type SalaryNumKey } from "@/views/MasterDataView";
 import { BracketTableCards } from "@/components/BracketTableCards";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { ChangeSummary } from "@/components/form/ChangeSummary";
 import { TabPills } from "@/components/ui/tab-pills";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
-import type { Project, ProjectStatus } from "@/lib/types";
+import type { Project, ProjectStatus, Currency } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable } from "@/store/usePayrollStore";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
@@ -139,9 +139,9 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
   },
 ];
 
-type SecTab = "legal" | "company" | "data";
+type SecTab = "legal" | "company" | "currency" | "data";
 // 出勤功能隱藏時，公司分頁不含「打卡設定」，標籤簡化為「公司」（FEATURES.attendance）。
-const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", FEATURES.attendance ? "公司與出勤" : "公司"], ["data", "資料與安全"]];
+const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", FEATURES.attendance ? "公司與出勤" : "公司"], ["currency", "幣別與匯率"], ["data", "資料與安全"]];
 
 export function SettingsView() {
   const { parameters, brackets, setParameters, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
@@ -327,6 +327,8 @@ export function SettingsView() {
       </>)}
 
       {secTab === "company" && FEATURES.attendance && <AttendanceSettings />}
+
+      {secTab === "currency" && <CurrencyCenterCard locked={locked} />}
 
       {secTab === "data" && (<>
       <Card>
@@ -726,6 +728,111 @@ function SalaryDefaultsCard({ locked }: { locked: boolean }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ── 幣別與匯率維護中心（多幣別薪資） ──────────────────────────────
+function CurrencyCenterCard({ locked }: { locked: boolean }) {
+  const { currencies, fxRates, fxPolicy, currentPeriod, upsertCurrency, setCurrencyEnabled, setFxRate, setFxPolicy } = usePayrollStore();
+  const [ratePeriod, setRatePeriod] = useState(currentPeriod);
+  const [draftC, setDraftC] = useState({ code: "", name: "", symbol: "", decimals: 2 });
+  const addCurrency = () => {
+    const code = draftC.code.trim().toUpperCase();
+    if (!code) return;
+    upsertCurrency({ code, name: draftC.name.trim() || code, symbol: draftC.symbol.trim() || code, decimals: Number(draftC.decimals) || 0, enabled: true });
+    setDraftC({ code: "", name: "", symbol: "", decimals: 2 });
+  };
+  const cCols: Column<Currency>[] = [
+    { key: "code", header: "代碼", freeze: true, sortValue: (c) => c.code, cell: (c) => <span className="font-medium tabular-nums">{c.code}</span> },
+    { key: "name", header: "名稱", sortValue: (c) => c.name, cell: (c) => c.name },
+    { key: "symbol", header: "符號", cell: (c) => c.symbol },
+    { key: "decimals", header: "小數位", numeric: true, cell: (c) => c.decimals },
+    { key: "enabled", header: "狀態", cell: (c) => <Badge variant={c.enabled ? "success" : "secondary"}>{c.enabled ? "啟用" : "停用"}</Badge> },
+    { key: "ops", header: "", headerClassName: "w-20", cell: (c) => (
+      <Button variant="outline" size="sm" className="h-7" disabled={locked} onClick={() => setCurrencyEnabled(c.code, !c.enabled)}>
+        {c.enabled ? "停用" : "啟用"}
+      </Button>
+    ) },
+  ];
+  const active = currencies.filter((c) => c.enabled);
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">幣別與匯率維護中心</CardTitle>
+        <CardDescription>
+          公司可自訂要用的額外薪資幣別並維護各期匯率。外幣薪資與台幣<strong>分開計算、視作獎金</strong>，
+          <strong>預設不納入勞健保與投保級距</strong>；是否計所得稅／二代健保補充保費由下方政策決定。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* 政策 */}
+        <div className="space-y-2">
+          <p className="text-sm font-medium">政策</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <PolicyToggle label="啟用多幣別" hint="關閉時全站不顯示外幣欄位、計算完全不含外幣。" checked={fxPolicy.enabled} disabled={locked} onChange={(v) => setFxPolicy({ enabled: v })} />
+            <PolicyToggle label="外幣計所得稅" hint="開啟＝外幣台幣約當併入獎金代扣所得稅建議與扣繳憑單。" checked={fxPolicy.incomeTax} disabled={locked || !fxPolicy.enabled} onChange={(v) => setFxPolicy({ incomeTax: v })} />
+            <PolicyToggle label="外幣計二代健保補充保費" hint="開啟＝外幣台幣約當併入二代健保補充保費基數。" checked={fxPolicy.supplementary} disabled={locked || !fxPolicy.enabled} onChange={(v) => setFxPolicy({ supplementary: v })} />
+          </div>
+        </div>
+
+        {/* 幣別清單 */}
+        <div className="space-y-2">
+          <p className="text-sm font-medium">薪資幣別</p>
+          <div className="flex flex-wrap items-end gap-2 rounded-md border p-3">
+            <div><label className="text-xs font-medium">代碼</label><Input className="col-input h-8 w-24" placeholder="USD" disabled={locked} value={draftC.code} onChange={(e) => setDraftC({ ...draftC, code: e.target.value })} /></div>
+            <div><label className="text-xs font-medium">名稱</label><Input className="col-input h-8 w-28" placeholder="美金" disabled={locked} value={draftC.name} onChange={(e) => setDraftC({ ...draftC, name: e.target.value })} /></div>
+            <div><label className="text-xs font-medium">符號</label><Input className="col-input h-8 w-24" placeholder="US$" disabled={locked} value={draftC.symbol} onChange={(e) => setDraftC({ ...draftC, symbol: e.target.value })} /></div>
+            <div><label className="text-xs font-medium">小數位</label><Input type="number" className="col-input h-8 w-20 text-right" disabled={locked} value={draftC.decimals} onChange={(e) => setDraftC({ ...draftC, decimals: Number(e.target.value) })} /></div>
+            <Button size="sm" className="h-8" disabled={locked || !draftC.code.trim()} onClick={addCurrency}><Plus /> 新增幣別</Button>
+          </div>
+          {currencies.length > 0 && (
+            <DataTable rows={currencies} columns={cCols} getRowKey={(c) => c.code} initialSort={{ key: "code", dir: "asc" }} pageSize={5} />
+          )}
+        </div>
+
+        {/* 匯率表 */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">匯率（對台幣）</p>
+            <Input type="month" className="col-input h-8 w-36" value={ratePeriod} onChange={(e) => e.target.value && setRatePeriod(e.target.value)} />
+          </div>
+          {active.length === 0 ? (
+            <p className="text-xs text-muted-foreground">尚無啟用幣別。先於上方新增幣別後，即可逐期維護匯率。</p>
+          ) : (
+            <div className="space-y-2">
+              {active.map((c) => {
+                const rate = fxRates[c.code]?.[ratePeriod];
+                return (
+                  <div key={c.code} className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-sm">
+                    <span className="w-16 font-medium tabular-nums">{c.code}</span>
+                    <span className="text-muted-foreground">1 {c.symbol || c.code} =</span>
+                    <Input type="number" step="0.001" className="col-input h-8 w-32 text-right tabular-nums" disabled={locked}
+                      placeholder="未設" value={rate ?? ""} onChange={(e) => setFxRate(c.code, ratePeriod, Number(e.target.value) || 0)} />
+                    <span className="text-muted-foreground">元</span>
+                    {(rate == null || rate <= 0) && <Badge variant="warning">未設匯率</Badge>}
+                  </div>
+                );
+              })}
+              <p className="text-[11px] text-muted-foreground">匯率僅用於顯示台幣約當與（政策開啟時）法定代扣基數；未設匯率＝該幣別當期台幣約當以 0 計。</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PolicyToggle({ label, hint, checked, disabled, onChange }: { label: string; hint: string; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button type="button" disabled={disabled} onClick={() => onChange(!checked)}
+      className={cn("rounded-md border-2 p-2.5 text-left text-sm transition-colors disabled:opacity-50",
+        checked ? "border-primary bg-primary/5" : "hover:border-primary/40")}>
+      <div className="flex items-center justify-between">
+        <span className="font-medium">{label}</span>
+        <Badge variant={checked ? "success" : "secondary"}>{checked ? "開" : "關"}</Badge>
+      </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+    </button>
   );
 }
 

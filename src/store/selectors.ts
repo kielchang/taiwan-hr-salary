@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 import { calculatePayroll, type PayrollResult, leaveSegments, segmentRatio } from "@/lib/calc";
 import { companySupplementary } from "@/lib/calc";
-import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy, Subsidy } from "@/lib/types";
+import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy, Subsidy, FxPolicy } from "@/lib/types";
 import type { Parameters } from "@/config/parameters";
 import type { InsuranceBrackets } from "@/config/brackets";
 import { usePayrollStore, blankEvent, DEFAULT_LEAVE_POLICY } from "./usePayrollStore";
@@ -76,6 +76,26 @@ export interface PayrollData {
   brackets: InsuranceBrackets;
   leavePolicy?: LeavePolicy;
   subsidies?: Subsidy[]; // 區間補貼（於本期生效者注入計薪）
+  fxPolicy?: FxPolicy; // 外幣政策（未啟用或缺省＝完全無外幣分支，TC-9 不變）
+  fxRates?: Record<string, Record<string, number>>; // 幣別→期別→匯率
+}
+
+/**
+ * 解析某員工當期「有效外幣」：當期覆寫優先於薪資結構固定值；僅在 fxPolicy 啟用且有金額時回傳。
+ * 匯率取當期匯率表（未設＝0，仍回傳供顯示「未設匯率」）。回傳 undefined＝無外幣分支（保 TC-9）。
+ */
+function resolveFx(
+  salary: SalaryStructure,
+  event: MonthlyEvent,
+  period: string,
+  fxPolicy?: FxPolicy,
+  fxRates?: Record<string, Record<string, number>>,
+): { currency: string; amount: number; rate: number; policy: FxPolicy } | undefined {
+  if (!fxPolicy?.enabled) return undefined;
+  const fp = event.foreignOverride ?? salary.foreignPay ?? null;
+  if (!fp || !fp.amount) return undefined;
+  const rate = fxRates?.[fp.currency]?.[period] ?? 0;
+  return { currency: fp.currency, amount: fp.amount, rate, policy: fxPolicy };
 }
 
 /** 該員工於某期間生效的區間補貼（from≤period≤to 且命中族群）。 */
@@ -102,21 +122,22 @@ export function buildPayrollRows(period: string, data: PayrollData): PayrollRow[
       if (insured.length) salary = { ...salary, customAllowances: [...(salary.customAllowances ?? []), ...insured.map((s) => ({ id: `SUB${s.id}`, name: s.name, amount: s.amount }))] };
       if (nonInsured.length) event = { ...event, otherAddition: event.otherAddition + nonInsured.reduce((a, s) => a + s.amount, 0) };
     }
-    const result = calculatePayroll(emp, salary, dependents, event, parameters, brackets, { period, leavePolicy });
+    const fx = resolveFx(salary, event, period, data.fxPolicy, data.fxRates);
+    const result = calculatePayroll(emp, salary, dependents, event, parameters, brackets, { period, leavePolicy, fx });
     return { ...result, name: emp.name, department: emp.department, costCenter: emp.costCenter, project: emp.project };
   });
 }
 
 /** 計算當月（currentPeriod）全體員工薪資結算 */
 export function usePayrollRows(): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod, leavePolicy, subsidies } = usePayrollStore();
-  return buildPayrollRows(currentPeriod, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies });
+  const { employees, salaries, dependents, events, parameters, brackets, currentPeriod, leavePolicy, subsidies, fxPolicy, fxRates } = usePayrollStore();
+  return buildPayrollRows(currentPeriod, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies, fxPolicy, fxRates });
 }
 
 /** 計算指定期間全體員工薪資結算（檢視歷史/其他月份用） */
 export function usePayrollRowsFor(period: string): PayrollRow[] {
-  const { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies } = usePayrollStore();
-  return buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies });
+  const { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies, fxPolicy, fxRates } = usePayrollStore();
+  return buildPayrollRows(period, { employees, salaries, dependents, events, parameters, brackets, leavePolicy, subsidies, fxPolicy, fxRates });
 }
 
 export interface Totals {

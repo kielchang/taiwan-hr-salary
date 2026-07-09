@@ -72,6 +72,12 @@ export interface SalaryStructure {
   otherFixedAllowance: number; // 其他固定津貼
   /** 自訂固定津貼（HR 命名，如語言/值班/危險津貼）；皆屬工資、計入月薪資總額與級距（應稅） */
   customAllowances?: CustomAllowance[];
+  /**
+   * 固定每月外幣給付（如美金）。與台幣分開計算、視作獎金角度：
+   * **刻意不進 `monthlySalaryTotal`**，故永不觸動投保級距/勞健保保費（詳 lib/calc/wage.ts）。
+   * v1 每員一種幣別；未來要多幣別可改陣列。undefined＝無外幣（＝既有資料，逐位元不變）。
+   */
+  foreignPay?: ForeignPay;
 }
 
 /** 自訂固定津貼項目（每月固定發放） */
@@ -79,6 +85,31 @@ export interface CustomAllowance {
   id: string;
   name: string;
   amount: number;
+}
+
+/** 外幣給付（原幣別＋原額；台幣約當由匯率表換算，不存於此） */
+export interface ForeignPay {
+  currency: string; // 幣別代碼（對應 Currency.code，如 "USD"）
+  amount: number; // 原幣別金額
+}
+
+/**
+ * 公司自訂的額外薪資幣別（維護中心）。TWD 為隱含本位幣、不入此清單。
+ * 停用（enabled=false）＝不再供新發放選用，但不刪歷史資料。
+ */
+export interface Currency {
+  code: string; // 幣別代碼（ISO 4217，如 USD/JPY/EUR）
+  name: string; // 顯示名稱（如「美金」）
+  symbol: string; // 顯示符號（如「US$」）
+  decimals: number; // 小數位數（USD=2、JPY=0）
+  enabled: boolean; // 是否啟用
+}
+
+/** 外幣政策（公司層級開關；預設全關＝外幣完全獨立、不進法定計算與申報） */
+export interface FxPolicy {
+  enabled: boolean; // 啟用多幣別（關＝全站零外幣 UI 與計算）
+  incomeTax: boolean; // 外幣台幣約當是否併入所得稅代扣建議與扣繳憑單
+  supplementary: boolean; // 外幣台幣約當是否併入二代健保補充保費
 }
 
 /** 眷屬名冊（README §3.2、P4 分流眷屬模型） */
@@ -112,6 +143,8 @@ export interface MonthlyEvent {
   otherAddition: number; // 其他加項
   otherDeduction: number; // 其他扣款
   withheldTax: number | null; // 代扣所得稅（人工轉填；null＝未填）
+  /** 當期外幣覆寫：null/undefined＝沿用薪資結構固定值；填值＝當月改用此外幣金額 */
+  foreignOverride?: ForeignPay | null;
 }
 
 /* ───────────── 出勤打卡（額外模組；README 將出勤列為非目標，獨立於薪資管線） ───────────── */
@@ -221,6 +254,10 @@ export interface PayrollSnapshot {
   overtimePay: number; // Σ加班費
   bonusTotal: number; // Σ當月獎金
   gini: number; // 月薪資總額之 Gini
+  /** Σ外幣台幣約當（獨立序列，**不含**於 totalCost；undefined＝該期無外幣或功能未啟用） */
+  foreignTwdTotal?: number;
+  /** 各幣別原額合計（如 {USD: 1200}）；供年報明細，供顯示用 */
+  foreignByCurrency?: Record<string, number>;
 }
 
 /** 薪酬分析設定（持久化於 localStorage） */

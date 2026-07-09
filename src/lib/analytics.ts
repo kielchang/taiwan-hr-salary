@@ -414,6 +414,13 @@ export function simulateRaise(
 /** 由當期結算列＋當月獎金合計，計算可保存的趨勢快照（不含個資） */
 export function buildSnapshot(rows: PayrollRow[], period: string, bonusTotal: number): PayrollSnapshot {
   const salaries = rows.map((r) => r.salaryTotal);
+  // 外幣：獨立序列（**不併入 totalCost**），供年報/趨勢以獨立線呈現。無外幣＝undefined（不佔快照）。
+  const foreignTwdTotal = rows.reduce((a, r) => a + (r.foreignPay?.twd ?? 0), 0);
+  const foreignByCurrency: Record<string, number> = {};
+  for (const r of rows) if (r.foreignPay && r.foreignPay.amount) {
+    foreignByCurrency[r.foreignPay.currency] = (foreignByCurrency[r.foreignPay.currency] ?? 0) + r.foreignPay.amount;
+  }
+  const hasForeign = foreignTwdTotal > 0 || Object.keys(foreignByCurrency).length > 0;
   return {
     period,
     savedAt: new Date().toISOString(),
@@ -426,6 +433,7 @@ export function buildSnapshot(rows: PayrollRow[], period: string, bonusTotal: nu
     overtimePay: rows.reduce((a, r) => a + r.overtimePay, 0),
     bonusTotal,
     gini: gini(salaries),
+    ...(hasForeign ? { foreignTwdTotal, foreignByCurrency } : {}),
   };
 }
 
