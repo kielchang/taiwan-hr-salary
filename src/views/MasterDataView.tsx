@@ -27,6 +27,7 @@ import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import { EditableField } from "@/components/form/EditableField";
 import { ChangeSummary } from "@/components/form/ChangeSummary";
+import { BatchSalaryPanel } from "@/views/BatchSalaryPanel";
 import { TabPills } from "@/components/ui/tab-pills";
 import { diffRecord, type FieldSpec, type Change, type FieldKind } from "@/lib/forms/diff";
 import { Plus, Trash2, UserPlus, Upload, FileDown, Download, RotateCcw, LogOut, PauseCircle, PlayCircle, Wallet, Users, Receipt, Contact } from "lucide-react";
@@ -94,7 +95,7 @@ const openSegment = (e: Employee) => currentSegs(e).find((s) => s.to == null);
 
 /** 情境：8 種申請單（含 onboard 到職＝新增員工）。 */
 type Scenario = ChangeScenario;
-type TopTab = "list" | "log";
+type TopTab = "list" | "batch" | "log";
 
 export function MasterDataView() {
   const {
@@ -255,16 +256,17 @@ export function MasterDataView() {
     />
   );
 
-  // 深連結 ?emp=E001：直接開啟該員檔案面板
+  // 深連結 ?emp=E001（開該員檔案）／?tab=batch（開批次薪資分頁，供規劃頁 CTA 導向）
   const [searchParams, setSearchParams] = useSearchParams();
   const empParam = searchParams.get("emp");
+  const tabParam = searchParams.get("tab");
   useEffect(() => {
-    if (!empParam) return;
-    const target = employees.find((e) => e.id === empParam);
-    if (target) openProfile(target);
+    if (!empParam && !tabParam) return;
+    if (empParam) { const target = employees.find((e) => e.id === empParam); if (target) openProfile(target); }
+    if (tabParam === "batch" || tabParam === "log") setTopTab(tabParam);
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empParam]);
+  }, [empParam, tabParam]);
 
   const draftTotal = monthlySalaryTotal(draftSalary);
   const draftInsured = lookupInsuredAmounts(brackets, draftTotal);
@@ -414,7 +416,7 @@ export function MasterDataView() {
       </div>
 
       <TabPills
-        tabs={[{ key: "list", label: "員工清單" }, { key: "log", label: `異動紀錄${logRows.length ? `（${logRows.length}）` : ""}` }]}
+        tabs={[{ key: "list", label: "員工清單" }, { key: "batch", label: "批次薪資" }, { key: "log", label: `異動紀錄${logRows.length ? `（${logRows.length}）` : ""}` }]}
         value={topTab}
         onChange={(k) => setTopTab(k as TopTab)}
       />
@@ -431,6 +433,8 @@ export function MasterDataView() {
           </CardContent>
         </Card>
       )}
+
+      {topTab === "batch" && <BatchSalaryPanel />}
 
       {topTab === "log" && (
         <Card>

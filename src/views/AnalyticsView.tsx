@@ -713,6 +713,10 @@ function RaiseTab({ rows }: { rows: PayrollRow[] }) {
   return (
     <div className="space-y-4">
       <SandboxNotice applyHint />
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-info/30 bg-info/10 p-2.5 text-sm">
+        <span className="text-info">要對「單位或全公司」批次調整薪資結構、加津貼或發區間補貼？用主檔的「批次薪資」作業。</span>
+        <Button variant="outline" size="sm" onClick={() => navigate("/master?tab=batch")}>前往批次薪資</Button>
+      </div>
       {applyMsg && (
         <div className="flex items-center justify-between gap-2 rounded-md border border-success/30 bg-success/10 p-2.5 text-sm text-success">
           <span className="flex items-center gap-2"><CheckCircle2 className="size-4 shrink-0" />{applyMsg}</span>
