@@ -2,9 +2,14 @@ import { describe, it, expect } from "vitest";
 import { seniorityMonths, seniorityRefDate, annualLeaveDays } from "../src/lib/calc/seniority";
 
 describe("seniorityRefDate 基準日解析", () => {
-  it("fixedDate（預設）→ 回固定基準日", () => {
+  it("fixedDate 相容舊完整日期（YYYY-MM-DD）", () => {
     expect(seniorityRefDate("fixedDate", "2026-01-01", "2026-06")).toBe("2026-01-01");
     expect(seniorityRefDate(undefined, "2026-01-01", "2026-06")).toBe("2026-01-01");
+  });
+  it("fixedDate 月-日：取當期月底前最近一次基準日", () => {
+    expect(seniorityRefDate("fixedDate", "01-01", "2026-06")).toBe("2026-01-01"); // 1/1 已過 → 當年
+    expect(seniorityRefDate("fixedDate", "06-01", "2026-03")).toBe("2025-06-01"); // 6/1 未到 → 前一年
+    expect(seniorityRefDate("fixedDate", "06-01", "2026-06")).toBe("2026-06-01"); // 6/1＝當月月底前 → 當年
   });
   it("hireDate＋period → 當期月底", () => {
     expect(seniorityRefDate("hireDate", "2026-01-01", "2026-06")).toBe("2026-06-30");

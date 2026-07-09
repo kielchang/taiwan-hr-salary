@@ -14,6 +14,7 @@ import { Stepper } from "@/components/Stepper";
 import type { Employee } from "@/lib/types";
 import { ntd } from "@/lib/utils";
 import { SALARY_ITEMS } from "@/views/MasterDataView";
+import { MmddPicker } from "@/views/SettingsView";
 import { Trash2, Plus } from "lucide-react";
 import { monthlySalaryTotal } from "@/lib/calc";
 import {
@@ -239,10 +240,9 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                   </div>
                   {(parameters.seniorityBasis ?? "fixedDate") === "fixedDate" && (
                     <div className="pt-1">
-                      <Label className="text-xs">固定基準日</Label>
-                      <Input type="date" className="col-assumption" value={parameters.seniorityBaseDate}
-                        onChange={(e) => setParameters({ seniorityBaseDate: e.target.value })} />
-                      <p className="text-xs text-muted-foreground">通常設為當月 1 日或年度 1/1；系統以此日計算每位員工的年資與特休天數。</p>
+                      <Label className="text-xs">固定基準日（每年）</Label>
+                      <MmddPicker value={parameters.seniorityBaseDate} onChange={(v) => setParameters({ seniorityBaseDate: v })} />
+                      <p className="text-xs text-muted-foreground">每年重複的月/日（不需設年，常設 1/1）；系統以此計算每位員工的年資與特休天數。</p>
                     </div>
                   )}
                 </div>

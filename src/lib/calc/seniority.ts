@@ -18,21 +18,31 @@ export function seniorityMonths(hireDate: string, baseDate: string): number {
 /** 年資/特休的基準日計算方式：fixedDate＝公司統一固定基準日；hireDate＝依到職日算實際年資（截至當期月底）。 */
 export type SeniorityBasis = "fixedDate" | "hireDate";
 
+/** 當期（yyyy-mm）月底日 ISO（純算，由 y/m 決定）。 */
+function periodMonthEnd(period: string): string | null {
+  const [y, m] = period.split("-").map(Number);
+  if (!y || !m) return null;
+  return `${period}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+}
+
 /**
  * 解析年資/特休的「基準（截止）日」：
- * - fixedDate（預設）：回傳公司固定基準日 `fixedBaseDate`（全體同一日，行為與先前相同）。
- * - hireDate：以「當期（period）月底」為截止日 → 每位員工依到職日算到當月的實際年資（週年制、逐月累進）；
- *   未提供 period（如 TC-9 無期間路徑）時回退固定基準日，保持純函數與既有結果不變。
+ * - hireDate（週年制）：以「當期（period）月底」為截止日 → 每位員工依到職日算到當月的實際年資（逐月累進）。
+ * - fixedDate（曆年制）：`fixedBaseDate` 以**月-日**（"MM-DD"）表示的年度基準日（相容舊的完整 "YYYY-MM-DD"）；
+ *   截止日＝「當期月底之前、最近一次的基準日」（即當前休假年度的起算點）。例：基準 06-01、當期 2026-03 → 2025-06-01。
+ * 未提供 period（如 TC-9 無期間路徑；年資僅顯示、不入總額）時回退：完整日期原樣、月-日則給哨兵年（年資 0，不影響 TC-9）。
  */
 export function seniorityRefDate(basis: SeniorityBasis | undefined, fixedBaseDate: string, period?: string): string {
-  if (basis === "hireDate" && period) {
-    const [y, m] = period.split("-").map(Number);
-    if (y && m) {
-      const lastDay = new Date(y, m, 0).getDate(); // 當期月底日（由 y/m 決定，純算）
-      return `${period}-${String(lastDay).padStart(2, "0")}`;
-    }
+  if (basis === "hireDate") {
+    return (period && periodMonthEnd(period)) || fixedBaseDate;
   }
-  return fixedBaseDate;
+  const mmdd = fixedBaseDate.length >= 8 ? fixedBaseDate.slice(-5) : fixedBaseDate; // 相容 "YYYY-MM-DD"→取 MM-DD
+  if (!/^\d{2}-\d{2}$/.test(mmdd)) return fixedBaseDate; // 非預期格式：保守原樣
+  if (!period) return fixedBaseDate.length >= 10 ? fixedBaseDate : `0001-${mmdd}`;
+  const py = Number(period.slice(0, 4));
+  const pEnd = periodMonthEnd(period)!;
+  const thisYear = `${py}-${mmdd}`;
+  return thisYear <= pEnd ? thisYear : `${py - 1}-${mmdd}`; // 取當期月底前最近一次
 }
 
 /** 年資月數 → "N年M月" 顯示 */

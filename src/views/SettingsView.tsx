@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { EditableField } from "@/components/form/EditableField";
 import { ChangeSummary } from "@/components/form/ChangeSummary";
 import { TabPills } from "@/components/ui/tab-pills";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable } from "@/store/usePayrollStore";
@@ -50,8 +51,27 @@ interface Field {
 
 const COMPANY_FIELDS: Field[] = [
   { key: "occupationalRate", label: "職業災害保險費率", kind: "rate", help: "每家公司不同，依勞保局核定通知書填寫（全產業平均約 0.21%），由公司全額負擔。" },
-  { key: "seniorityBaseDate", label: "年資／特休計算基準日", kind: "date", help: "系統以此日期計算每位員工的年資與特休天數，通常設為當月 1 日。" },
+  { key: "seniorityBaseDate", label: "年資／特休固定基準日", kind: "date", help: "曆年制的年度基準日（月/日，每年重複）。" },
 ];
+
+/** 月/日選擇器（每年重複的基準日；值＝"MM-DD"，相容舊的完整日期）。 */
+export function MmddPicker({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  const mmdd = value && value.length >= 8 ? value.slice(-5) : value; // 相容 "YYYY-MM-DD"
+  const [mm, dd] = /^\d{2}-\d{2}$/.test(mmdd) ? mmdd.split("-") : ["01", "01"];
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    <div className="flex items-center gap-2">
+      <Select value={mm} disabled={disabled} onValueChange={(m) => onChange(`${m}-${dd}`)}>
+        <SelectTrigger className="col-assumption h-9 w-24"><SelectValue /></SelectTrigger>
+        <SelectContent>{Array.from({ length: 12 }, (_, i) => pad(i + 1)).map((m) => <SelectItem key={m} value={m}>{Number(m)} 月</SelectItem>)}</SelectContent>
+      </Select>
+      <Select value={dd} disabled={disabled} onValueChange={(d) => onChange(`${mm}-${d}`)}>
+        <SelectTrigger className="col-assumption h-9 w-24"><SelectValue /></SelectTrigger>
+        <SelectContent>{Array.from({ length: 31 }, (_, i) => pad(i + 1)).map((d) => <SelectItem key={d} value={d}>{Number(d)} 日</SelectItem>)}</SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
   {
@@ -219,12 +239,11 @@ export function SettingsView() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             {renderField(COMPANY_FIELDS[0]) /* 職災費率 */}
-            {(paramDraft.seniorityBasis ?? "fixedDate") === "fixedDate" && renderField(COMPANY_FIELDS[1]) /* 固定基準日 */}
           </div>
           <div className="space-y-1.5">
             <p className="text-sm font-medium">年資／特休計算方式</p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {([["fixedDate", "固定基準日", "全體以同一基準日計算年資（曆年制常用，如統一設 1/1）。"], ["hireDate", "依到職日（週年制）", "每位員工依到職日算實際年資（算至當月），特休隨週年逐年增加。"]] as const).map(([val, title, desc]) => (
+              {([["fixedDate", "固定基準日", "全體以同一基準日（月/日）計算年資（曆年制常用，如統一設 1/1）。"], ["hireDate", "依到職日（週年制）", "每位員工依到職日算實際年資（算至當月），特休隨週年逐年增加。"]] as const).map(([val, title, desc]) => (
                 <button key={val} type="button" disabled={locked}
                   onClick={() => setParamDraft((d) => ({ ...d, seniorityBasis: val }))}
                   className={cn("rounded-md border-2 p-2.5 text-left text-sm transition-colors disabled:opacity-60",
@@ -234,6 +253,14 @@ export function SettingsView() {
                 </button>
               ))}
             </div>
+            {(paramDraft.seniorityBasis ?? "fixedDate") === "fixedDate" && (
+              <div className="pt-1">
+                <p className="text-xs font-medium">固定基準日（每年）</p>
+                <MmddPicker value={String(paramDraft.seniorityBaseDate)} disabled={locked}
+                  onChange={(v) => setParamDraft((d) => ({ ...d, seniorityBaseDate: v }))} />
+                <p className="mt-1 text-xs text-muted-foreground">每年重複的月/日（不需設年）；系統取「當期月底前最近一次基準日」計算年資與特休。</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
