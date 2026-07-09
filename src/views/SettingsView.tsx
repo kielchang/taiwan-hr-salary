@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { EditableField } from "@/components/form/EditableField";
 import { ChangeSummary } from "@/components/form/ChangeSummary";
 import { TabPills } from "@/components/ui/tab-pills";
+import { Callout } from "@/components/ui/callout";
+import { validateSettings } from "@/lib/validation";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus, Currency } from "@/lib/types";
@@ -239,6 +241,20 @@ export function SettingsView() {
         </div>
       )}
 
+      {(() => {
+        const issues = validateSettings(paramDraft, brackets, currentPeriod);
+        if (issues.length === 0) return null;
+        const errs = issues.filter((i) => i.severity === "error");
+        const warns = issues.filter((i) => i.severity === "warning");
+        return (
+          <Callout variant={errs.length ? "danger" : "warning"} title={errs.length ? "系統設定有問題，會導致計算錯誤" : "系統設定提醒"}>
+            <ul className="ml-4 list-disc space-y-0.5">
+              {[...errs, ...warns].map((i, idx) => <li key={idx}>{i.message}</li>)}
+            </ul>
+          </Callout>
+        );
+      })()}
+
       <TabPills tabs={SEC_TABS.map(([k, label]) => ({ key: k, label }))} value={secTab} onChange={(k) => setSecTab(k as SecTab)} />
 
       {secTab === "company" && (
@@ -413,20 +429,20 @@ export function SettingsView() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-danger/40">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">資料管理</CardTitle>
-          <CardDescription>資料只存在這台電腦的瀏覽器；清除瀏覽器資料會一併刪除，請留意備份需求。</CardDescription>
+          <CardTitle className="text-base text-danger">示範與重置（危險操作）</CardTitle>
+          <CardDescription>以下操作會<strong>覆蓋或清除現有資料且無法復原</strong>，與上方「從備份檔還原」不同。若要保留現有資料，請先「匯出備份」。</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             onClick={() => {
-              if (confirm("將以示範公司（62 名員工，含多月歷史、確認/稽核、加退保/停復保與各種狀態）覆蓋目前所有資料，確定？")) resetToSeed();
+              if (confirm("【會覆蓋現有全部資料】將以示範公司（62 名員工，含多月歷史、確認/稽核、加退保/停復保與各種狀態）取代目前所有資料。此操作無法復原，確定？")) resetToSeed();
             }}
           >
-            <RotateCcw /> 還原為示範公司資料
+            <RotateCcw /> 載入示範公司（覆蓋現有資料）
           </Button>
           <Button
             variant="outline"
@@ -441,10 +457,10 @@ export function SettingsView() {
             <CalendarRange /> 載入多月示範資料{snapshots.length > 0 ? `（已有 ${snapshots.length} 期快照）` : ""}
           </Button>
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             onClick={() => {
-              if (confirm("確定清空所有員工與結算資料？（費率設定會保留）")) clearAll();
+              if (confirm("【無法復原】確定清空所有員工與結算資料？（費率設定會保留）")) clearAll();
             }}
           >
             <Trash2 /> 清空員工資料

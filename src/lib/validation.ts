@@ -39,7 +39,9 @@ export interface ValidationIssue {
    * V3、V5 為 README §8 保留編號，不產生逐筆 issue：
    * V3 彙總勾稽＝報表層 reconciliationDiff（差異紅標）；V5 級距申報一致＝程序面（申報名冊／級距調整報表）。
    */
-  rule: "V1" | "V2" | "V4" | "V6" | "V7" | "V8" | "V9" | "V10" | "V11" | "V12";
+  rule: "V1" | "V2" | "V4" | "V6" | "V7" | "V8" | "V9" | "V10" | "V11" | "V12"
+    // V13–V17：系統設定自身一致性（非逐員；由 validateSettings 產出，防「改設定後靜默算錯」）
+    | "V13" | "V14" | "V15" | "V16" | "V17";
   severity: Severity;
   employeeId?: string;
   message: string;
@@ -275,4 +277,65 @@ function blankEventFor(employeeId: string): MonthlyEvent {
  */
 export function reconciliationDiff(total: number, classifiedSum: number): number {
   return total - classifiedSum;
+}
+
+/**
+ * V13–V17 系統設定一致性檢核（純函數；不改資料）。
+ * 目的：防「改法定參數/級距後靜默算錯錢」——級距未排序取錯級、費率量級誤植（5.17 vs 0.0517）、
+ * 設定年度與結算月份不符、基準日格式錯。error＝會算錯；warning＝需確認。
+ * 於系統設定頁與結算查核頁呈現。`currentPeriod` 供 V16 年度一致比對（選填）。
+ */
+export function validateSettings(
+  p: Parameters,
+  brackets?: InsuranceBrackets,
+  currentPeriod?: string,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const push = (rule: ValidationIssue["rule"], severity: Severity, message: string) => issues.push({ rule, severity, message });
+
+  // V13 投保級距：非空、皆正數、非遞減（lookupBracket 依升冪；未排序會取錯級、空陣列→保費 NaN）
+  if (brackets) {
+    const tables: [string, number[]][] = [["勞保", brackets.labor], ["職保", brackets.occupational], ["健保", brackets.health], ["勞退", brackets.pension]];
+    for (const [name, arr] of tables) {
+      if (!Array.isArray(arr) || arr.length === 0) { push("V13", "error", `${name}投保級距表為空，將導致保費計算錯誤`); continue; }
+      if (arr.some((v) => !Number.isFinite(v) || v <= 0)) { push("V13", "error", `${name}投保級距含非正數或無效值`); continue; }
+      for (let i = 1; i < arr.length; i++) if (arr[i] < arr[i - 1]) { push("V13", "error", `${name}投保級距未由小到大排序（第 ${i + 1} 級 ${arr[i].toLocaleString()} < 前一級），查表會取錯級`); break; }
+    }
+  }
+
+  // V14 費率/負擔比例量級與範圍（catch 把 0.0517 打成 5.17 之類的百倍誤植）
+  const rates: [string, number][] = [
+    ["勞就保合計費率", p.laborEmploymentRate], ["職災費率", p.occupationalRate], ["健保費率", p.healthRate],
+    ["勞退提繳率", p.pensionEmployerRate], ["固定扣繳率", p.fixedWithholdingRate],
+    ["非居住者稅率(門檻內)", p.nonResidentRateLow], ["非居住者稅率(超門檻)", p.nonResidentRateHigh],
+  ];
+  for (const [name, r] of rates) if (!(r > 0 && r < 1)) push("V14", "error", `${name} ${r} 超出合理範圍（應為 0–1 之間的比率，如 5.17%＝0.0517）`);
+  const shares: [string, number][] = [
+    ["勞保員工負擔", p.laborEmployeeShare], ["勞保雇主負擔", p.laborEmployerShare],
+    ["健保員工負擔", p.healthEmployeeShare], ["健保雇主負擔", p.healthEmployerShare],
+  ];
+  for (const [name, s] of shares) if (!(s >= 0 && s <= 1)) push("V14", "error", `${name}比例 ${s} 超出 0–1 範圍`);
+  if (p.laborEmployeeShare + p.laborEmployerShare > 1.0001) push("V14", "error", `勞保員工＋雇主負擔比例合計 > 100%`);
+  if (p.healthEmployeeShare + p.healthEmployerShare > 1.0001) push("V14", "error", `健保員工＋雇主負擔比例合計 > 100%`);
+
+  // V15 補充保費/免稅額/上限量級
+  if (!(p.supplementaryRate > 0 && p.supplementaryRate < 0.1)) push("V15", "error", `二代健保補充保費率 ${p.supplementaryRate} 超出合理範圍（約 0.02）`);
+  if (p.mealAllowanceExemption < 0) push("V15", "error", `伙食費免稅額不可為負`);
+  if (!(p.supplementaryCap > 0)) push("V15", "error", `補充保費單次計費上限應為正數`);
+  if (p.minWageMonthly <= 0 || p.monthlyWorkHours <= 0) push("V15", "error", `最低工資與月計薪時數需為正數`);
+
+  // V16 設定年度 vs 結算月份（warning；防既有使用者沿用去年費率）
+  if (currentPeriod) {
+    const yr = (p.year.match(/(\d{4})/) || [])[1];
+    const periodYr = currentPeriod.slice(0, 4);
+    if (yr && periodYr && yr !== periodYr) push("V16", "warning", `法定參數設定年度為 ${yr}，但目前結算月份為 ${currentPeriod}；請確認費率/級距是否已更新為當年度`);
+  }
+
+  // V17 固定基準日格式（warning）
+  if ((p.seniorityBasis ?? "fixedDate") === "fixedDate") {
+    const d = p.seniorityBaseDate ?? "";
+    if (!/^\d{2}-\d{2}$/.test(d) && !/^\d{4}-\d{2}-\d{2}$/.test(d)) push("V17", "warning", `年資固定基準日格式異常（${d || "未設"}），應為「月-日」如 01-01`);
+  }
+
+  return issues;
 }

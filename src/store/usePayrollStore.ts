@@ -792,6 +792,7 @@ export const usePayrollStore = create<PayrollState>()(
       fxPolicy: DEFAULT_FX_POLICY,
       upsertCurrency: (c) =>
         set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
           const code = c.code.trim().toUpperCase();
           if (!code) return st;
           const exists = st.currencies.some((x) => x.code === code);
@@ -805,23 +806,32 @@ export const usePayrollStore = create<PayrollState>()(
           };
         }),
       setCurrencyEnabled: (code, enabled) =>
-        set((st) => ({
-          currencies: st.currencies.map((x) => (x.code === code ? { ...x, enabled } : x)),
-          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
-            `${enabled ? "啟用" : "停用"}薪資幣別 ${code}`)),
-        })),
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          return {
+            currencies: st.currencies.map((x) => (x.code === code ? { ...x, enabled } : x)),
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+              `${enabled ? "啟用" : "停用"}薪資幣別 ${code}`)),
+          };
+        }),
       setFxRate: (code, period, rate) =>
-        set((st) => ({
-          fxRates: { ...st.fxRates, [code]: { ...(st.fxRates[code] ?? {}), [period]: rate } },
-          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
-            `設定 ${code} ${period} 匯率＝${rate}`)),
-        })),
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          return {
+            fxRates: { ...st.fxRates, [code]: { ...(st.fxRates[code] ?? {}), [period]: rate } },
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+              `設定 ${code} ${period} 匯率＝${rate}`)),
+          };
+        }),
       setFxPolicy: (patch) =>
-        set((st) => ({
-          fxPolicy: { ...st.fxPolicy, ...patch },
-          auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
-            `更新外幣政策：${Object.entries(patch).map(([k, v]) => `${k}=${v}`).join("、")}`)),
-        })),
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          return {
+            fxPolicy: { ...st.fxPolicy, ...patch },
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
+              `更新外幣政策：${Object.entries(patch).map(([k, v]) => `${k}=${v}`).join("、")}`)),
+          };
+        }),
 
       upsertEmployee: (raw) =>
         set((st) => {

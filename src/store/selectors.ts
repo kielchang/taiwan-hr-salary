@@ -94,6 +94,8 @@ function resolveFx(
   if (!fxPolicy?.enabled) return undefined;
   const fp = event.foreignOverride ?? salary.foreignPay ?? null;
   if (!fp || !fp.amount) return undefined;
+  // 註：刻意**不**檢查該幣別 currencies[].enabled——停用幣別只收合「新指派下拉」（各表單已 filter c.enabled），
+  //     既有 foreignPay 仍照算，避免停用幣別時回溯抹除歷史月的外幣台幣約當（造成新的快照/即時漂移）。
   const rate = fxRates?.[fp.currency]?.[period] ?? 0;
   return { currency: fp.currency, amount: fp.amount, rate, policy: fxPolicy };
 }
