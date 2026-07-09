@@ -15,6 +15,26 @@ export function seniorityMonths(hireDate: string, baseDate: string): number {
   return Math.max(0, months);
 }
 
+/** 年資/特休的基準日計算方式：fixedDate＝公司統一固定基準日；hireDate＝依到職日算實際年資（截至當期月底）。 */
+export type SeniorityBasis = "fixedDate" | "hireDate";
+
+/**
+ * 解析年資/特休的「基準（截止）日」：
+ * - fixedDate（預設）：回傳公司固定基準日 `fixedBaseDate`（全體同一日，行為與先前相同）。
+ * - hireDate：以「當期（period）月底」為截止日 → 每位員工依到職日算到當月的實際年資（週年制、逐月累進）；
+ *   未提供 period（如 TC-9 無期間路徑）時回退固定基準日，保持純函數與既有結果不變。
+ */
+export function seniorityRefDate(basis: SeniorityBasis | undefined, fixedBaseDate: string, period?: string): string {
+  if (basis === "hireDate" && period) {
+    const [y, m] = period.split("-").map(Number);
+    if (y && m) {
+      const lastDay = new Date(y, m, 0).getDate(); // 當期月底日（由 y/m 決定，純算）
+      return `${period}-${String(lastDay).padStart(2, "0")}`;
+    }
+  }
+  return fixedBaseDate;
+}
+
 /** 年資月數 → "N年M月" 顯示 */
 export function formatSeniority(months: number): string {
   return `${Math.floor(months / 12)}年${months % 12}月`;

@@ -224,16 +224,27 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <Label>年資與特休的計算基準日</Label>
-                  <Input
-                    type="date"
-                    className="col-assumption"
-                    value={parameters.seniorityBaseDate}
-                    onChange={(e) => setParameters({ seniorityBaseDate: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    通常設為當月 1 日；系統用它計算每位員工的年資與特休天數。
-                  </p>
+                  <Label>年資與特休的計算方式</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setParameters({ seniorityBasis: "hireDate" })}
+                      className={`rounded-md border-2 p-2.5 text-left text-sm transition-colors ${parameters.seniorityBasis === "hireDate" ? "border-primary bg-primary/5" : "hover:border-primary/40"}`}>
+                      <p className="font-medium">依到職日（週年制）</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">每位員工依自己到職日算實際年資（算至當月），特休隨週年逐年增加。</p>
+                    </button>
+                    <button type="button" onClick={() => setParameters({ seniorityBasis: "fixedDate" })}
+                      className={`rounded-md border-2 p-2.5 text-left text-sm transition-colors ${(parameters.seniorityBasis ?? "fixedDate") === "fixedDate" ? "border-primary bg-primary/5" : "hover:border-primary/40"}`}>
+                      <p className="font-medium">固定基準日</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">全體以同一基準日計算年資（曆年制常用，如統一設為 1/1）。</p>
+                    </button>
+                  </div>
+                  {(parameters.seniorityBasis ?? "fixedDate") === "fixedDate" && (
+                    <div className="pt-1">
+                      <Label className="text-xs">固定基準日</Label>
+                      <Input type="date" className="col-assumption" value={parameters.seniorityBaseDate}
+                        onChange={(e) => setParameters({ seniorityBaseDate: e.target.value })} />
+                      <p className="text-xs text-muted-foreground">通常設為當月 1 日或年度 1/1；系統以此日計算每位員工的年資與特休天數。</p>
+                    </div>
+                  )}
                 </div>
                 <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
                   已內建（115 年度）：最低工資 {ntd(parameters.minWageMonthly)} 元、勞就保 12.5%、健保

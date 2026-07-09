@@ -28,7 +28,7 @@ import { parseIpList } from "@/lib/attendance";
 import { saveBlob } from "@/lib/payslipPdf";
 import { parseBackup, summarizeBackup } from "@/lib/backup";
 import { csvSerialize } from "@/lib/csv";
-import { ntd } from "@/lib/utils";
+import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
 import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban, Sun, Moon, Monitor } from "lucide-react";
@@ -160,7 +160,10 @@ export function SettingsView() {
   const [paramDraft, setParamDraft] = useState<Parameters>(parameters);
   useEffect(() => setParamDraft(parameters), [parameters]);
   const efKind = (k: Field["kind"]): FieldSpec["kind"] => (k === "int" ? "number" : k);
-  const PARAM_SPECS: FieldSpec[] = [...COMPANY_FIELDS, ...LEGAL_GROUPS.flatMap((g) => g.fields)].map((f) => ({ key: f.key as string, label: f.label, kind: efKind(f.kind) }));
+  const PARAM_SPECS: FieldSpec[] = [
+    ...[...COMPANY_FIELDS, ...LEGAL_GROUPS.flatMap((g) => g.fields)].map((f) => ({ key: f.key as string, label: f.label, kind: efKind(f.kind) })),
+    { key: "seniorityBasis", label: "年資計算方式", kind: "select", format: (v) => (v === "hireDate" ? "依到職日" : "固定基準日") },
+  ];
   const paramChanges = diffRecord(parameters as unknown as Record<string, unknown>, paramDraft as unknown as Record<string, unknown>, PARAM_SPECS);
   const applyParams = () => {
     const patch: Partial<Parameters> = {};
@@ -211,11 +214,26 @@ export function SettingsView() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">公司專屬設定</CardTitle>
-          <CardDescription>這兩項依貴公司情況填寫，與法規公告無關。</CardDescription>
+          <CardDescription>依貴公司情況填寫，與法規公告無關。年資計算方式：固定基準日＝全體同一日；依到職日＝各員依到職日算實際年資（週年制）。</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            {COMPANY_FIELDS.map((f) => renderField(f))}
+            {renderField(COMPANY_FIELDS[0]) /* 職災費率 */}
+            {(paramDraft.seniorityBasis ?? "fixedDate") === "fixedDate" && renderField(COMPANY_FIELDS[1]) /* 固定基準日 */}
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">年資／特休計算方式</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([["fixedDate", "固定基準日", "全體以同一基準日計算年資（曆年制常用，如統一設 1/1）。"], ["hireDate", "依到職日（週年制）", "每位員工依到職日算實際年資（算至當月），特休隨週年逐年增加。"]] as const).map(([val, title, desc]) => (
+                <button key={val} type="button" disabled={locked}
+                  onClick={() => setParamDraft((d) => ({ ...d, seniorityBasis: val }))}
+                  className={cn("rounded-md border-2 p-2.5 text-left text-sm transition-colors disabled:opacity-60",
+                    (paramDraft.seniorityBasis ?? "fixedDate") === val ? "border-primary bg-primary/5" : "hover:border-primary/40")}>
+                  <p className="font-medium">{title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{desc}</p>
+                </button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

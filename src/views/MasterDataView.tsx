@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePayrollStore, isPeriodLocked, auditRestorable, SCENARIO_LABEL } from "@/store/usePayrollStore";
 import type { Employee, SalaryStructure, Dependent, LeaveSegment, LeaveStatus, ChangeScenario, AuditEntry } from "@/lib/types";
-import { monthlySalaryTotal, lookupInsuredAmounts, seniorityMonths, formatSeniority, annualLeaveDays, isLeaveStatus } from "@/lib/calc";
+import { monthlySalaryTotal, lookupInsuredAmounts, seniorityMonths, seniorityRefDate, formatSeniority, annualLeaveDays, isLeaveStatus } from "@/lib/calc";
 import { saveBlob } from "@/lib/payslipPdf";
 import { csvSerialize } from "@/lib/csv";
 import { parseEmployeeCsv, IMPORT_COLUMNS, type ImportPreview } from "@/lib/import/employeeCsv";
@@ -320,7 +320,7 @@ export function MasterDataView() {
   const empRows: EmpRow[] = employees.map((emp) => {
     const s = salaries.find((x) => x.employeeId === emp.id) ?? blankSalary(emp.id);
     const total = monthlySalaryTotal(s);
-    const months = seniorityMonths(emp.hireDate, parameters.seniorityBaseDate);
+    const months = seniorityMonths(emp.hireDate, seniorityRefDate(parameters.seniorityBasis, parameters.seniorityBaseDate, currentPeriod));
     return {
       emp, total, months, leaveDays: annualLeaveDays(months),
       hd: dependents.filter((d) => d.employeeId === emp.id && d.enrolledInHealthInsurance).length,

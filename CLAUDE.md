@@ -98,7 +98,7 @@ src/
     ├── ProjectsView   專案之家（主檔+工時分攤+成本/EAC）
     └── MasterDataView(情境化申請單：員工清單/批次薪資/異動紀錄三分頁＋員工檔案面板挑情境→聚焦表單＋原因→applyChangeTicket；
         批次薪資＝BatchSalaryPanel 族群選擇→調整既有%/定額·新增津貼·區間補貼→預覽→即時套用/排程)/AttendanceView/
-        SettingsView(公司分頁含 LeavePolicyCard 非在職給薪比例＋SalaryDefaultsCard 新進預設)/
+        SettingsView(公司分頁含 年資計算方式〔seniorityBasis：fixedDate 固定基準日／hireDate 依到職日算至當月，僅影響年資/特休顯示、TC-9 不變〕＋LeavePolicyCard＋SalaryDefaultsCard 新進預設)/
         SetupWizard(五步：歡迎/公司設定/薪資結構預設〔伙食津貼預帶 3000→salaryDefaults，空白模式快速新增即帶入〕/員工資料/完成)/HelpView/SourcesView
 ```
 
