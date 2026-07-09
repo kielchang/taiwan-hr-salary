@@ -60,6 +60,27 @@ export const 設計Tokens: S = {
       </section>
 
       <section>
+        <p className={SECTION}>欄位用色（可編輯 vs 唯讀，單一語意）</p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          舊 Excel 三色（橘輸入/黃假設/藍公式）已收斂為一種訊號：<strong>可編輯欄位＝淡冷底＋清楚邊框</strong>
+          （<code>col-input</code>，<code>col-assumption</code> 為同款別名、呼叫點不動），刻意與暖色狀態語意及琥珀「已變更」
+          <code>--edit</code> 區隔；<strong>唯讀/計算值</strong>直接顯示純文字（<code>col-formula</code> muted 保留為顯性唯讀底）。
+          深淺色各一份 token（<code>--col-*</code>／<code>--field-border</code>，見 <code>index.css</code>）。
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <span className="col-input inline-flex h-9 w-full items-center rounded-md border px-2 text-sm">可編輯欄位（col-input／col-assumption）</span>
+          </div>
+          <div>
+            <span className="border-edit bg-edit-bg text-edit-foreground inline-flex h-9 w-full items-center rounded-md border px-2 text-sm">已變更未送出（--edit）</span>
+          </div>
+          <div>
+            <span className="col-formula inline-flex h-9 w-full items-center rounded-md px-2 text-sm">唯讀/計算值（col-formula）</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
         <p className={SECTION}>圖表類別色票（PALETTE，8 色，Gem）</p>
         <p className="mb-2 text-xs text-muted-foreground">
           與其餘 token 同源：<code>--chart-1..8</code>／<code>--chart-axis/grid/text</code>（<code>index.css</code>）。

@@ -212,8 +212,8 @@ export function SettingsView() {
         <div>
           <h1 className="flex items-center gap-2 text-lg font-bold">系統設定 <HelpHint id="settings" /></h1>
           <p className="text-sm text-muted-foreground">
-            黃色欄位是「貴公司自己的設定」；白色欄位是政府公告的法定值，已內建 115 年度資料，
-            通常每年 1 月依新公告更新一次即可。
+            有淡底＋外框的欄位都可以點擊修改。「法定參數」分頁是政府公告的法定值（已內建 115 年度資料，
+            通常每年 1 月依新公告更新一次即可）；「公司」分頁才是貴公司自己的專屬設定。
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => navigate("/setup")}>

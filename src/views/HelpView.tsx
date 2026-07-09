@@ -172,9 +172,9 @@ export function HelpView() {
           <CardTitle className="text-base">畫面慣例</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p><span className="mr-2 inline-block size-3 rounded-sm bg-col-input align-middle ring-1 ring-warning/30" />橘色欄位＝需要您輸入或可修改的地方。</p>
-          <p><span className="mr-2 inline-block size-3 rounded-sm bg-col-assumption align-middle ring-1 ring-warning/20" />黃色欄位＝貴公司專屬的設定（與法規公告無關）。</p>
-          <p>其餘數字都由系統自動計算，不需要也無法直接修改。</p>
+          <p><span className="col-input mr-2 inline-block size-4 rounded-sm border align-middle" />有<strong className="text-foreground">淡底＋外框</strong>的欄位＝可以<strong className="text-foreground">輸入或修改</strong>的地方（含公司自訂的設定）。</p>
+          <p><span className="mr-2 inline-block size-4 rounded-sm border border-edit bg-edit-bg align-middle" />欄位變成<strong className="text-foreground">琥珀色</strong>＝這格<strong className="text-foreground">已被你改動、尚未送出</strong>（送出前可還原）。</p>
+          <p>其餘直接顯示的數字＝<strong className="text-foreground">系統自動計算</strong>，不需要也無法直接修改。</p>
           <p>金額一律四捨五入到「元」。勞健保費與官方繳款單可能有正負 1 元的尾差，屬正常現象，請以繳款單為繳費依據。</p>
         </CardContent>
       </Card>

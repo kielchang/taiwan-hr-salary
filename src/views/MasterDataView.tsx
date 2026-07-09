@@ -566,7 +566,7 @@ export function MasterDataView() {
               {/* 異動原因（申請單）＋變更摘要＋送出 */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium">異動原因 *</label>
-                <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={isNew ? "例：新進到職報到" : "例：年度調薪／自請離職／更新聯絡資料"} />
+                <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={isNew ? "例：新進到職報到" : "例：年度調薪／自請離職／更新聯絡資料"} className="col-input" />
               </div>
               {!isNew && (
                 <div className="space-y-1">

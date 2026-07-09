@@ -46,6 +46,7 @@ storage undefined 時先想到這裡，不要改測試本身。
    UI 需預攔提示「先取消確認」。**不要**改回「編輯自動解除確認」的舊行為。
    `unconfirmPeriod` 會同步刪該期快照；重新確認時 `ReviewView.doConfirm` 重建。
 4. **比率顯示＝百分比**（使用者拍板）：compa-ratio／市場 compa 顯示 105% 不是 1.05（`ratioPct`）；百分比用 `pctOf`；金額 `ntd`。
+   **欄位用色＝「可編輯 vs 唯讀」單一語意**（使用者拍板，2026-07 收斂舊 Excel 三色）：可編輯欄位一律 `.col-input`（＝`.col-assumption` 同款：淡冷底＋`--field-border` 邊框，改一次全站同步於 `index.css`）；唯讀/計算值＝純文字或 `.col-formula` muted。**不要**再用暖橘（輸入）/暖黃（假設）/藍（公式）三分法——那是 Excel 儲存格慣例、對網頁表單語意不成立。暖色琥珀 `--edit` 專屬「已改動未送出」；狀態語意走 `success/warning/info/danger`。改欄位色屬元件庫視覺（鐵律 10）：bump `UI_KIT`＋補 `docs/ui-kit/CHANGELOG.md`。
 5. **表格一律用 `DataTable`**（`src/components/ui/data-table.tsx`）：欄位設定驅動，內建關鍵字搜尋/**單欄篩選（文字包含·數值範圍）**/
    排序/**十字對準 highlight**/門檻分頁（每頁 5/15/30/50，預設 15）/合計/凍結首欄/空狀態/CSV。圖表卡用 `ChartCard`。
    不要退回手刻 `<Table>`（僅可編輯參數格例外）。
