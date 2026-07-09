@@ -55,19 +55,30 @@ const COMPANY_FIELDS: Field[] = [
 ];
 
 /** 月/日選擇器（每年重複的基準日；值＝"MM-DD"，相容舊的完整日期）。 */
+// 固定基準日每月的可選天數：不設年（每年重複的月/日），故 2 月一律上限 28
+// （避免選到 2/29 在平年失效／年資基準跳月）；小月 30、大月 31。
+function daysInFixedMonth(m: number): number {
+  if (m === 2) return 28;
+  return [4, 6, 9, 11].includes(m) ? 30 : 31;
+}
+
 export function MmddPicker({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
   const mmdd = value && value.length >= 8 ? value.slice(-5) : value; // 相容 "YYYY-MM-DD"
   const [mm, dd] = /^\d{2}-\d{2}$/.test(mmdd) ? mmdd.split("-") : ["01", "01"];
   const pad = (n: number) => String(n).padStart(2, "0");
+  const maxDay = daysInFixedMonth(Number(mm));
+  const ddClamped = pad(Math.min(Number(dd) || 1, maxDay)); // 顯示恆為當月合法日，避免舊值超月變空白
+  // 切換月份時，若原本的「日」超過該月天數（如 3/31 → 改 2 月），自動夾到當月上限。
+  const onMonth = (m: string) => onChange(`${m}-${pad(Math.min(Number(dd) || 1, daysInFixedMonth(Number(m))))}`);
   return (
     <div className="flex items-center gap-2">
-      <Select value={mm} disabled={disabled} onValueChange={(m) => onChange(`${m}-${dd}`)}>
+      <Select value={mm} disabled={disabled} onValueChange={onMonth}>
         <SelectTrigger className="col-assumption h-9 w-24"><SelectValue /></SelectTrigger>
         <SelectContent>{Array.from({ length: 12 }, (_, i) => pad(i + 1)).map((m) => <SelectItem key={m} value={m}>{Number(m)} 月</SelectItem>)}</SelectContent>
       </Select>
-      <Select value={dd} disabled={disabled} onValueChange={(d) => onChange(`${mm}-${d}`)}>
+      <Select value={ddClamped} disabled={disabled} onValueChange={(d) => onChange(`${mm}-${d}`)}>
         <SelectTrigger className="col-assumption h-9 w-24"><SelectValue /></SelectTrigger>
-        <SelectContent>{Array.from({ length: 31 }, (_, i) => pad(i + 1)).map((d) => <SelectItem key={d} value={d}>{Number(d)} 日</SelectItem>)}</SelectContent>
+        <SelectContent>{Array.from({ length: maxDay }, (_, i) => pad(i + 1)).map((d) => <SelectItem key={d} value={d}>{Number(d)} 日</SelectItem>)}</SelectContent>
       </Select>
     </div>
   );
