@@ -76,7 +76,7 @@ const DEMO = buildDemoCompany();
 // 僅路徑不同），localStorage 依 origin 共用；若不分鍵，在 /dev 動資料會污染正式站與 /stage。
 // 正式站保留原鍵（不改＝既有使用者資料不流失）；stage/dev 各自加後綴，資料互不干擾。
 export const STORAGE_KEY = `taiwan-hr-salary:v1${APP_ENV === "stage" ? ":stage" : APP_ENV === "dev" ? ":dev" : ""}`;
-export const STORE_VERSION = 2; // 資料結構版本（v2：新增專案主檔與工時分攤）
+export const STORE_VERSION = 3; // 資料結構版本（v2：專案主檔＋工時分攤；v3：留停/停職/暫離改多段 leaveRecords）
 
 const DEFAULT_ATTENDANCE: AttendanceConfig = {
   companyLat: null,
@@ -811,7 +811,9 @@ export const usePayrollStore = create<PayrollState>()(
     {
       name: STORAGE_KEY,
       version: STORE_VERSION,
-      // 版本升級轉換點。v1→v2：由 employees[].project 自由字串合成專案主檔（避免漏算）。
+      // 版本升級轉換點。
+      // v1→v2：由 employees[].project 自由字串合成專案主檔（避免漏算）。
+      // v2→v3：把舊單段留停/停職/暫離（status+leaveDate+returnDate+leavePaidRatio）轉成 leaveRecords 陣列。
       migrate: (persisted) => {
         const st = (persisted ?? {}) as Partial<PayrollState>;
         if (!st.projects && Array.isArray(st.employees)) {
@@ -821,6 +823,16 @@ export const usePayrollStore = create<PayrollState>()(
             startDate: "", endDate: "", status: "進行中" as const,
           }));
           st.allocations = st.allocations ?? [];
+        }
+        if (Array.isArray(st.employees)) {
+          const LEAVE = ["留停", "停職", "暫離"];
+          st.employees = st.employees.map((e) => {
+            if (e.leaveRecords && e.leaveRecords.length) return e; // 已是新模型
+            if (e.status && LEAVE.includes(e.status) && e.leaveDate) {
+              return { ...e, leaveRecords: [{ status: e.status as "留停" | "停職" | "暫離", from: e.leaveDate, to: e.returnDate ?? null, paidRatio: e.leavePaidRatio ?? null }] };
+            }
+            return e;
+          });
         }
         return st as PayrollState;
       },

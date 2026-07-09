@@ -13,7 +13,7 @@ import { round } from "@/lib/rounding";
 import { lookupInsuredAmounts, type InsuredAmounts } from "./brackets";
 import { dependentStats, type DependentStats } from "./dependents";
 import { seniorityMonths, annualLeaveDays } from "./seniority";
-import { monthlySalaryTotal, overtimePay, leaveDeduction, payFactor, employmentDaysFactor, effectiveLeaveRatio } from "./wage";
+import { monthlySalaryTotal, overtimePay, leaveDeduction, payFactor, employmentDaysFactor, leaveSegments } from "./wage";
 
 /** 破月給薪比例預設政策（無給）；呼叫端未提供 leavePolicy 時採用 */
 const DEFAULT_LEAVE_POLICY: LeavePolicy = { 留停: 0, 停職: 0, 暫離: 0 };
@@ -73,9 +73,10 @@ export function calculatePayroll(
 
   // 破月：僅當提供 period 且非全月在職時 factor<1；factor===1 短路保持與原本逐位元相同
   // 固定薪資依 payFactor（含請假區間給薪比例）；勞保費另依在職天數（employmentDaysFactor）。
-  const leaveRatio = effectiveLeaveRatio(employee, opts?.leavePolicy ?? DEFAULT_LEAVE_POLICY);
+  const policy = opts?.leavePolicy ?? DEFAULT_LEAVE_POLICY;
+  const termination = employee.status === "離職" ? (employee.leaveDate ?? null) : null;
   const factor = opts?.period
-    ? payFactor(opts.period, employee.hireDate, employee.leaveDate ?? null, employee.status, employee.returnDate ?? null, leaveRatio)
+    ? payFactor(opts.period, employee.hireDate, termination, leaveSegments(employee), policy)
     : 1;
   const empFactor = opts?.period
     ? employmentDaysFactor(opts.period, employee.hireDate, employee.leaveDate ?? null, employee.status)

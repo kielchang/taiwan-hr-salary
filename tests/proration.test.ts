@@ -9,30 +9,44 @@ const emp = SEED_EMPLOYEES[0]; // E001 全月在職
 const sal = SEED_SALARIES.find((s) => s.employeeId === emp.id)!;
 const ev = SEED_EVENTS.find((e) => e.employeeId === emp.id)!;
 
-describe("payFactor 破月（生效日＋復職日＋給薪比例）", () => {
+const POL = { 留停: 0, 停職: 0, 暫離: 0 } as const;
+const seg = (from: string, to: string | null, paidRatio: number, status: "留停" | "停職" | "暫離" = "留停") => ({ status, from, to, paidRatio });
+
+describe("payFactor 破月（多段生效日＋復職日＋給薪比例）", () => {
   it("全月在職 → 1", () => {
-    expect(payFactor("2026-03", "2020-01-01", null)).toBe(1);
+    expect(payFactor("2026-03", "2020-01-01", null, [], POL)).toBe(1);
   });
   it("月中到職（3/16，31 天）→ 16/31", () => {
-    expect(payFactor("2026-03", "2026-03-16", null)).toBeCloseTo(16 / 31, 6);
+    expect(payFactor("2026-03", "2026-03-16", null, [], POL)).toBeCloseTo(16 / 31, 6);
   });
   it("月中離職（3/10，離職日 inclusive）→ 10/31", () => {
-    expect(payFactor("2026-03", "2020-01-01", "2026-03-10", "離職")).toBeCloseTo(10 / 31, 6);
+    expect(payFactor("2026-03", "2020-01-01", "2026-03-10", [], POL)).toBeCloseTo(10 / 31, 6);
   });
   it("當月尚未到職 → 0", () => {
-    expect(payFactor("2026-03", "2026-05-01", null)).toBe(0);
+    expect(payFactor("2026-03", "2026-05-01", null, [], POL)).toBe(0);
   });
   it("留停 20 號生效、無給 → 付 1–19 日＝19/31", () => {
-    expect(payFactor("2026-03", "2020-01-01", "2026-03-20", "留停", null, 0)).toBeCloseTo(19 / 31, 6);
+    expect(payFactor("2026-03", "2020-01-01", null, [seg("2026-03-20", null, 0)], POL)).toBeCloseTo(19 / 31, 6);
   });
   it("停職 16 號生效、半薪 → 15 日全薪＋16 日半薪＝23/31", () => {
-    expect(payFactor("2026-03", "2020-01-01", "2026-03-16", "停職", null, 0.5)).toBeCloseTo(23 / 31, 6);
+    expect(payFactor("2026-03", "2020-01-01", null, [seg("2026-03-16", null, 0.5, "停職")], POL)).toBeCloseTo(23 / 31, 6);
   });
   it("留停含復職日（1 號留停、11 號復職、無給）→ 付 11–31 日＝21/31", () => {
-    expect(payFactor("2026-03", "2020-01-01", "2026-03-01", "留停", "2026-03-11", 0)).toBeCloseTo(21 / 31, 6);
+    expect(payFactor("2026-03", "2020-01-01", null, [seg("2026-03-01", "2026-03-11", 0)], POL)).toBeCloseTo(21 / 31, 6);
   });
   it("整月留停無給 → 0", () => {
-    expect(payFactor("2026-03", "2020-01-01", "2026-02-01", "留停", null, 0)).toBe(0);
+    expect(payFactor("2026-03", "2020-01-01", null, [seg("2026-02-01", null, 0)], POL)).toBe(0);
+  });
+  // B-1：多段
+  it("同月兩段留停無給（1–6、16–21）→ 付其餘 21/31", () => {
+    expect(payFactor("2026-03", "2020-01-01", null, [seg("2026-03-01", "2026-03-06", 0), seg("2026-03-16", "2026-03-21", 0)], POL)).toBeCloseTo(21 / 31, 6);
+  });
+  it("兩段不同比例（1–11 半薪、21– 無給）→ 10*0.5 + 10*1 + 11*0 = 15/31", () => {
+    // 1–10 半薪(10 天×0.5=5)、11–20 全薪(10)、21–31 無給(11×0)= 15
+    expect(payFactor("2026-03", "2020-01-01", null, [seg("2026-03-01", "2026-03-11", 0.5), seg("2026-03-21", null, 0)], POL)).toBeCloseTo(15 / 31, 6);
+  });
+  it("段落給薪比例空 → 採公司政策（停職政策 0.5）", () => {
+    expect(payFactor("2026-03", "2020-01-01", null, [{ status: "停職", from: "2026-03-16", to: null, paidRatio: null }], { 留停: 0, 停職: 0.5, 暫離: 0 })).toBeCloseTo(23 / 31, 6);
   });
 });
 

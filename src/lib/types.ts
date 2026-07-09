@@ -17,6 +17,14 @@ export type LeaveStatus = "留停" | "停職" | "暫離";
 /** 公司各非在職狀態之預設給薪比例（0＝無給、0.5＝半薪、1＝全薪）；員工可逐案覆寫 */
 export type LeavePolicy = Record<LeaveStatus, number>;
 
+/** 單段留停/停職/暫離區間（B-1：支援多段歷史）。同一員工可有多段（不重疊）。 */
+export interface LeaveSegment {
+  status: LeaveStatus; // 該段的非在職狀態
+  from: string; // 生效日(起) ISO yyyy-mm-dd
+  to: string | null; // 復職日 ISO；null＝尚未復職（開放段）
+  paidRatio?: number | null; // 逐案覆寫給薪比例（0/0.5/1）；空＝採公司該狀態預設（LeavePolicy）
+}
+
 /**
  * 員工主檔（README §3.2）
  * 注意：月薪資總額、投保級距、年資、特休、眷屬統計皆為「衍生值」，
@@ -38,9 +46,12 @@ export interface Employee {
   nationalId: string; // 身分證字號／居留證號（薪資條加密 PDF 之開啟密碼）
   email: string; // 員工 Email（薪資條 email 通知收件人）
   status?: EmployeeStatus; // 任職狀態（undefined＝在職）
-  leaveDate?: string | null; // 離職＝離職日；留停/停職/暫離＝生效日(起) ISO（破月與加退/停保清單用）
-  returnDate?: string | null; // 復職日／請假迄日 ISO（留停/停職/暫離用；空＝尚未復職）
-  leavePaidRatio?: number | null; // 逐案覆寫給薪比例（0/0.5/1）；空＝採公司該狀態預設（LeavePolicy）
+  leaveDate?: string | null; // 「離職」＝離職日 ISO（終態）。留停/停職/暫離改以 leaveRecords 記錄（見下）。
+  returnDate?: string | null; // （舊模型）復職日；leaveRecords 導入後留作相容回退，不再驅動 payroll。
+  leavePaidRatio?: number | null; // （舊模型）逐案給薪比例；同上，相容回退用。
+  /** B-1：留停/停職/暫離的完整多段歷史（含當前開放段）。有值時為 payroll/名冊/驗證的唯一來源；
+   *  空/未定義時回退到舊單段欄位（leaveDate/returnDate/leavePaidRatio），確保舊資料與 TC-9 不變。 */
+  leaveRecords?: LeaveSegment[];
   note?: string;
 }
 

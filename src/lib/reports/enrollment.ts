@@ -1,7 +1,7 @@
 // B4 加退保作業清單（純函數）：依生命週期日期，列出當期應辦加保/退保/停保/復保者。
+// B-1：停保/復保改掃描 leaveSegments（支援多段）——當期有段落「生效」＝停保、有段落「復職」＝復保。
 import type { Employee } from "@/lib/types";
-
-const LEAVE = ["留停", "停職", "暫離"];
+import { leaveSegments } from "@/lib/calc/wage";
 
 /** 該日期是否落在指定期間（yyyy-mm）月內 */
 function inPeriod(dateIso: string | null | undefined, period: string): boolean {
@@ -20,7 +20,7 @@ export function enrollmentWorklist(employees: Employee[], period: string): Enrol
   return {
     newHires: employees.filter((e) => inPeriod(e.hireDate, period)),
     leavers: employees.filter((e) => e.status === "離職" && inPeriod(e.leaveDate, period)),
-    suspends: employees.filter((e) => e.status != null && LEAVE.includes(e.status) && inPeriod(e.leaveDate, period)),
-    returns: employees.filter((e) => e.status != null && LEAVE.includes(e.status) && inPeriod(e.returnDate, period)),
+    suspends: employees.filter((e) => leaveSegments(e).some((s) => inPeriod(s.from, period))),
+    returns: employees.filter((e) => leaveSegments(e).some((s) => inPeriod(s.to, period))),
   };
 }

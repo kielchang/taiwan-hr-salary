@@ -29,7 +29,7 @@ import type {
   MonthlyEvent,
   Allocation,
 } from "@/lib/types";
-import { monthlySalaryTotal } from "./calc/wage";
+import { monthlySalaryTotal, isLeaveStatus, leaveSegments } from "./calc/wage";
 import { calculatePayroll } from "./calc";
 
 export type Severity = "error" | "warning";
@@ -134,18 +134,38 @@ export function checkNationalIds(employees: Employee[]): ValidationIssue[] {
   return issues;
 }
 
-/** V8 到離職日期一致性：離職/留停必填生效日（否則整月照發薪資）；生效日不得早於到職日 */
+/** V8 生命週期日期一致性（B-1：支援 leaveRecords 多段）：
+ *  離職＝終態需填離職日且不早於到職；留停/停職/暫離＝需有生效日/開放段（否則整月照發）；
+ *  各段生效日≥到職日、復職日≥生效日、段落不得重疊、至多一段開放（未復職）。 */
 export function checkLifecycleDates(employee: Employee): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const err = (message: string) => issues.push({ rule: "V8" as const, severity: "error" as const, employeeId: employee.id, message });
   const status = employee.status ?? "在職";
-  if (status !== "在職" && !employee.leaveDate) {
-    issues.push({ rule: "V8", severity: "error", employeeId: employee.id, message: `${employee.name}：狀態為「${status}」但未填生效日 — 系統將視為全月在職照發薪資，請補填` });
+
+  // 離職：終態，需離職日且不早於到職日
+  if (status === "離職") {
+    if (!employee.leaveDate) err(`${employee.name}：狀態為「離職」但未填離職日 — 系統將視為全月在職照發薪資，請補填`);
+    else if (employee.hireDate && employee.leaveDate < employee.hireDate) err(`${employee.name}：離職日（${employee.leaveDate}）早於到職日（${employee.hireDate}）`);
+    return issues;
   }
-  if (employee.leaveDate && employee.hireDate && employee.leaveDate < employee.hireDate) {
-    issues.push({ rule: "V8", severity: "error", employeeId: employee.id, message: `${employee.name}：離職／留停生效日（${employee.leaveDate}）早於到職日（${employee.hireDate}）` });
+
+  const segs = leaveSegments(employee);
+  // 留停/停職/暫離：需有段落（leaveRecords 或舊單段回退）
+  if (isLeaveStatus(status) && segs.length === 0) {
+    err(`${employee.name}：狀態為「${status}」但未填生效日 — 系統將視為全月在職照發薪資，請補填`);
   }
-  if (employee.returnDate && employee.leaveDate && employee.returnDate < employee.leaveDate) {
-    issues.push({ rule: "V8", severity: "error", employeeId: employee.id, message: `${employee.name}：復職日（${employee.returnDate}）早於生效日（${employee.leaveDate}）` });
+  // 逐段檢查：生效日≥到職日、復職日≥生效日
+  for (const s of segs) {
+    if (employee.hireDate && s.from < employee.hireDate) err(`${employee.name}：${s.status}生效日（${s.from}）早於到職日（${employee.hireDate}）`);
+    if (s.to && s.to < s.from) err(`${employee.name}：${s.status}復職日（${s.to}）早於生效日（${s.from}）`);
+  }
+  // 至多一段開放（尚未復職）
+  if (segs.filter((s) => !s.to).length > 1) err(`${employee.name}：有多段「尚未復職」的留停/停職/暫離，請先補填先前段落的復職日`);
+  // 段落不得重疊（依生效日排序，後段生效日須 ≥ 前段復職日）
+  const sorted = [...segs].filter((s) => s.from).sort((a, b) => a.from.localeCompare(b.from));
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    if (!prev.to || sorted[i].from < prev.to) err(`${employee.name}：留停/停職/暫離段落重疊（${prev.from} 起 與 ${sorted[i].from} 起），請檢查`);
   }
   return issues;
 }

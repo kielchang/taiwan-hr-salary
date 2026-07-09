@@ -17,7 +17,7 @@
 // ── 累計獎金自動化（ytdBonusBefore）
 //   由系統累加「本期之前同年度的 monthlyBonus」取代人工記憶，直接餵二代健保 4× 門檻判斷。
 // ─────────────────────────────────────────────────────────────────────────
-import { calculatePayroll, type PayrollResult, isLeaveStatus, effectiveLeaveRatio } from "@/lib/calc";
+import { calculatePayroll, type PayrollResult, leaveSegments, segmentRatio } from "@/lib/calc";
 import { companySupplementary } from "@/lib/calc";
 import type { Employee, SalaryStructure, Dependent, MonthlyEvent, LeavePolicy } from "@/lib/types";
 import type { Parameters } from "@/config/parameters";
@@ -36,12 +36,21 @@ export function isActiveInPeriod(emp: Employee, period: string, leavePolicy: Lea
   const monthStart = new Date(y, m - 1, 1);
   if (emp.hireDate && new Date(emp.hireDate) > monthEnd) return false; // 尚未到職
   if (emp.status === "離職" && emp.leaveDate && new Date(emp.leaveDate) < monthStart) return false; // 期前已離職
-  if (isLeaveStatus(emp.status)) {
-    const ratio = effectiveLeaveRatio(emp, leavePolicy);
-    const start = emp.leaveDate ? new Date(emp.leaveDate) : monthStart;
-    const ret = emp.returnDate ? new Date(emp.returnDate) : null;
-    const coversWholeMonth = start <= monthStart && (!ret || ret > monthEnd);
-    if (ratio === 0 && coversWholeMonth) return false; // 整月無給休假 → 不列入計薪
+  // 整月被「無給(ratio 0)」的留停/停職/暫離段完整覆蓋 → 不列入計薪（B-1：逐日檢查，支援多段）。
+  const segs = leaveSegments(emp).map((s) => ({
+    from: new Date(s.from).getTime(),
+    to: s.to ? new Date(s.to).getTime() : Infinity,
+    ratio: segmentRatio(s, leavePolicy),
+  }));
+  if (segs.length) {
+    const total = monthEnd.getDate();
+    let allZeroCovered = true;
+    for (let d = 1; d <= total; d++) {
+      const t = new Date(y, m - 1, d).getTime();
+      const seg = segs.find((s) => t >= s.from && t < s.to);
+      if (!seg || seg.ratio !== 0) { allZeroCovered = false; break; }
+    }
+    if (allZeroCovered) return false;
   }
   return true;
 }
