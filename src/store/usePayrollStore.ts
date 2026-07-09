@@ -85,7 +85,39 @@ const DEMO = buildDemoCompany();
 // 僅路徑不同），localStorage 依 origin 共用；若不分鍵，在 /dev 動資料會污染正式站與 /stage。
 // 正式站保留原鍵（不改＝既有使用者資料不流失）；stage/dev 各自加後綴，資料互不干擾。
 export const STORAGE_KEY = `taiwan-hr-salary:v1${APP_ENV === "stage" ? ":stage" : APP_ENV === "dev" ? ":dev" : ""}`;
-export const STORE_VERSION = 3; // 資料結構版本（v2：專案主檔＋工時分攤；v3：留停/停職/暫離改多段 leaveRecords）
+export const STORE_VERSION = 4; // v2：專案主檔＋工時分攤；v3：多段 leaveRecords；v4：法定參數/級距生效月版本化
+
+// ── 設定生效月版本化（P2 治本）──────────────────────────────────────────
+// parameters/brackets 改為「依生效年月版本」；各期取「effectiveFrom ≤ period 的最後一個版本」。
+// 計算核心簽章不動（吃已解析值），解析在 selectors/呼叫端；TC-9 直接用 DEFAULT_* 不受影響。
+export const SETTINGS_BASE_PERIOD = "0000-01"; // 遷移哨兵：早於任何真實期別，使單一舊版本涵蓋所有歷史月
+export interface SettingVersion<T> { effectiveFrom: string; value: T }
+
+/** 解析某期生效的版本值：取 effectiveFrom ≤ period 的最後一個；period 早於最早版本→回最早；空→fallback。永不 undefined。 */
+export function resolveSettingVersion<T>(versions: SettingVersion<T>[] | undefined, period: string, fallback: T): T {
+  if (!versions || versions.length === 0) return fallback;
+  const sorted = [...versions].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  let chosen = sorted[0].value;
+  for (const v of sorted) { if (v.effectiveFrom <= period) chosen = v.value; else break; }
+  return chosen;
+}
+/** 最新版本值（最大 effectiveFrom）；供「編輯/模擬/顯示最新」與相容 mirror。 */
+export function latestSettingVersion<T>(versions: SettingVersion<T>[] | undefined, fallback: T): T {
+  if (!versions || versions.length === 0) return fallback;
+  return [...versions].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))[versions.length - 1].value;
+}
+/** 對版本清單套用「patch 到最新版本」；回傳新清單（不動其他版本）。 */
+function patchLatestVersion<T>(versions: SettingVersion<T>[], patch: Partial<T>): SettingVersion<T>[] {
+  const sorted = [...versions].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  const lastIdx = sorted.length - 1;
+  sorted[lastIdx] = { ...sorted[lastIdx], value: { ...sorted[lastIdx].value, ...patch } };
+  return sorted;
+}
+/** 插入或取代同 effectiveFrom 的版本，回傳升冪清單。 */
+function upsertVersion<T>(versions: SettingVersion<T>[], effectiveFrom: string, value: T): SettingVersion<T>[] {
+  const rest = versions.filter((v) => v.effectiveFrom !== effectiveFrom);
+  return [...rest, { effectiveFrom, value }].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+}
 
 /**
  * B-1 遷移（v2→v3）：把舊單段留停/停職/暫離（status＋leaveDate＋returnDate＋leavePaidRatio）
@@ -213,9 +245,13 @@ interface PayrollState {
   confirmPeriod: (period: string) => void;
   unconfirmPeriod: (period: string) => void;
 
-  // 設定
-  setParameters: (patch: Partial<Parameters>) => void;
+  // 設定（生效月版本化；上方 parameters/brackets 為「最新版本」相容 mirror，源頭＝*Versions）
+  parameterVersions: SettingVersion<Parameters>[];
+  bracketVersions: SettingVersion<InsuranceBrackets>[];
+  setParameters: (patch: Partial<Parameters>) => void; // 改「最新版本」
   setBrackets: (patch: Partial<InsuranceBrackets>) => void;
+  addParameterVersion: (effectiveFrom: string, value: Parameters) => void; // 新增生效版本
+  addBracketVersion: (effectiveFrom: string, value: InsuranceBrackets) => void;
   setCurrentPeriod: (period: string) => void;
 
   // 員工主檔
@@ -365,6 +401,8 @@ export const usePayrollStore = create<PayrollState>()(
     (set, get) => ({
       parameters: DEFAULT_PARAMETERS,
       brackets: DEFAULT_BRACKETS,
+      parameterVersions: [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: DEFAULT_PARAMETERS }],
+      bracketVersions: [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: DEFAULT_BRACKETS }],
       employees: DEMO.employees,
       salaries: DEMO.salaries,
       dependents: DEMO.dependents,
@@ -752,8 +790,10 @@ export const usePayrollStore = create<PayrollState>()(
       setParameters: (patch) =>
         set((st) => {
           if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          const parameterVersions = patchLatestVersion(st.parameterVersions, patch);
           return {
-            parameters: { ...st.parameters, ...patch },
+            parameterVersions,
+            parameters: latestSettingVersion(parameterVersions, DEFAULT_PARAMETERS), // 相容 mirror
             auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
               `更新法定/公司參數：${Object.keys(patch).join("、")}`)),
           };
@@ -761,10 +801,32 @@ export const usePayrollStore = create<PayrollState>()(
       setBrackets: (patch) =>
         set((st) => {
           if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st; // 硬鎖定：當期已確認
+          const bracketVersions = patchLatestVersion(st.bracketVersions, patch);
           return {
-            brackets: { ...st.brackets, ...patch },
+            bracketVersions,
+            brackets: latestSettingVersion(bracketVersions, DEFAULT_BRACKETS),
             auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter",
               `更新投保級距表：${Object.keys(patch).join("、")}`)),
+          };
+        }),
+      addParameterVersion: (effectiveFrom, value) =>
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st;
+          const parameterVersions = upsertVersion(st.parameterVersions, effectiveFrom, value);
+          return {
+            parameterVersions,
+            parameters: latestSettingVersion(parameterVersions, DEFAULT_PARAMETERS),
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter", `新增法定參數生效版本（自 ${effectiveFrom}）`)),
+          };
+        }),
+      addBracketVersion: (effectiveFrom, value) =>
+        set((st) => {
+          if (isPeriodLocked(st.confirmations, st.currentPeriod)) return st;
+          const bracketVersions = upsertVersion(st.bracketVersions, effectiveFrom, value);
+          return {
+            bracketVersions,
+            brackets: latestSettingVersion(bracketVersions, DEFAULT_BRACKETS),
+            auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "parameter", `新增投保級距生效版本（自 ${effectiveFrom}）`)),
           };
         }),
       setCurrentPeriod: (period) => set({ currentPeriod: period }),
@@ -1030,6 +1092,8 @@ export const usePayrollStore = create<PayrollState>()(
         set({
           parameters: DEFAULT_PARAMETERS,
           brackets: DEFAULT_BRACKETS,
+          parameterVersions: [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: DEFAULT_PARAMETERS }],
+          bracketVersions: [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: DEFAULT_BRACKETS }],
           employees: demo.employees,
           salaries: demo.salaries,
           dependents: demo.dependents,
@@ -1071,9 +1135,14 @@ export const usePayrollStore = create<PayrollState>()(
       importAll: (env) =>
         set((st) => {
           const s = (env?.state ?? {}) as Partial<PayrollState>;
+          // 相容 v3 備份（無 *Versions）：由單一 parameters/brackets 建一個哨兵版本
+          const pVers = s.parameterVersions ?? (s.parameters ? [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: { ...st.parameters, ...s.parameters } }] : st.parameterVersions);
+          const bVers = s.bracketVersions ?? (s.brackets ? [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: s.brackets }] : st.bracketVersions);
           return {
-            parameters: { ...st.parameters, ...(s.parameters ?? {}) },
-            brackets: s.brackets ?? st.brackets,
+            parameterVersions: pVers,
+            bracketVersions: bVers,
+            parameters: latestSettingVersion(pVers, DEFAULT_PARAMETERS),
+            brackets: latestSettingVersion(bVers, DEFAULT_BRACKETS),
             employees: s.employees ?? st.employees,
             salaries: s.salaries ?? st.salaries,
             dependents: s.dependents ?? st.dependents,
@@ -1126,15 +1195,25 @@ export const usePayrollStore = create<PayrollState>()(
         if (Array.isArray(st.employees)) {
           st.employees = backfillLeaveRecords(st.employees); // v2→v3：舊單段 → leaveRecords
         }
+        // v3→v4：單一 parameters/brackets → 生效月版本清單（哨兵版本涵蓋所有歷史月＝行為逐位元不變）
+        const anySt = st as unknown as { parameterVersions?: unknown; bracketVersions?: unknown };
+        if (!anySt.parameterVersions && st.parameters) st.parameterVersions = [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: st.parameters }];
+        if (!anySt.bracketVersions && st.brackets) st.bracketVersions = [{ effectiveFrom: SETTINGS_BASE_PERIOD, value: st.brackets }];
         return st as PayrollState;
       },
       // 與預設深度合併，使舊版 localStorage 自動補上新增欄位（如彈性工時設定）
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<PayrollState>;
+        // 生效月版本化：源頭＝*Versions（migrate 已為舊資料補上）；parameters/brackets 為最新版本 mirror。
+        const parameterVersions = p.parameterVersions ?? current.parameterVersions;
+        const bracketVersions = p.bracketVersions ?? current.bracketVersions;
         return {
           ...current,
           ...p,
-          parameters: { ...current.parameters, ...(p.parameters ?? {}) },
+          parameterVersions,
+          bracketVersions,
+          parameters: latestSettingVersion(parameterVersions, current.parameters),
+          brackets: latestSettingVersion(bracketVersions, current.brackets),
           attendance: { ...current.attendance, ...(p.attendance ?? {}) },
           analytics: {
             ...current.analytics,
