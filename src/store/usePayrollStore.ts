@@ -52,6 +52,7 @@ import type {
   PayrollSnapshot,
   AuditEntry,
   AuditAction,
+  ChangeScenario,
   DeclaredInsured,
   Project,
   Allocation,
@@ -212,6 +213,10 @@ interface PayrollState {
   /** 以人為單位整批覆寫某員工之眷屬（基本資料編輯視窗用） */
   setEmployeeDependents: (employeeId: string, deps: Dependent[]) => void;
 
+  /** 情境化異動申請單：依情境套用主檔並**一律**留一筆帶 scenario/reason 的結構化稽核（可回復）。
+   *  硬鎖定守衛：計薪相關情境於當期已確認時 no-op（UI 預攔）；contact 免鎖。 */
+  applyChangeTicket: (t: ChangeTicketInput) => void;
+
   // 每月變動事件
   upsertEvent: (e: MonthlyEvent) => void;
   getEvent: (employeeId: string, period: string) => MonthlyEvent;
@@ -272,6 +277,35 @@ const EMP_PAY_FIELDS = [
 ] as const;
 const empPayFieldsChanged = (prev: Employee, next: Employee): boolean =>
   EMP_PAY_FIELDS.some((k) => (prev[k] ?? null) !== (next[k] ?? null));
+
+/** 情境化異動申請單輸入（applyChangeTicket）。傳更新後的完整記錄；view 另傳 summary/reason。 */
+export type ChangeTicketInput = {
+  scenario: ChangeScenario;
+  employeeId: string;
+  reason: string;
+  summary?: string; // 逐欄摘要文字（view 以 diffRecord 產生 before→after）
+  employee?: Employee; // contact/withholding/terminate/leave/reinstate：更新後完整員工
+  salary?: SalaryStructure; // salary：更新後完整薪資
+  dependents?: Dependent[]; // dependents：更新後完整名冊
+  newEmployee?: Employee; // onboard：新員工
+  effectivePeriod?: string; // 生效期（人員異動用）
+};
+
+/** 情境中文標籤（異動紀錄 badge、稽核摘要共用）。 */
+export const SCENARIO_LABEL: Record<ChangeScenario, string> = {
+  onboard: "到職",
+  terminate: "離職",
+  leave: "留停/停職/暫離",
+  reinstate: "復職",
+  salary: "薪資結構調整",
+  dependents: "眷屬異動",
+  withholding: "扣繳設定",
+  contact: "基本聯絡資料",
+};
+
+/** 計薪相關情境（當期已確認時擋下）；contact 純聯絡資訊免鎖。 */
+const isPayScenario = (s: ChangeScenario): boolean => s !== "contact";
+const clampPensionRate = (r: number): number => Math.min(0.06, Math.max(0, r));
 
 const AUDIT_CAP = 1000;
 const newId = () =>
@@ -409,6 +443,12 @@ export const usePayrollStore = create<PayrollState>()(
             case "dependent": {
               const rec = entry.before as Dependent;
               return { dependents: st.dependents.map((d) => (d.id === rec.id ? rec : d)), auditLog };
+            }
+            case "dependents": {
+              // 整份眷屬名冊回復（情境化眷屬異動）：以 before 陣列整批取代該員名冊。
+              const recs = (entry.before as Dependent[]) ?? [];
+              const empId = entry.targetId ?? "";
+              return { dependents: [...st.dependents.filter((d) => d.employeeId !== empId), ...recs], auditLog };
             }
             case "event": {
               const rec = entry.before as MonthlyEvent;
@@ -719,6 +759,58 @@ export const usePayrollStore = create<PayrollState>()(
             auditLog: pushAudit(st.auditLog, makeAudit(st.operatorName, "dependent",
               `更新眷屬名冊 ${before.length} → ${deps.length} 名`, { targetId: employeeId })),
           };
+        }),
+
+      applyChangeTicket: (t) =>
+        set((st) => {
+          // 硬鎖定：計薪相關情境於當期已確認時 no-op（UI 預攔並提示先取消確認）；contact 免鎖。
+          if (isPayScenario(t.scenario) && isPeriodLocked(st.confirmations, st.currentPeriod)) return st;
+          const emp = st.employees.find((e) => e.id === t.employeeId);
+          const empName = t.newEmployee?.name ?? emp?.name ?? t.employeeId;
+          // 沿用既有 AuditAction：薪資→salary、眷屬→dependent、其餘員工類→employee。
+          const action: AuditAction = t.scenario === "salary" ? "salary" : t.scenario === "dependents" ? "dependent" : "employee";
+          const summary = [`${SCENARIO_LABEL[t.scenario]}・${empName}`, t.summary, t.reason ? `原因：${t.reason}` : ""].filter(Boolean).join("；");
+
+          let patch: Partial<PayrollState> = {};
+          let restore: Partial<AuditEntry> = {}; // 結構化 before/after（可回復）；插入類不附＝不可回復
+          switch (t.scenario) {
+            case "onboard": {
+              if (!t.newEmployee || st.employees.some((e) => e.id === t.newEmployee!.id)) return st; // 防重複員編
+              const ne = { ...t.newEmployee, voluntaryPensionRate: clampPensionRate(t.newEmployee.voluntaryPensionRate) };
+              patch = {
+                employees: [...st.employees, ne],
+                salaries: st.salaries.some((s) => s.employeeId === ne.id) ? st.salaries : [...st.salaries, t.salary ?? blankSalary(ne.id)],
+                dependents: t.dependents?.length ? [...st.dependents, ...t.dependents.map((d) => ({ ...d, employeeId: ne.id }))] : st.dependents,
+              };
+              break; // 到職＝插入，不可回復
+            }
+            case "salary": {
+              if (!t.salary) return st;
+              const prevSal = st.salaries.find((x) => x.employeeId === t.employeeId);
+              patch = { salaries: prevSal ? st.salaries.map((x) => (x.employeeId === t.employeeId ? t.salary! : x)) : [...st.salaries, t.salary] };
+              if (prevSal) restore = { restoreKind: "salary", before: prevSal, after: t.salary };
+              break;
+            }
+            case "dependents": {
+              const deps = (t.dependents ?? []).map((d) => ({ ...d, employeeId: t.employeeId }));
+              const beforeDeps = st.dependents.filter((d) => d.employeeId === t.employeeId);
+              patch = { dependents: [...st.dependents.filter((d) => d.employeeId !== t.employeeId), ...deps] };
+              restore = { restoreKind: "dependents", before: beforeDeps, after: deps };
+              break;
+            }
+            default: {
+              // contact / withholding / terminate / leave / reinstate → 更新員工
+              if (!t.employee || !emp) return st;
+              const ne = { ...t.employee, voluntaryPensionRate: clampPensionRate(t.employee.voluntaryPensionRate) };
+              patch = { employees: st.employees.map((e) => (e.id === ne.id ? ne : e)) };
+              restore = { restoreKind: "employee", before: emp, after: ne };
+              break;
+            }
+          }
+          const auditLog = pushAudit(st.auditLog, makeAudit(st.operatorName, action, summary, {
+            targetId: t.employeeId, period: t.effectivePeriod, scenario: t.scenario, reason: t.reason, ...restore,
+          }));
+          return { ...patch, auditLog };
         }),
 
       upsertEvent: (e) =>

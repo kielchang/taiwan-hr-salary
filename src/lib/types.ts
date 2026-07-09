@@ -287,8 +287,22 @@ export type AuditAction =
   | "allocation" // 工時分攤異動
   | "clear"; // 清空資料
 
-/** F6 可回復稽核的類別（僅逐欄編輯類；批次匯入/調薪核定/月結確認/清空不可回復）。 */
-export type AuditRestoreKind = "salary" | "employee" | "dependent" | "event";
+/** F6 可回復稽核的類別（僅逐欄編輯類；批次匯入/調薪核定/月結確認/清空不可回復）。
+ *  `dependents`＝整份眷屬名冊回復（供情境化眷屬異動；相對於單筆 `dependent`）。 */
+export type AuditRestoreKind = "salary" | "employee" | "dependent" | "dependents" | "event";
+
+/** 基本資料維護「情境」（申請單）：異動紀錄以此標記，供情境化清單與動線。
+ *  onboard 到職／terminate 離職／leave 留停·停職·暫離／reinstate 復職／
+ *  salary 薪資結構／dependents 眷屬異動／withholding 扣繳設定／contact 基本聯絡資料。 */
+export type ChangeScenario =
+  | "onboard"
+  | "terminate"
+  | "leave"
+  | "reinstate"
+  | "salary"
+  | "dependents"
+  | "withholding"
+  | "contact";
 
 export interface AuditEntry {
   id: string;
@@ -303,6 +317,9 @@ export interface AuditEntry {
   before?: unknown; // 變更前的完整記錄（還原目標）
   after?: unknown; // 變更後的完整記錄（僅供對照顯示）
   restoredFrom?: string; // 若此筆＝回復動作，記來源稽核 id（回復動作本身不可再回復）
+  // ── 情境化申請單：由 applyChangeTicket 產生的異動紀錄帶此兩欄（供「異動紀錄」清單透鏡與匯出）。
+  scenario?: ChangeScenario; // 異動情境
+  reason?: string; // 異動原因（申請單填寫）
 }
 
 /* ───────────── 調薪排程（核定於未來月份生效） ───────────── */
