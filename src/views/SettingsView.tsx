@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { SALARY_ITEMS, type SalaryNumKey } from "@/views/MasterDataView";
-import { BracketTableCards } from "@/components/BracketTableCards";
+import { BracketEditor } from "@/components/BracketEditor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -368,17 +368,17 @@ export function SettingsView() {
       <Card>
         <CardHeader className="cursor-pointer pb-3" onClick={() => setShowBrackets((s) => !s)}>
           <CardTitle className="flex items-center justify-between text-base">
-            投保級距表（115 年度，唯讀檢視）
+            投保級距表（檢視／編輯）
             {showBrackets ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
           </CardTitle>
           <CardDescription>
-            系統依「月薪資總額」自動查表決定四種投保金額，您不需要手動選擇級距：薪資落在某級區間即以該級金額投保，
-            介於兩級之間取較高一級，超過最高級則以最高級計（觸頂）。詳細說明與官方分級表連結見「法規依據」頁。
+            系統依「月薪資總額」自動查表決定四種投保金額（薪資落某級即以該級投保、介於兩級取較高、超最高級觸頂）。
+            年度基本工資調整時可在此更新級距：逐格編輯或 CSV 整表匯入；已有已確認月則以「新增生效版本」方式、不回溯改動已申報月。
           </CardDescription>
         </CardHeader>
         {showBrackets && (
           <CardContent>
-            <BracketTableCards brackets={brackets} />
+            <BracketEditor />
           </CardContent>
         )}
       </Card>
