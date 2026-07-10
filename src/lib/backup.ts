@@ -11,8 +11,14 @@ export interface BackupEnvelope {
   state: Record<string, unknown>;
 }
 
-/** 納入備份的資料切片鍵（只含資料、不含 actions/函數） */
+/** 納入備份的資料切片鍵（只含資料、不含 actions/函數）
+ *  ⚠ 新增 store 資料切片時務必同步加到這裡，否則備份/還原會靜默丟該切片
+ *  （曾漏 currencies/fxRates/fxPolicy 與 parameterVersions/bracketVersions 等 → 還原即資料遺失）。
+ *  importAll 讀取端須也能吃該鍵。tests/backup.test.ts 有 round-trip 斷言把關。 */
 export const BACKUP_KEYS = [
+  // 法定參數/級距：版本清單為源頭真值（生效月版本化），parameters/brackets 為最新版本 mirror
+  "parameterVersions",
+  "bracketVersions",
   "parameters",
   "brackets",
   "employees",
@@ -31,8 +37,15 @@ export const BACKUP_KEYS = [
   "declaredInsured",
   "projects",
   "allocations",
+  "scheduledRaises",
   "scheduledSalaryChanges",
   "subsidies",
+  "leavePolicy",
+  "salaryDefaults",
+  // 多幣別：幣別主檔／各期匯率／政策（先前漏存＝還原即丟外幣設定）
+  "currencies",
+  "fxRates",
+  "fxPolicy",
 ] as const;
 
 /** 由完整 store 狀態（含函數）挑出資料切片，包成信封 */

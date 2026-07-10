@@ -1083,7 +1083,7 @@ export function ProjectCostTab({ rows, period }: { rows: PayrollRow[]; period: s
 
 /* ───────── 趨勢與預算 ───────── */
 function TrendTab({ rows }: { rows: PayrollRow[] }) {
-  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameterVersions, bracketVersions, setPlanning, loadDemoData, employees, salaries, dependents } = usePayrollStore();
+  const { snapshots, saveSnapshot, removeSnapshot, currentPeriod, events, analytics, parameterVersions, bracketVersions, setPlanning, loadDemoData, employees, salaries, dependents, leavePolicy, subsidies, fxPolicy, fxRates } = usePayrollStore();
   const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
   const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
 
@@ -1112,8 +1112,11 @@ function TrendTab({ rows }: { rows: PayrollRow[] }) {
   // 年報：當年累計（實際，快照優先、缺則回推估算）＋模擬全年（YTD＋剩餘月 run-rate）
   const year = currentPeriod.slice(0, 4);
   const candidatePeriods = [...new Set(events.map((e) => e.period))];
+  // 逐期重算須「與 live 計薪路徑同款輸入」，否則估算月與已確認月不一致：
+  // 除逐期解析參數/級距外，也要帶 leavePolicy／subsidies／外幣（fxPolicy/fxRates），
+  // 讓破月、區間補貼、外幣台幣約當在重算月一致（比照 selectors.usePayrollRowsFor）。
   const recompute = (p: string) =>
-    buildSnapshot(buildPayrollRows(p, { employees, salaries, dependents, events, parameters: resolveSettingVersion(parameterVersions, p, DEFAULT_PARAMETERS), brackets: resolveSettingVersion(bracketVersions, p, DEFAULT_BRACKETS) }), p, events.filter((e) => e.period === p).reduce((a, e) => a + e.monthlyBonus, 0));
+    buildSnapshot(buildPayrollRows(p, { employees, salaries, dependents, events, parameters: resolveSettingVersion(parameterVersions, p, DEFAULT_PARAMETERS), brackets: resolveSettingVersion(bracketVersions, p, DEFAULT_BRACKETS), leavePolicy, subsidies, fxPolicy, fxRates }), p, events.filter((e) => e.period === p).reduce((a, e) => a + e.monthlyBonus, 0));
   const aMonths = annualMonths(year, currentPeriod, snapshots, candidatePeriods, recompute);
   const aTot = annualTotals(aMonths);
   const estimatedCount = aMonths.filter((m) => m.estimated).length;

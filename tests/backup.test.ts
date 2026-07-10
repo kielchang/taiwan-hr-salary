@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { serializeState, parseBackup, summarizeBackup, BACKUP_SCHEMA, BACKUP_KEYS } from "../src/lib/backup";
+import { usePayrollStore } from "../src/store/usePayrollStore";
 
 const VERSION = 1;
 
@@ -60,6 +61,67 @@ describe("parseBackup", () => {
   });
   it("缺員工資料 → 失敗", () => {
     expect(parseBackup(JSON.stringify({ schema: BACKUP_SCHEMA, schemaVersion: 1, exportedAt: "", state: {} }), VERSION).ok).toBe(false);
+  });
+});
+
+describe("BACKUP_KEYS 涵蓋關鍵切片（防再度漏存 → 還原即資料遺失）", () => {
+  it("必含多幣別、費率版本、排程/政策/預設等切片", () => {
+    const critical = [
+      "currencies", "fxRates", "fxPolicy",
+      "parameterVersions", "bracketVersions",
+      "scheduledRaises", "leavePolicy", "salaryDefaults",
+    ];
+    for (const k of critical) expect(BACKUP_KEYS).toContain(k);
+  });
+});
+
+describe("整檔備份 exportAll → importAll 逐切片存活（store 整合）", () => {
+  it("外幣設定＋費率版本＋排程/政策 匯出→清空→匯入後完整還原", () => {
+    const st = () => usePayrollStore.getState();
+    // 佈置一份含關鍵切片的狀態（含兩個生效月費率版本＝驗證版本史不被壓成單一哨兵）
+    const currencies = [{ code: "USD", name: "美金", symbol: "$", decimals: 2, enabled: true }];
+    const fxRates = { "2026-06": { USD: 32 }, "2026-07": { USD: 31.5 } };
+    const fxPolicy = { enabled: true, incomeTax: false, supplementary: true };
+    const parameterVersions = [
+      { effectiveFrom: "0000-01", value: { ...st().parameters } },
+      { effectiveFrom: "2026-07", value: { ...st().parameters, laborInsuranceRate: 0.13 } },
+    ];
+    const scheduledRaises = [{ id: "R1", employeeId: "E001", effectiveFrom: "2026-08", newBase: 50000 }];
+    const salaryDefaults = { standard: { mealAllowance: 3000 }, custom: [{ name: "交通", amount: 1200 }] };
+
+    usePayrollStore.setState({
+      currencies, fxRates, fxPolicy,
+      parameterVersions,
+      scheduledRaises,
+      salaryDefaults,
+    } as never);
+
+    const env = st().exportAll();
+    // 序列化端有帶上（先前 bug＝這裡整段是 undefined）
+    expect(env.state.currencies).toEqual(currencies);
+    expect(env.state.fxRates).toEqual(fxRates);
+    expect(env.state.fxPolicy).toEqual(fxPolicy);
+    expect((env.state.parameterVersions as unknown[]).length).toBe(2);
+    expect(env.state.scheduledRaises).toEqual(scheduledRaises);
+    expect(env.state.salaryDefaults).toEqual(salaryDefaults);
+
+    // 清空（模擬換機/清瀏覽器後的全新狀態）
+    usePayrollStore.setState({
+      currencies: [], fxRates: {}, fxPolicy: { enabled: false, incomeTax: false, supplementary: false },
+      parameterVersions: [{ effectiveFrom: "0000-01", value: { ...st().parameters } }],
+      scheduledRaises: [],
+    } as never);
+    expect(st().currencies).toEqual([]);
+
+    // 還原
+    st().importAll(env);
+    expect(st().currencies).toEqual(currencies);
+    expect(st().fxRates).toEqual(fxRates);
+    expect(st().fxPolicy.enabled).toBe(true);
+    expect(st().fxPolicy.supplementary).toBe(true);
+    expect(st().parameterVersions.length).toBe(2); // 版本史保留、未被壓成單一哨兵
+    expect(st().scheduledRaises).toEqual(scheduledRaises);
+    expect(st().salaryDefaults).toEqual(salaryDefaults);
   });
 });
 
