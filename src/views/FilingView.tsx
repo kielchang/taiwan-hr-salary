@@ -54,14 +54,16 @@ export function FilingView({ initialTab }: { initialTab?: FilingTab } = {}) {
 
 /* B1 年度扣繳憑單彙總 */
 function WithholdingTab() {
-  const { employees, salaries, dependents, events, parameters, brackets, parameterVersions, bracketVersions, currentPeriod } = usePayrollStore();
+  const { employees, salaries, dependents, events, parameters, brackets, parameterVersions, bracketVersions, currentPeriod, fxPolicy, fxRates } = usePayrollStore();
   const years = availableYears(events);
   const [year, setYear] = useState(years[0] ?? currentPeriod.slice(0, 4));
   // 扣繳憑單逐月依「該期生效版本」解析費率/級距 → 年中改率不回溯改動已申報月份
+  // 外幣：fxPolicy.incomeTax 開時，外幣視作獎金 → foreignTaxable 累計（獨立欄、不併入應稅/應發）
   const rows = yearlyWithholding(employees, salaries, dependents, events, parameters, brackets, year, {
     parametersFor: (p) => resolveSettingVersion(parameterVersions, p, parameters),
     bracketsFor: (p) => resolveSettingVersion(bracketVersions, p, brackets),
-  });
+  }, { fxPolicy, fxRates });
+  const showForeign = fxPolicy.enabled && fxPolicy.incomeTax;
   type R = (typeof rows)[number];
   const money = (key: string, header: string, get: (r: R) => number): Column<R> =>
     ({ key, header, numeric: true, sortValue: get, cell: (r) => ntd(get(r)), total: (rs) => ntd(rs.reduce((a, r) => a + get(r), 0)) });
@@ -73,6 +75,7 @@ function WithholdingTab() {
     money("bonus", "全年獎金", (r) => r.bonus),
     money("withheld", "全年代扣稅", (r) => r.withheld),
     money("supp", "補充保費", (r) => r.supplementary),
+    ...(showForeign ? [money("foreignTaxable", "外幣應稅(折台)", (r) => r.foreignTaxable)] : []),
   ];
   return (
     <Card className="print-block">
@@ -95,8 +98,8 @@ function WithholdingTab() {
             </Select>
           }
           csv={{
-            headers: ["員工編號", "姓名", "結算月數", "全年應發", "全年應稅(估)", "全年獎金", "全年代扣稅", "全年補充保費"],
-            row: (r) => [r.employeeId, r.name, r.months, r.gross, r.taxable, r.bonus, r.withheld, r.supplementary],
+            headers: ["員工編號", "姓名", "結算月數", "全年應發", "全年應稅(估)", "全年獎金", "全年代扣稅", "全年補充保費", ...(showForeign ? ["外幣應稅(折台)"] : [])],
+            row: (r) => [r.employeeId, r.name, r.months, r.gross, r.taxable, r.bonus, r.withheld, r.supplementary, ...(showForeign ? [r.foreignTaxable] : [])],
             fileName: `年度扣繳彙總_${year}.csv`,
           }}
           empty={{ title: "該年度尚無結算資料", hint: "選擇其他年度，或先在「每月薪資作業」完成至少一個月的結算。" }}

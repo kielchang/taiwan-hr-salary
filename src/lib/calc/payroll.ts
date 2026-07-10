@@ -24,7 +24,9 @@ import {
   taxableSalary,
   estimatedTaxThreshold,
   withholdingSuggestion,
+  bonusWithholding,
   type WithholdingSuggestion,
+  type BonusWithholding,
 } from "./tax";
 
 export interface PayrollResult {
@@ -58,6 +60,10 @@ export interface PayrollResult {
   belowMinWage: boolean; // V1：月薪資總額 < 最低工資
   // 外幣（獨立金流，**不進** grossPay/netPay/taxable/insured/premiums；僅顯示與獨立加總）
   foreignPay?: ForeignPayResult;
+  // 外幣所得稅（政策 fxPolicy.incomeTax 開時）：外幣視作獎金 → 應稅台幣約當＋獎金代扣稅建議。
+  // **仍不併入台幣核心欄**（獨立呈現原則）；政策關或無外幣＝0/null，TC-9 逐位元不變。
+  foreignTaxableTwd: number; // 併入所得稅的外幣應稅台幣約當（政策關＝0）
+  foreignWithholding: BonusWithholding | null; // 外幣（視作獎金）代扣稅建議（政策關＝null）
 }
 
 /** 當月外幣結算結果（原幣別/原額/當期匯率/台幣約當） */
@@ -122,6 +128,11 @@ export function calculatePayroll(
   const foreignPayResult: ForeignPayResult | undefined = fx
     ? { currency: fx.currency, amount: fx.amount, rate: fx.rate, twd: foreignTwd }
     : undefined;
+  // 所得稅政策閘門（預設關）：開時外幣視作獎金 → 應稅台幣約當＋獎金代扣稅建議（bonusWithholding）。
+  // 仍不併入台幣核心欄（獨立呈現）；政策關或無外幣＝0/null，保 TC-9。
+  const foreignIncomeTax = !!fx?.policy.incomeTax && foreignTwd > 0;
+  const foreignTaxableTwd = foreignIncomeTax ? foreignTwd : 0;
+  const foreignWithholding = foreignIncomeTax ? bonusWithholding(foreignTwd, employee.taxResidency, p) : null;
   // 補充保費政策閘門（預設關）：開時把外幣台幣約當當額外獎金併入補充保費基數。
   const suppBonus = fx?.policy.supplementary ? event.monthlyBonus + foreignTwd : event.monthlyBonus;
   const suppCumulative = fx?.policy.supplementary ? event.cumulativeBonus + foreignTwd : event.cumulativeBonus;
@@ -195,5 +206,7 @@ export function calculatePayroll(
     withholdingSuggestion: suggestion,
     belowMinWage: salaryTotal < p.minWageMonthly,
     foreignPay: foreignPayResult,
+    foreignTaxableTwd,
+    foreignWithholding,
   };
 }

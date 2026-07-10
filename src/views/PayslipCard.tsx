@@ -73,6 +73,15 @@ export const PayslipCard = forwardRef<HTMLDivElement, { emp: Employee; r: Payrol
               <p className="mt-1 text-xs text-muted-foreground">
                 {fp.rate > 0 ? <>台幣約當 ≈ {ntd(fp.twd)} 元（匯率 {fp.rate}）</> : <>尚未設定本期匯率，台幣約當暫以 0 計。</>}
               </p>
+              {r.foreignWithholding && (
+                <p className="mt-1 text-xs text-info">
+                  所得稅：外幣視作獎金，
+                  {r.foreignWithholding.type === "auto"
+                    ? <>建議代扣 ≈ <strong>{ntd(r.foreignWithholding.amount)}</strong> 元{r.foreignWithholding.amount > 0 ? "（5%）" : "（未達起扣標準、免扣）"}。</>
+                    : <>非居住者請併當月薪資依 6%/18% 計。</>}
+                  應稅台幣約當 {ntd(r.foreignTaxableTwd)} 元已列入年度扣繳憑單。
+                </p>
+              )}
             </div>
           )}
 

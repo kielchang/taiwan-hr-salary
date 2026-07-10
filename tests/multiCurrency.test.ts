@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildPayrollRows, type PayrollData } from "../src/store/selectors";
 import { buildSnapshot } from "../src/lib/analytics";
+import { yearlyWithholding } from "../src/lib/reports/withholding";
 import { DEFAULT_PARAMETERS } from "../src/config/parameters";
 import { DEFAULT_BRACKETS } from "../src/config/brackets";
 import type { Employee, SalaryStructure, MonthlyEvent, FxPolicy } from "../src/lib/types";
@@ -71,6 +72,43 @@ describe("多幣別薪資", () => {
     const withoutSupp = buildPayrollRows("2026-03", data({ salaries: [sal({ currency: "USD", amount: 10000 })], fxPolicy: ON }))[0];
     expect(withSupp.personalSupplementary).toBeGreaterThan(withoutSupp.personalSupplementary);
     expect(withoutSupp.personalSupplementary).toBe(0); // 政策關＝外幣不進補充保費
+  });
+
+  it("所得稅政策關：外幣不進所得稅（foreignTaxableTwd=0、無代扣建議）", () => {
+    const r = buildPayrollRows("2026-03", data({ salaries: [sal({ currency: "USD", amount: 1000 })], fxPolicy: ON }))[0];
+    expect(r.foreignTaxableTwd).toBe(0);
+    expect(r.foreignWithholding).toBeNull();
+  });
+
+  it("所得稅政策開：外幣視作獎金 → 應稅台幣約當＋獎金代扣稅建議（5%），仍不動台幣 gross/taxable", () => {
+    const taxOn: FxPolicy = { enabled: true, incomeTax: true, supplementary: false };
+    const small = buildPayrollRows("2026-03", data({ salaries: [sal({ currency: "USD", amount: 1000 })], fxPolicy: taxOn }))[0];
+    const plain = buildPayrollRows("2026-03", data({ salaries: [sal()], fxPolicy: taxOn }))[0];
+    expect(small.foreignTaxableTwd).toBe(32000); // 1000×32
+    expect(small.foreignWithholding).toEqual({ type: "auto", amount: 0 }); // 32000 < 起扣標準 → 免扣
+    expect(small.grossPay).toBe(plain.grossPay); // 台幣核心不受影響
+    expect(small.taxableSalary).toBe(plain.taxableSalary);
+    expect(small.netPay).toBe(plain.netPay);
+    // 大額外幣（≥起扣標準）→ 建議 5%
+    const big = buildPayrollRows("2026-03", data({ salaries: [sal({ currency: "USD", amount: 10000 })], fxPolicy: taxOn }))[0];
+    expect(big.foreignTaxableTwd).toBe(320000);
+    expect(big.foreignWithholding).toEqual({ type: "auto", amount: 16000 }); // 320000×5%
+  });
+
+  it("扣繳憑單 yearlyWithholding：政策開時 foreignTaxable 累計外幣台幣約當（獨立欄、不併入 gross/taxable）", () => {
+    const taxOn: FxPolicy = { enabled: true, incomeTax: true, supplementary: false };
+    const evs: MonthlyEvent[] = ["2026-01", "2026-02"].map((period) => ({
+      employeeId: "E1", period, overtimeWeekday1: 0, overtimeWeekday2: 0, overtimeRestday1: 0,
+      overtimeRestday2: 0, overtimeHoliday: 0, personalLeaveHours: 0, sickLeaveHours: 0, monthlyBonus: 0,
+      cumulativeBonus: 0, otherAddition: 0, otherDeduction: 0, withheldTax: null,
+    }));
+    const fxRates = { USD: { "2026-01": 32, "2026-02": 30 } };
+    const rowsOn = yearlyWithholding([emp], [sal({ currency: "USD", amount: 1000 })], [], evs, DEFAULT_PARAMETERS, DEFAULT_BRACKETS, "2026", undefined, { fxPolicy: taxOn, fxRates })[0];
+    expect(rowsOn.foreignTaxable).toBe(62000); // 1000×32 + 1000×30
+    const rowsOff = yearlyWithholding([emp], [sal({ currency: "USD", amount: 1000 })], [], evs, DEFAULT_PARAMETERS, DEFAULT_BRACKETS, "2026")[0];
+    expect(rowsOff.foreignTaxable).toBe(0); // 無 fx＝不含外幣
+    expect(rowsOn.gross).toBe(rowsOff.gross); // 台幣核心不受外幣影響
+    expect(rowsOn.taxable).toBe(rowsOff.taxable);
   });
 
   it("buildSnapshot：外幣獨立序列，不併入 totalCost", () => {
