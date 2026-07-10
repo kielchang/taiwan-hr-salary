@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePayrollStore, resolveSettingVersion } from "@/store/usePayrollStore";
 import { DEFAULT_PARAMETERS } from "@/config/parameters";
 import { DEFAULT_BRACKETS } from "@/config/brackets";
-import { usePayrollRows } from "@/store/selectors";
+import { usePayrollRows, useBackupStatus, useRunBackup } from "@/store/selectors";
 import { validateAll, allocationIssues } from "@/lib/validation";
 import { FEATURES } from "@/config/features";
 import { enrollmentWorklist } from "@/lib/reports/enrollment";
@@ -19,9 +19,9 @@ import { ntd, formatPeriod } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import {
   LayoutDashboard, AlertTriangle, FileText, UserPlus, UserMinus, Scale,
-  CheckCircle2, ArrowRight, CalendarClock, Banknote, TrendingUp, XCircle, PauseCircle, Compass,
+  CheckCircle2, ArrowRight, CalendarClock, Banknote, TrendingUp, XCircle, PauseCircle, Compass, ShieldAlert, Download, Database,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 /** 待辦卡：數字＋說明＋一鍵直達（0 時以綠色「無待辦」呈現） */
 function TodoCard({
@@ -63,6 +63,9 @@ export function DashboardView() {
     scheduledRaises, cancelScheduledRaise, applyScheduledRaise,
     tourPromptSeen, completedTours, dismissTourPrompt, startTour,
   } = usePayrollStore();
+  const backup = useBackupStatus();
+  const runBackup = useRunBackup();
+  const [backupSnoozed, setBackupSnoozed] = useState(false);
   const parameters = resolveSettingVersion(parameterVersions, currentPeriod, DEFAULT_PARAMETERS);
   const brackets = resolveSettingVersion(bracketVersions, currentPeriod, DEFAULT_BRACKETS);
   const rows = usePayrollRows();
@@ -111,6 +114,29 @@ export function DashboardView() {
             <Button size="sm" variant="ghost" onClick={() => navigate("/help")}>所有導引</Button>
             <Button size="sm" variant="ghost" onClick={dismissTourPrompt}>不用了</Button>
           </div>
+        </div>
+      )}
+
+      {/* 備份提醒（純前端資料易失）：距上次備份過久或從未備份且有未備份變更時跳出 */}
+      {backup.reminderDue && !backupSnoozed && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 p-3">
+          <p className="flex items-center gap-2 text-sm text-warning"><ShieldAlert className="size-4 shrink-0" />
+            {backup.lastBackupAt == null ? <>尚未備份過資料。</> : <>距上次備份已 <strong>{backup.days}</strong> 天。</>}
+            資料只存在本機瀏覽器，<strong>清除瀏覽器或換電腦即全部遺失</strong>——建議立即匯出備份另存。</p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => runBackup()}><Download /> 立即匯出備份</Button>
+            <Button size="sm" variant="ghost" onClick={() => setBackupSnoozed(true)}>稍後</Button>
+          </div>
+        </div>
+      )}
+
+      {/* 儲存空間告警：localStorage 逼近上限，超限會寫入失敗（資料無法儲存） */}
+      {backup.nearQuota && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/40 bg-danger/10 p-3">
+          <p className="flex items-center gap-2 text-sm text-danger"><Database className="size-4 shrink-0" />
+            瀏覽器儲存空間已用約 <strong>{Math.round(backup.usageRatio * 100)}%</strong>，逼近上限。
+            超過後將<strong>無法儲存新資料</strong>——請先匯出備份，再清理不需要的歷史快照/示範資料。</p>
+          <Button size="sm" onClick={() => runBackup()}><Download /> 匯出備份</Button>
         </div>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">

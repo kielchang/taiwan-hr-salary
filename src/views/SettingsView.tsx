@@ -24,6 +24,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus, Currency } from "@/lib/types";
 import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable, isSettingsInPlaceLocked, maxConfirmedPeriod } from "@/store/usePayrollStore";
+import { useRunBackup } from "@/store/selectors";
+import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import type { Parameters } from "@/config/parameters";
 import { FEATURES } from "@/config/features";
@@ -153,7 +155,7 @@ function nextMonthOf(period: string): string {
 }
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, parameterVersions, addParameterVersion, resetToSeed, clearAll, loadDemoData, snapshots, exportAll, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
+  const { parameters, brackets, setParameters, parameterVersions, addParameterVersion, resetToSeed, clearAll, loadDemoData, snapshots, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
   // 非版本化卡（leavePolicy/salaryDefaults/幣別）仍用「當期已確認」鎖；法定參數/級距改用版本感知鎖。
   const locked = Boolean(confirmations[currentPeriod]);
   // 版本化守衛：就地改「最新版本」會回溯改寫已確認月 → 鎖住就地編輯，導向「新增生效版本」
@@ -173,11 +175,8 @@ export function SettingsView() {
     );
   };
 
-  const onExport = () => {
-    const env = exportAll();
-    const date = new Date().toISOString().slice(0, 10);
-    saveBlob(new Blob([JSON.stringify(env, null, 2)], { type: "application/json" }), `HR薪資備份_${date}.json`);
-  };
+  // 匯出備份改走共用入口（同時記錄 lastBackupAt，供備份提醒/指示消警）
+  const onExport = useRunBackup();
 
   const onImportFile = async (file: File) => {
     const text = await file.text();
@@ -200,7 +199,12 @@ export function SettingsView() {
   const navigate = useNavigate();
   const [showBrackets, setShowBrackets] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set()); // 法定參數群組收合（預設全開）
-  const [secTab, setSecTab] = useState<SecTab>("legal");
+  // ?tab= 深連結（側邊欄「備份指示」/工作台提醒 → 直接開資料分頁）
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab") as SecTab | null;
+  const [secTab, setSecTab] = useState<SecTab>(
+    tabParam && (["legal", "company", "currency", "data"] as const).includes(tabParam) ? tabParam : "legal",
+  );
 
   // 參數改「唯讀逐欄編輯＋送出」：本地草稿，改值標黃、底部黏著列一次套用（取代逐鍵即時寫入，
   // 亦避免每次按鍵都寫一筆稽核）。外部變更（重置/還原）時以 effect 重新同步草稿。

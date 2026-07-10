@@ -25,6 +25,8 @@ import type { InsuranceBrackets } from "@/config/brackets";
 import { usePayrollStore, blankEvent, DEFAULT_LEAVE_POLICY, resolveSettingVersion } from "./usePayrollStore";
 import { DEFAULT_PARAMETERS } from "@/config/parameters";
 import { DEFAULT_BRACKETS } from "@/config/brackets";
+import { saveBlob } from "@/lib/download";
+import { daysSinceBackup, isDirtySinceBackup, backupReminderDue, estimateStorageBytes, storageUsageRatio, storageNearCap } from "@/lib/backupStatus";
 
 /**
  * 該員工於某期間是否列入計薪（undefined 狀態＝在職）。
@@ -190,6 +192,39 @@ export function ytdBonusBefore(events: MonthlyEvent[], employeeId: string, perio
   return events
     .filter((e) => e.employeeId === employeeId && e.period.startsWith(year) && e.period < period)
     .reduce((a, e) => a + e.monthlyBonus, 0);
+}
+
+/**
+ * 備份健康度（純前端 durability）：距上次備份天數、是否有未備份變更、儲存空間是否逼近上限。
+ * 供側邊欄指示、工作台提醒卡、離開前 nudge 共用。dirty 以稽核軌跡末筆 vs lastBackupAt 判定。
+ */
+export function useBackupStatus() {
+  const lastBackupAt = usePayrollStore((s) => s.lastBackupAt);
+  const auditLog = usePayrollStore((s) => s.auditLog);
+  const days = daysSinceBackup(lastBackupAt, Date.now());
+  const dirty = isDirtySinceBackup(auditLog, lastBackupAt);
+  const reminderDue = backupReminderDue(dirty, days);
+  const bytes = typeof localStorage !== "undefined" ? estimateStorageBytes(localStorage) : 0;
+  return {
+    lastBackupAt,
+    days,
+    dirty,
+    reminderDue,
+    usageRatio: storageUsageRatio(bytes),
+    nearQuota: storageNearCap(bytes),
+  };
+}
+
+/** 執行整檔備份匯出（下載 JSON）並記錄 lastBackupAt。SettingsView 與工作台提醒共用同一入口。 */
+export function useRunBackup(): () => void {
+  const exportAll = usePayrollStore((s) => s.exportAll);
+  const markBackedUp = usePayrollStore((s) => s.markBackedUp);
+  return () => {
+    const env = exportAll();
+    const date = new Date().toISOString().slice(0, 10);
+    saveBlob(new Blob([JSON.stringify(env, null, 2)], { type: "application/json" }), `HR薪資備份_${date}.json`);
+    markBackedUp();
+  };
 }
 
 /** 投保單位（公司）二代健保補充保費（差額制，§5.7） */

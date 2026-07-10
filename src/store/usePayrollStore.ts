@@ -266,6 +266,10 @@ interface PayrollState {
   tourPromptSeen: boolean;
   dismissTourPrompt: () => void;
 
+  /** 上次成功匯出備份檔的時間（ISO；null＝從未備份）。純前端 localStorage 易失，用於備份提醒/指示。 */
+  lastBackupAt: string | null;
+  markBackedUp: () => void;
+
   /** 每月結算之人事確認紀錄：period → 確認時間（ISO）。已確認＝硬鎖定：需先取消確認才能異動薪資資料 */
   confirmations: Record<string, string>;
   confirmPeriod: (period: string) => void;
@@ -808,6 +812,9 @@ export const usePayrollStore = create<PayrollState>()(
       tourPromptSeen: false,
       dismissTourPrompt: () => set({ tourPromptSeen: true }),
 
+      lastBackupAt: null,
+      markBackedUp: () => set({ lastBackupAt: new Date().toISOString() }),
+
       confirmations: DEMO.confirmations,
       confirmPeriod: (period) =>
         set((st) => ({
@@ -1216,6 +1223,8 @@ export const usePayrollStore = create<PayrollState>()(
             fxRates: s.fxRates ?? st.fxRates,
             fxPolicy: { ...DEFAULT_FX_POLICY, ...(s.fxPolicy ?? {}) },
             auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
+            // 剛還原＝手上有這份備份檔，以其匯出時間為「上次備份」基準，避免還原後立刻誤跳「尚未備份」提醒
+            lastBackupAt: env?.exportedAt ?? st.lastBackupAt,
           };
         }),
     }),

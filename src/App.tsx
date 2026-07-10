@@ -18,7 +18,7 @@
 //   報表/申報已從薪資兩步流程**移出**成獨立「報表與申報中心」（/reports）＝actual 單一出口；
 //   舊 `/payroll/reports`、`/filing` 皆 redirect 至 /reports，避免多入口產生不一致文件。
 // ─────────────────────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Routes,
   Route,
@@ -32,6 +32,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { TourRunner } from "@/components/TourRunner";
 import { usePayrollStore } from "@/store/usePayrollStore";
+import { useBackupStatus } from "@/store/selectors";
 import { validateAll } from "@/lib/validation";
 import { cn, formatPeriod } from "@/lib/utils";
 import { SetupWizard } from "@/views/SetupWizard";
@@ -49,7 +50,7 @@ import { VERSION_LABEL, COMMIT_URL, ENV_BADGE } from "@/version";
 import { FEATURES } from "@/config/features";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
-  FileText, FolderKanban, Menu, LayoutDashboard, X, Compass,
+  FileText, FolderKanban, Menu, LayoutDashboard, X, Compass, ShieldCheck, ShieldAlert,
 } from "lucide-react";
 
 type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算"; feature?: keyof typeof FEATURES };
@@ -135,6 +136,15 @@ function Layout() {
     usePayrollStore();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const backup = useBackupStatus();
+
+  // 離開前 nudge：有未備份變更時，關頁/重整前跳瀏覽器原生確認（純前端資料清瀏覽器即失）
+  useEffect(() => {
+    if (!backup.dirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [backup.dirty]);
 
   if (!setupCompleted) return <Navigate to="/setup" replace />;
 
@@ -233,12 +243,33 @@ function Layout() {
                 </div>
               </div>
             ))}
+            {/* 備份健康度指示（純前端易失資料的 durability 提示）：點擊直達備份分頁 */}
+            <NavLink
+              to="/settings?tab=data"
+              onClick={() => setOpen(false)}
+              title="資料只存在本機瀏覽器，清除即遺失；建議定期匯出備份。點擊前往備份。"
+              className={cn(
+                "mt-2 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px]",
+                backup.reminderDue ? "bg-warning/10 text-warning" : "text-muted-foreground/80 hover:bg-accent",
+              )}
+            >
+              {backup.reminderDue ? <ShieldAlert className="size-3.5 shrink-0" /> : <ShieldCheck className="size-3.5 shrink-0" />}
+              <span className="flex-1 leading-tight">
+                {backup.lastBackupAt == null
+                  ? "尚未備份資料"
+                  : backup.days === 0
+                    ? "今日已備份"
+                    : `上次備份 ${backup.days} 天前`}
+                {backup.reminderDue && <span className="block text-[10px] opacity-80">建議立即匯出備份</span>}
+                {!backup.reminderDue && backup.dirty && <span className="block text-[10px] text-muted-foreground/70">有未備份變更</span>}
+              </span>
+            </NavLink>
             <a
               href={COMMIT_URL}
               target="_blank"
               rel="noreferrer"
               title="目前部署版本（點擊查看此版對應的 GitHub commit）；詳細見 系統設定 → 關於"
-              className="mt-2 block px-2 pt-2 text-[10px] tabular-nums text-muted-foreground/70 hover:text-muted-foreground"
+              className="mt-1 block px-2 pt-1 text-[10px] tabular-nums text-muted-foreground/70 hover:text-muted-foreground"
             >
               {VERSION_LABEL}
             </a>
