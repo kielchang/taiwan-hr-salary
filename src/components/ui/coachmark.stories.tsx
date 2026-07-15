@@ -36,6 +36,28 @@ export const 錨定元素: S = {
   },
 };
 
+/** 可縮小：需要實際操作（開對話框/切子分頁）時，按標題列「－」把卡收成右下角膠囊，整個畫面恢復可操作，之後「展開」繼續。 */
+export const 可縮小: S = {
+  render: () => {
+    const ref = useRef<HTMLButtonElement>(null);
+    const [rect, setRect] = useState<DOMRect | null>(null);
+    useEffect(() => { if (ref.current) setRect(ref.current.getBoundingClientRect()); }, []);
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-10">
+        <Button ref={ref}>員工「編輯」對話框</Button>
+        {rect && (
+          <Coachmark
+            targetRect={rect} title="⑤ 月結查看（需實際操作）"
+            body={<>到<strong>薪資結算</strong>開啟員工「編輯」對話框覆寫外幣。<br/>若導覽卡擋住對話框，按右上<strong>「－」縮小</strong>騰出空間，完成後「展開」繼續。</>}
+            stepIndex={4} stepCount={7} isFirst={false} isLast={false}
+            onPrev={() => {}} onNext={() => {}} onSkip={() => setRect(null)}
+          />
+        )}
+      </div>
+    );
+  },
+};
+
 /** 驗收模式：步驟卡多一列「✅ 通過／❌ 有問題（＋備註）」逐步標記（audience:"acceptance" 導覽用）。 */
 export const 驗收標記: S = {
   render: () => {

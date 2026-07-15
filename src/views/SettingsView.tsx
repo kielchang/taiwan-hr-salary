@@ -849,7 +849,7 @@ function CurrencyCenterCard({ locked }: { locked: boolean }) {
         </div>
 
         {/* 匯率表 */}
-        <div className="space-y-2">
+        <div className="space-y-2" data-tour="fx-rate-table">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">匯率（對台幣）</p>
             <Input type="month" className="col-input h-8 w-36" value={ratePeriod} onChange={(e) => e.target.value && setRatePeriod(e.target.value)} />

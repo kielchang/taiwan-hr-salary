@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { X, Minus, Maximize2 } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
 
@@ -51,10 +51,13 @@ export function Coachmark({
 }: CoachmarkProps) {
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  // 縮小：需要實際操作（開對話框/切子分頁）時，把導覽卡收成右下角小膠囊，整個畫面恢復可操作。
+  const [collapsed, setCollapsed] = useState(false);
 
   // 無障礙：進入每一步把焦點移入卡片（螢幕報讀者會唸出 aria-live 的步驟內容），
   // 並讓鍵盤操作（Esc/←/→/Enter）作用在卡片上——不搶輸入框焦點（只在換步時 focus 一次）。
-  useEffect(() => { popRef.current?.focus(); }, [stepIndex]);
+  // 換步一律先展開，確保每步都先看到新說明（避免上一步縮小後漏讀下一步）。
+  useEffect(() => { setCollapsed(false); popRef.current?.focus(); }, [stepIndex]);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") { e.preventDefault(); onSkip(); }
     else if (e.key === "ArrowRight") { e.preventDefault(); onNext(); }
@@ -82,6 +85,20 @@ export function Coachmark({
     left = Math.min(Math.max(PAD, left), Math.max(PAD, vw - pw - PAD));
     setPos({ top, left });
   }, [targetRect, title, body, stepIndex, stepCount]);
+
+  // 縮小態：只留右下角膠囊，隱藏暗罩/聚光/卡片 → 整個畫面可操作（唯一擋點是 pointer-events-auto 的卡片）。
+  if (collapsed) {
+    return createPortal(
+      <div className="pointer-events-none fixed inset-0 z-[200]">
+        <div className="pointer-events-auto fixed bottom-4 right-4 flex items-center gap-2 rounded-full border bg-popover px-3 py-2 text-xs shadow-lg">
+          <span className="tabular-nums text-muted-foreground">導引 {stepIndex + 1}/{stepCount}</span>
+          <Button size="sm" variant="outline" onClick={() => setCollapsed(false)}><Maximize2 className="size-3.5" /> 展開</Button>
+          <button type="button" onClick={onSkip} className="text-[11px] text-muted-foreground underline underline-offset-2">略過</button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
 
   return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[200]" role="dialog" aria-modal="false" aria-label="操作導引">
@@ -128,9 +145,14 @@ export function Coachmark({
       >
         <div className="mb-1 flex items-start justify-between gap-2">
           <p className="text-sm font-semibold">{title}</p>
-          <button type="button" onClick={onSkip} aria-label="略過導引" className="tap-target -m-1 rounded p-1 text-muted-foreground hover:text-foreground">
-            <X className="size-4" />
-          </button>
+          <div className="-m-1 flex items-center gap-0.5">
+            <button type="button" onClick={() => setCollapsed(true)} aria-label="縮小導引（騰出空間操作，之後可展開）" title="縮小（騰出空間操作）" className="tap-target rounded p-1 text-muted-foreground hover:text-foreground">
+              <Minus className="size-4" />
+            </button>
+            <button type="button" onClick={onSkip} aria-label="略過導引" className="tap-target rounded p-1 text-muted-foreground hover:text-foreground">
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
         <div className="text-sm text-muted-foreground [&_strong]:text-foreground">{body}</div>
         {warning && (
