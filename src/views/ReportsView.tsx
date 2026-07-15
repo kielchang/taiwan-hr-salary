@@ -126,7 +126,7 @@ function SummaryReport() {
         const fxTwd = rows.reduce((a, r) => a + (r.foreignPay?.twd ?? 0), 0);
         if (byCur.size === 0) return null;
         return (
-          <Card>
+          <Card data-tour="fx-report-summary">
             <CardHeader className="pb-2"><CardTitle className="text-base">外幣給付彙總（與台幣分開，不含於上方應發/成本）</CardTitle></CardHeader>
             <CardContent className="space-y-1.5 text-sm">
               {[...byCur.entries()].map(([code, amt]) => {

@@ -14,6 +14,7 @@ export interface TourStep {
   actionHint?: ReactNode; // 搭配 advanceOn 的互動提示文字（預設「👆 點上方圈選處即可繼續」）
   mobileTarget?: string; // 窄螢幕（<768）改圈此 data-tour（如桌機圈側邊欄、手機圈左上選單鈕）
   requireUnconfirmed?: boolean; // 此步需「當期未確認」才可操作；已確認時導引顯示紅字提醒先取消確認
+  run?: "seedFxDemo" | "clearFxDemo"; // 進入此步時執行的一次性動作鍵（實作在 TourRunner；內容層維持宣告式、不 import store）
 }
 export interface Tour {
   id: string;
@@ -32,16 +33,14 @@ export const TOURS: Record<string, Tour> = {
     id: "fx",
     title: "多幣別薪資（驗收導覽）",
     audience: "acceptance",
-    summary: "啟用外幣 → 新增幣別 → 設匯率 → 員工設定 → 月結／薪資條／報表查看外幣。",
+    summary: "自動塞一筆外幣範例到示範公司，帶你看月結/報表/薪資條的真實外幣數字；走完自動清除。",
     steps: [
-      { title: "多幣別薪資導覽", body: <>帶你走一遍外幣薪資。外幣與台幣<strong>分開計算、視作獎金、預設不進勞健保</strong>。過程中我會替你換頁並<strong>圈出該點的控制項</strong>。<br/>需要實際操作（開對話框/切分頁）時，卡片擋到就按右上<strong>「－」縮小</strong>騰出空間，完成後「展開」繼續。隨時可略過。</> },
-      { route: "/settings", target: "settings-tab-currency", advanceOn: "click", title: "① 開啟「幣別與匯率」分頁", body: <>系統設定上方這排分頁，點圈起來的<strong>「幣別與匯率」</strong>。</> },
-      { route: "/settings", target: "fx-enable-toggle", advanceOn: "click", title: "② 打開「啟用多幣別」", body: <>點這個開關<strong>啟用多幣別</strong>。啟用前全站沒有任何外幣欄位；啟用後下方才會出現維護中心。</> },
-      { route: "/settings", target: "currency-center", title: "③ 新增幣別", body: <>在維護中心上半：填代碼（如 <strong>USD</strong>）、名稱、符號 →「<strong>新增幣別</strong>」。停用的幣別只是不出現在指派下拉，既有資料照算。新增好按「下一步」看匯率。</> },
-      { route: "/settings", target: "fx-rate-table", title: "④ 設定匯率（重要）", body: <>在「<strong>匯率（對台幣）</strong>」區：先選<strong>匯率月份</strong>，再輸入 1 USD＝多少台幣（如 <strong>32</strong>）。台幣約當＝外幣×匯率。<br/><strong>未設匯率＝該幣別當期台幣約當以 0 計</strong>（原幣別金額仍會記錄與顯示，只是約當 0），旁邊會顯示<strong>「未設匯率」</strong>標記；<strong>設好匯率後才看得到台幣約當</strong>。是逐月維護，每月各設一次。</> },
-      { route: "/master", target: "master-tabs", title: "⑤ 給員工設定外幣（需操作）", body: <>到<strong>基本資料</strong>：點員工→「薪資結構調整」設「固定每月外幣」；或用<strong>「批次薪資 → 外幣薪資」</strong>對整個部門一次發放。<br/>操作對話框被擋住時，按卡片右上<strong>「－」縮小</strong>，做完再展開標記。</> },
-      { route: "/payroll/monthly", target: "period-picker", title: "⑥ 月結查看（需操作）", body: <>回<strong>薪資結算</strong>：員工「編輯」對話框可<strong>逐月覆寫</strong>外幣並看台幣約當；查核頁多一欄<strong>「外幣(折台)」</strong>。台幣實發不含外幣。<br/>要開對話框確認時，先「－」縮小本卡。</> },
-      { route: "/reports", target: "report-period", title: "⑦ 報表與薪資條", body: <>報表的<strong>「外幣給付彙總」</strong>卡與薪資條的<strong>「外幣給付」</strong>區塊，都與台幣核心<strong>分開呈現</strong>、不併入應發/成本。（切子分頁查看時可先「－」縮小本卡。）導覽完成！</> },
+      { title: "多幣別薪資導覽（示範情境）", body: <>這支會<strong>直接幫你在示範公司發一筆外幣範例</strong>（蔡佩珊/葉外籍 各 <strong>USD 1500</strong>、當月匯率 <strong>32</strong>、啟用多幣別），再帶你到<strong>已經有真實數字</strong>的畫面逐一看差異、標「通過/有問題」。<br/>只動<strong>示範資料</strong>，<strong>走完（完成或略過）會自動清除、還原示範公司</strong>。按「下一步」開始。</> },
+      { run: "seedFxDemo", route: "/settings?tab=currency", target: "fx-rate-table", requireUnconfirmed: true, title: "① 已建立外幣範例＋匯率", body: <>已幫你：<strong>啟用多幣別</strong>、新增 <strong>USD</strong>、設當月匯率 <strong>1 USD = 32 TWD</strong>、發給兩位員工各 <strong>USD 1500</strong>。<br/>圈起來的是「匯率（對台幣）」表——這裡逐月維護匯率；<strong>未設匯率＝該幣別當期台幣約當以 0 計</strong>（原幣別金額仍記錄）。確認匯率已填 32。</> },
+      { route: "/payroll/review", target: "fx-review-col", title: "② 月結查核：外幣(折台) 獨立欄", body: <>查核表多一欄<strong>「外幣(折台)」</strong>：兩位員工 ＝ 1500 × 32 ＝ <strong>48,000</strong>。<br/>對照他們的台幣「應發/實發」——<strong>完全不受外幣影響</strong>（外幣視作獎金、獨立金流、不進投保與勞健保）。這就是「帶入外幣後的差異」。</> },
+      { route: "/reports?tab=summary", target: "fx-report-summary", title: "③ 報表：外幣給付彙總（獨立卡）", body: <>月結報表出現<strong>「外幣給付彙總」</strong>卡：按幣別列原幣總額與台幣約當，<strong>與台幣成本/獎金比分開呈現</strong>、不併入台幣核心。確認數字（USD 3,000 ≈ 96,000）。</> },
+      { route: "/reports?tab=payslip", target: "fx-payslip", title: "④ 薪資條：外幣給付區塊", body: <>薪資條底部<strong>「外幣給付（另行給付…）」</strong>區塊：顯示原幣金額與台幣約當，<strong>不含於上方台幣應發/實發</strong>。（若「外幣計所得稅」政策開啟，這裡還會顯示「視作獎金／建議代扣」。）</> },
+      { route: "/", title: "⑤ 驗收完成", body: <>看完四個畫面的外幣呈現了。按<strong>「完成」</strong>會<strong>自動清除這筆示範外幣、關閉多幣別、還原乾淨示範公司</strong>；標好的「通過/有問題」會彙整成驗收報告供你複製回報。<br/>（想自己動手玩外幣＝到「系統設定 → 幣別與匯率」自行設定，不必走本導覽。）</> },
     ],
   },
 

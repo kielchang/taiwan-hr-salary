@@ -211,7 +211,7 @@ export function ReviewView({ onNext }: { onBack?: () => void; onNext?: () => voi
       </div>
 
       {tab === "overview" && (
-        <Card className="print-block">
+        <Card className="print-block" data-tour="fx-review-col">
           <CardContent className="pt-6">
             <DataTable
               rows={ovRows}

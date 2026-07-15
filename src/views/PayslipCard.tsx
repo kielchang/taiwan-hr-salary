@@ -64,7 +64,7 @@ export const PayslipCard = forwardRef<HTMLDivElement, { emp: Employee; r: Payrol
           </div>
 
           {fp && fp.amount > 0 && (
-            <div className="rounded-md border p-3 text-sm">
+            <div className="rounded-md border p-3 text-sm" data-tour="fx-payslip">
               <p className="mb-2 font-medium">外幣給付（另行給付，不含於上方台幣應發／實發）</p>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-muted-foreground">{cur?.name ?? fp.currency}</span>

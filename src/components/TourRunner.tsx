@@ -14,6 +14,24 @@ function pickTarget(step: TourStep, width: number): string | undefined {
   return width < 768 && step.mobileTarget ? step.mobileTarget : step.target;
 }
 
+// 導覽步驟動作（TourStep.run 對應）：只在示範公司（存在 P01）動作，避免污染真實資料。
+// 各 store setter 皆內建 isPeriodLocked 守衛（當期已確認即 no-op）；seed 步標 requireUnconfirmed 提醒先取消確認。
+const SEED_IDS = ["P01", "P05"];
+function runTourAction(key: "seedFxDemo" | "clearFxDemo") {
+  const st = usePayrollStore.getState();
+  const ids = SEED_IDS.filter((id) => st.employees.some((e) => e.id === id));
+  if (key === "seedFxDemo") {
+    if (!st.employees.some((e) => e.id === "P01") || ids.length === 0) return; // 僅示範公司
+    st.setFxPolicy({ enabled: true });
+    st.upsertCurrency({ code: "USD", name: "美金", symbol: "US$", decimals: 2, enabled: true });
+    st.setFxRate("USD", st.currentPeriod, 32);
+    st.applyBatchForeign({ employeeIds: ids, currency: "USD", mode: "set", value: 1500, reason: "導覽示範", scopeLabel: "導覽" });
+  } else {
+    if (ids.length) st.applyBatchForeign({ employeeIds: ids, currency: "USD", mode: "set", value: 0, reason: "清除導覽示範", scopeLabel: "導覽" });
+    st.setFxPolicy({ enabled: false });
+  }
+}
+
 /**
  * 導引引擎（app glue，刻意不入元件庫 barrel；可 import store/router/content）。
  * 讀 store.activeTourId → 取對應導引；每步：可自動導覽路由、輪詢等目標元素出現後量 rect 交給 Coachmark；
@@ -35,17 +53,30 @@ export function TourRunner() {
   const [report, setReport] = useState<string | null>(null);
   const verdictsRef = useRef(verdicts); // 供 advanceOn 點擊處理的舊 closure 取最新標記，避免漏最後一步
   verdictsRef.current = verdicts;
+  const ranFor = useRef<string>("");   // step.run 一次性 guard（每步只執行一次）
+  const seededRef = useRef(false);     // 本支導覽是否 seed 過外幣範例 → 結束時自動清除
 
   const tour = activeTourId ? TOURS[activeTourId] : null;
   const step = tour?.steps[stepIndex];
   const isAcceptance = tour?.audience === "acceptance";
 
-  // 換導引時歸零（含驗收標記）
-  useEffect(() => { setStepIndex(0); navigatedFor.current = ""; setVerdicts({}); }, [activeTourId]);
+  // 換導引時歸零（含驗收標記／動作 guard）
+  useEffect(() => { setStepIndex(0); navigatedFor.current = ""; ranFor.current = ""; seededRef.current = false; setVerdicts({}); }, [activeTourId]);
 
-  // 結束導引：驗收導覽且有任何標記 → 先擷取報告文字（activeTourId 清空前）再結束
+  // 進入某步：執行 step.run 對應動作一次（seed/clear）；seed 過即記，結束時自動清除。
+  useEffect(() => {
+    if (!tour || !step?.run) return;
+    const key = `${activeTourId}#${stepIndex}`;
+    if (ranFor.current === key) return;
+    ranFor.current = key;
+    runTourAction(step.run);
+    if (step.run === "seedFxDemo") seededRef.current = true;
+  }, [tour, step, stepIndex, activeTourId]);
+
+  // 結束導引：①seed 過的示範外幣自動清除、還原乾淨示範 ②驗收導覽有標記則先擷取報告文字（activeTourId 清空前）
   const finish = (completed: boolean) => {
     if (!tour) return;
+    if (seededRef.current) { runTourAction("clearFxDemo"); seededRef.current = false; }
     const v = verdictsRef.current;
     if (isAcceptance && hasAnyVerdict(v)) {
       setReport(buildAcceptanceReport(tour, v, new Date().toISOString().slice(0, 10)));
