@@ -82,6 +82,44 @@ export const TOURS: Record<string, Tour> = {
     ],
   },
 
+  fxtax: {
+    id: "fxtax",
+    title: "外幣計所得稅（驗收導覽）",
+    audience: "acceptance",
+    summary: "開啟「外幣計所得稅」→ 外幣視作獎金：薪資條給建議代扣、年度扣繳憑單多一欄外幣應稅，台幣核心不受影響。",
+    steps: [
+      { title: "外幣計所得稅導覽", body: <>驗收「外幣併入所得稅」：開關開啟時，外幣台幣約當<strong>視作獎金</strong>→薪資條顯示建議代扣、年度扣繳憑單多一欄，<strong>但台幣應發/應稅完全不受影響</strong>（獨立呈現）。逐步標「通過/有問題」，最後可複製報告回報。</> },
+      { route: "/settings", target: "settings-tab-currency", advanceOn: "click", title: "① 進「幣別與匯率」分頁", body: <>點圈起來的<strong>「幣別與匯率」</strong>分頁。（需先啟用多幣別、設好 USD 匯率並給某員工外幣，才看得到後續數字。）</> },
+      { route: "/settings", target: "fx-incometax-toggle", title: "② 開啟「外幣計所得稅」", body: <>打開這顆開關。關閉＝外幣完全不進所得稅；開啟＝外幣視作獎金併入代扣稅建議與扣繳憑單。確認開關可切換、狀態正確。</> },
+      { route: "/reports", target: "filing-withholding", title: "③ 年度扣繳憑單：外幣獨立欄", body: <>到<strong>報表與申報 → 年度申報 → 年度扣繳憑單</strong>：開啟政策後多一欄<strong>「外幣應稅(折台)」</strong>，且「全年應發/應稅」<strong>不含</strong>外幣。薪資條的外幣區塊也會顯示「視作獎金／建議代扣」。導覽完成！</> },
+    ],
+  },
+
+  durability: {
+    id: "durability",
+    title: "資料備份健康度（驗收導覽）",
+    audience: "acceptance",
+    summary: "側邊欄備份指示＋工作台提醒卡＋離開前提醒＋容量告警：純前端資料易失的防護。",
+    steps: [
+      { title: "資料備份健康度導覽", body: <>純前端資料只存在本機瀏覽器、清除即遺失。驗收這層防護：<strong>側邊欄備份指示、工作台備份提醒、匯出後消警、離開前提醒</strong>。</> },
+      { route: "/", target: "backup-indicator", mobileTarget: "sidebar-toggle", title: "① 側邊欄備份指示", body: <>側邊欄底部常駐<strong>備份狀態</strong>：「今日已備份／N 天前／尚未備份」，過久轉琥珀警示，點擊直達備份分頁。確認顯示正確。</> },
+      { route: "/", target: "backup-reminder", title: "② 工作台備份提醒卡", body: <>距上次備份過久或從未備份且有未備份變更時，工作台跳<strong>琥珀提醒卡</strong>。點<strong>「立即匯出備份」</strong>會下載 JSON，<strong>之後提醒消失、側欄轉「今日已備份」</strong>。確認這條動線。<br/>（若卡片沒出現＝目前已無未備份變更，屬正常。）</> },
+      { route: "/settings", target: "settings-tab-data", advanceOn: "click", title: "③ 資料分頁：匯出/還原", body: <>點<strong>「資料與安全」</strong>分頁：可手動「匯出備份檔」與「從備份檔還原」；換機/清瀏覽器後用備份檔還原，外幣設定、費率版本史都會完整回來。導覽完成！</> },
+    ],
+  },
+
+  brackets: {
+    id: "brackets",
+    title: "投保級距受管編輯（驗收導覽）",
+    audience: "acceptance",
+    summary: "投保級距可編輯：逐格改／CSV 整表匯入／V13 擋錯；已確認月走「新增生效版本」不回溯。",
+    steps: [
+      { title: "投保級距受管編輯導覽", body: <>年度基本工資調整時更新投保級距。驗收：<strong>逐格編輯、CSV 整表匯入、範本下載、V13 擋錯、已確認月改用「新增生效版本」</strong>。</> },
+      { route: "/settings", target: "settings-tab-legal", advanceOn: "click", title: "① 進「法定參數」分頁", body: <>點圈起來的<strong>「法定參數」</strong>分頁，下方有「投保級距表（檢視／編輯）」卡。</> },
+      { route: "/settings", target: "bracket-edit", title: "② 編輯級距（逐格／CSV／版本）", body: <>展開<strong>「投保級距表（檢視／編輯）」</strong>卡→點<strong>「編輯級距」</strong>：可分頁逐格改、<strong>「匯入 CSV」</strong>整表換版、<strong>「下載目前級距 CSV」</strong>當範本；把某級改成比前一級小會<strong>紅字擋存（V13）</strong>；示範公司有已確認歷史月，儲存時走<strong>「新增自 YYYY-MM 起生效版本」</strong>、不回溯。逐項確認後標記。導覽完成！</> },
+    ],
+  },
+
   overview: {
     id: "overview",
     title: "系統總覽（新手上手）",

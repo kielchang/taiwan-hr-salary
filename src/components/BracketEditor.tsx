@@ -87,7 +87,7 @@ export function BracketEditor() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">系統依「月薪資總額」自動查表投保；下列為目前採用級距（可編輯／年度整表換版）。</p>
-          <Button size="sm" variant="outline" onClick={start}><Pencil /> 編輯級距</Button>
+          <Button data-tour="bracket-edit" size="sm" variant="outline" onClick={start}><Pencil /> 編輯級距</Button>
         </div>
         <BracketTableCards brackets={brackets} />
       </div>

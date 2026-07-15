@@ -33,6 +33,12 @@ export interface CoachmarkProps {
   actionHint?: ReactNode;
   /** 選配警示（危險/前置條件未滿足，如「此示範月已確認，需先取消確認」）；以 danger 樣式顯示於說明下方。 */
   warning?: ReactNode;
+  /** 驗收模式：顯示「通過／有問題＋備註」逐步標記列（用於 audience:"acceptance" 導覽）。純呈現，狀態由 TourRunner 保存。 */
+  showVerdict?: boolean;
+  verdict?: "pass" | "issue" | null;
+  onVerdict?: (v: "pass" | "issue") => void;
+  note?: string;
+  onNote?: (s: string) => void;
 }
 
 const PAD = 12;
@@ -41,6 +47,7 @@ const HOLE = 6; // 聚光洞比目標外擴的邊距
 
 export function Coachmark({
   targetRect, title, body, stepIndex, stepCount, isFirst, isLast, onNext, onPrev, onSkip, finishLabel = "完成", secondaryAction, actionHint, warning,
+  showVerdict, verdict, onVerdict, note, onNote,
 }: CoachmarkProps) {
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -134,6 +141,30 @@ export function Coachmark({
             <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
             {actionHint}
           </p>
+        )}
+        {showVerdict && (
+          <div className="mt-2 rounded-md border bg-muted/40 p-2">
+            <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">驗收此步：</p>
+            <div className="flex gap-2" role="radiogroup" aria-label="驗收結果">
+              <button
+                type="button" role="radio" aria-checked={verdict === "pass"} onClick={() => onVerdict?.("pass")}
+                className={cn("tap-target flex-1 rounded-md border px-2 py-1 text-xs font-medium",
+                  verdict === "pass" ? "border-success bg-success/15 text-success" : "text-muted-foreground hover:bg-accent")}
+              >✅ 通過</button>
+              <button
+                type="button" role="radio" aria-checked={verdict === "issue"} onClick={() => onVerdict?.("issue")}
+                className={cn("tap-target flex-1 rounded-md border px-2 py-1 text-xs font-medium",
+                  verdict === "issue" ? "border-danger bg-danger/15 text-danger" : "text-muted-foreground hover:bg-accent")}
+              >❌ 有問題</button>
+            </div>
+            {verdict === "issue" && (
+              <textarea
+                value={note ?? ""} onChange={(e) => onNote?.(e.target.value)} rows={2}
+                placeholder="（選填）問題描述，會寫進驗收報告"
+                className="col-input mt-2 w-full resize-none rounded-md px-2 py-1 text-xs"
+              />
+            )}
+          </div>
         )}
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs tabular-nums text-muted-foreground">

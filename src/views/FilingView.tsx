@@ -78,7 +78,7 @@ function WithholdingTab() {
     ...(showForeign ? [money("foreignTaxable", "外幣應稅(折台)", (r) => r.foreignTaxable)] : []),
   ];
   return (
-    <Card className="print-block">
+    <Card className="print-block" data-tour="filing-withholding">
       <CardHeader className="flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-base">年度各類所得扣繳暨免扣繳憑單（彙總）</CardTitle>

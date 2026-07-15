@@ -3,6 +3,14 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.15.0] - 2026-07-10
+
+### 新增（Coachmark 驗收標記：逐步「通過／有問題＋備註」）
+- 支援「引導式驗收」：導覽逐步讓使用者標記結果，結束產出可複製的驗收報告（回報層由 TourRunner glue 組裝）。
+- **`showVerdict?: boolean`**：開啟後於卡片動作列上方顯示驗收列——「✅ 通過／❌ 有問題」二選一（`role="radiogroup"`），選「有問題」再展開備註輸入。
+- **`verdict?: "pass"|"issue"|null`／`onVerdict?`／`note?`／`onNote?`**：純呈現，狀態由外部（TourRunner 依 `audience:"acceptance"`）保存，元件不 import app 模組（維持元件庫邊界）。
+- Storybook「元件 / 導引 Coachmark」新增「驗收標記」狀態。
+
 ## [0.14.0] - 2026-07-09
 
 ### 新增（Coachmark 互動化：脈動聚光＋互動提示＋末步鏈結；TabPills 可錨定分頁）

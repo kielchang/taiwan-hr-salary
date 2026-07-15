@@ -36,6 +36,30 @@ export const 錨定元素: S = {
   },
 };
 
+/** 驗收模式：步驟卡多一列「✅ 通過／❌ 有問題（＋備註）」逐步標記（audience:"acceptance" 導覽用）。 */
+export const 驗收標記: S = {
+  render: () => {
+    const ref = useRef<HTMLButtonElement>(null);
+    const [rect, setRect] = useState<DOMRect | null>(null);
+    const [verdict, setVerdict] = useState<"pass" | "issue" | null>("issue");
+    const [note, setNote] = useState("提醒卡沒有出現");
+    useEffect(() => { if (ref.current) setRect(ref.current.getBoundingClientRect()); }, []);
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-10">
+        <Button ref={ref}>立即匯出備份</Button>
+        {rect && (
+          <Coachmark
+            targetRect={rect} title="③ 工作台備份提醒" body={<>有未備份變更時，工作台會跳<strong>琥珀提醒卡</strong>。請確認是否出現。</>}
+            stepIndex={2} stepCount={5} isFirst={false} isLast={false}
+            showVerdict verdict={verdict} onVerdict={setVerdict} note={note} onNote={setNote}
+            onPrev={() => {}} onNext={() => {}} onSkip={() => setRect(null)}
+          />
+        )}
+      </div>
+    );
+  },
+};
+
 /** 互動步驟：脈動環＋卡片內「👆 點圈選處繼續」互動提示（advanceOn 步驟用）。 */
 export const 互動待點: S = {
   render: () => {

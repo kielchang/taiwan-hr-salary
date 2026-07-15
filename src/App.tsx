@@ -245,6 +245,7 @@ function Layout() {
             ))}
             {/* 備份健康度指示（純前端易失資料的 durability 提示）：點擊直達備份分頁 */}
             <NavLink
+              data-tour="backup-indicator"
               to="/settings?tab=data"
               onClick={() => setOpen(false)}
               title="資料只存在本機瀏覽器，清除即遺失；建議定期匯出備份。點擊前往備份。"

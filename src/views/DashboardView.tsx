@@ -119,7 +119,7 @@ export function DashboardView() {
 
       {/* 備份提醒（純前端資料易失）：距上次備份過久或從未備份且有未備份變更時跳出 */}
       {backup.reminderDue && !backupSnoozed && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 p-3">
+        <div data-tour="backup-reminder" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 p-3">
           <p className="flex items-center gap-2 text-sm text-warning"><ShieldAlert className="size-4 shrink-0" />
             {backup.lastBackupAt == null ? <>尚未備份過資料。</> : <>距上次備份已 <strong>{backup.days}</strong> 天。</>}
             資料只存在本機瀏覽器，<strong>清除瀏覽器或換電腦即全部遺失</strong>——建議立即匯出備份另存。</p>

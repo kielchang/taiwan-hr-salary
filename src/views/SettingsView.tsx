@@ -828,7 +828,7 @@ function CurrencyCenterCard({ locked }: { locked: boolean }) {
           <p className="text-sm font-medium">政策</p>
           <div className="grid gap-2 sm:grid-cols-3">
             <div data-tour="fx-enable-toggle"><PolicyToggle label="啟用多幣別" hint="關閉時全站不顯示外幣欄位、計算完全不含外幣。" checked={fxPolicy.enabled} disabled={locked} onChange={(v) => setFxPolicy({ enabled: v })} /></div>
-            <PolicyToggle label="外幣計所得稅" hint="開啟＝外幣台幣約當併入獎金代扣所得稅建議與扣繳憑單。" checked={fxPolicy.incomeTax} disabled={locked || !fxPolicy.enabled} onChange={(v) => setFxPolicy({ incomeTax: v })} />
+            <div data-tour="fx-incometax-toggle"><PolicyToggle label="外幣計所得稅" hint="開啟＝外幣台幣約當併入獎金代扣所得稅建議與扣繳憑單。" checked={fxPolicy.incomeTax} disabled={locked || !fxPolicy.enabled} onChange={(v) => setFxPolicy({ incomeTax: v })} /></div>
             <PolicyToggle label="外幣計二代健保補充保費" hint="開啟＝外幣台幣約當併入二代健保補充保費基數。" checked={fxPolicy.supplementary} disabled={locked || !fxPolicy.enabled} onChange={(v) => setFxPolicy({ supplementary: v })} />
           </div>
         </div>

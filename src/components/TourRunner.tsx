@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { Coachmark } from "@/components/ui/coachmark";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Copy, Download } from "lucide-react";
+import { saveBlob } from "@/lib/download";
+import { buildAcceptanceReport, hasAnyVerdict, type VerdictEntry } from "@/lib/acceptanceReport";
 import { TOURS, type TourStep } from "@/content/tours";
 
 // 選有效目標：窄螢幕（<768，行動抽屜）優先用 mobileTarget（如側邊欄→左上選單鈕），否則用桌機 target。
@@ -25,12 +30,32 @@ export function TourRunner() {
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const navigatedFor = useRef<string>("");
+  // 驗收模式（audience:"acceptance"）：逐步標記通過/有問題＋備註；結束彙整成報告（回報層）。
+  const [verdicts, setVerdicts] = useState<Record<number, VerdictEntry>>({});
+  const [report, setReport] = useState<string | null>(null);
+  const verdictsRef = useRef(verdicts); // 供 advanceOn 點擊處理的舊 closure 取最新標記，避免漏最後一步
+  verdictsRef.current = verdicts;
 
   const tour = activeTourId ? TOURS[activeTourId] : null;
   const step = tour?.steps[stepIndex];
+  const isAcceptance = tour?.audience === "acceptance";
 
-  // 換導引時歸零
-  useEffect(() => { setStepIndex(0); navigatedFor.current = ""; }, [activeTourId]);
+  // 換導引時歸零（含驗收標記）
+  useEffect(() => { setStepIndex(0); navigatedFor.current = ""; setVerdicts({}); }, [activeTourId]);
+
+  // 結束導引：驗收導覽且有任何標記 → 先擷取報告文字（activeTourId 清空前）再結束
+  const finish = (completed: boolean) => {
+    if (!tour) return;
+    const v = verdictsRef.current;
+    if (isAcceptance && hasAnyVerdict(v)) {
+      setReport(buildAcceptanceReport(tour, v, new Date().toISOString().slice(0, 10)));
+    }
+    endTour(tour.id, completed);
+  };
+  const setVerdict = (v: "pass" | "issue") =>
+    setVerdicts((prev) => ({ ...prev, [stepIndex]: { verdict: v, note: prev[stepIndex]?.note } }));
+  const setNote = (s: string) =>
+    setVerdicts((prev) => ({ ...prev, [stepIndex]: { verdict: prev[stepIndex]?.verdict ?? "issue", note: s } }));
 
   // 進入某步：需要時自動導覽路由（每步只導一次，避免迴圈）
   useEffect(() => {
@@ -78,7 +103,7 @@ export function TourRunner() {
         // 讓 app 自身的點擊處理（換分頁/開對話框）先跑，再前進到下一步
         setTimeout(() => {
           setStepIndex((i) => {
-            if (i === tour.steps.length - 1) { endTour(tour.id, true); return i; }
+            if (i === tour.steps.length - 1) { finish(true); return i; }
             return i + 1;
           });
         }, 0);
@@ -104,7 +129,22 @@ export function TourRunner() {
     };
   }, [step]);
 
-  if (!tour || !step) return null;
+  // 驗收報告對話框：導覽結束後 activeTourId 已清空、tour 變 null，仍要能顯示，故獨立於 coachmark 之外。
+  const reportDialog = (
+    <Dialog open={report !== null} onOpenChange={(o) => { if (!o) setReport(null); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>驗收報告</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">逐步標記彙整如下。按「複製報告」貼回聊天回報給我，或下載存檔。</p>
+        <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-xs">{report}</pre>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => report && saveBlob(new Blob([report], { type: "text/plain;charset=utf-8" }), "驗收報告.txt")}><Download /> 下載</Button>
+          <Button onClick={() => { if (report) navigator.clipboard?.writeText(report); }}><Copy /> 複製報告</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (!tour || !step) return reportDialog;
   const isLast = stepIndex === tour.steps.length - 1;
   // 末步若有 next：先把本支記為完成，再啟動下一支（上手三支柱串成一條路徑）
   const nextTour = tour.next && TOURS[tour.next];
@@ -121,20 +161,28 @@ export function TourRunner() {
     ? <>此示範月（{currentPeriod}）已確認，<strong>計薪相關情境會被鎖定</strong>：請先到「薪資結算 → 查核與確認」按<strong>取消本月確認</strong>再操作。</>
     : undefined;
   return (
-    <Coachmark
-      targetRect={rect}
-      title={step.title}
-      body={step.body}
-      stepIndex={stepIndex}
-      stepCount={tour.steps.length}
-      isFirst={stepIndex === 0}
-      isLast={isLast}
-      secondaryAction={secondaryAction}
-      actionHint={actionHint}
-      warning={warning}
-      onPrev={() => setStepIndex((i) => Math.max(0, i - 1))}
-      onNext={() => { if (isLast) endTour(tour.id, true); else setStepIndex((i) => i + 1); }}
-      onSkip={() => endTour(tour.id, false)}
-    />
+    <>
+      <Coachmark
+        targetRect={rect}
+        title={step.title}
+        body={step.body}
+        stepIndex={stepIndex}
+        stepCount={tour.steps.length}
+        isFirst={stepIndex === 0}
+        isLast={isLast}
+        secondaryAction={secondaryAction}
+        actionHint={actionHint}
+        warning={warning}
+        showVerdict={isAcceptance}
+        verdict={verdicts[stepIndex]?.verdict ?? null}
+        onVerdict={setVerdict}
+        note={verdicts[stepIndex]?.note}
+        onNote={setNote}
+        onPrev={() => setStepIndex((i) => Math.max(0, i - 1))}
+        onNext={() => { if (isLast) finish(true); else setStepIndex((i) => i + 1); }}
+        onSkip={() => finish(false)}
+      />
+      {reportDialog}
+    </>
   );
 }
