@@ -41,6 +41,7 @@ import { MasterDataView } from "@/views/MasterDataView";
 import { PayrollFlow, type PayrollStep } from "@/views/PayrollFlow";
 import { HelpView } from "@/views/HelpView";
 import { SourcesView } from "@/views/SourcesView";
+import { WikiView } from "@/views/WikiView";
 import { AttendanceView } from "@/views/AttendanceView";
 import { AnalyticsView } from "@/views/AnalyticsView";
 import { ProjectsView } from "@/views/ProjectsView";
@@ -50,7 +51,7 @@ import { VERSION_LABEL, COMMIT_URL, ENV_BADGE } from "@/version";
 import { FEATURES } from "@/config/features";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
-  FileText, FolderKanban, Menu, LayoutDashboard, X, Compass, ShieldCheck, ShieldAlert,
+  FileText, FolderKanban, Menu, LayoutDashboard, X, Compass, ShieldCheck, ShieldAlert, BookMarked,
 } from "lucide-react";
 
 type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算"; feature?: keyof typeof FEATURES };
@@ -77,6 +78,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   ] },
   { title: "說明", items: [
     { to: "/help", match: "/help", label: "使用說明", icon: BookOpen },
+    { to: "/wiki", match: "/wiki", label: "操作手冊", icon: BookMarked },
     { to: "/sources", match: "/sources", label: "法規依據", icon: Scale },
   ] },
 ];
@@ -105,6 +107,7 @@ export default function App() {
         <Route path="/settings" element={<SettingsView />} />
         <Route path="/help" element={<HelpView />} />
         <Route path="/sources" element={<SourcesView />} />
+        <Route path="/wiki" element={<WikiView />} />
         <Route path="*" element={<Navigate to="/payroll/monthly" replace />} />
       </Route>
     </Routes>

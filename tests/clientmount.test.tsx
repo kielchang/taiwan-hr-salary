@@ -55,6 +55,19 @@ describe("client mount + 路由（白屏防護）", () => {
     expect(div.textContent).toContain("投保級距表（四險）");
   });
 
+  it("深連結 /wiki → 操作手冊（預設第1章）", async () => {
+    seedDone();
+    const div = await mountAt("/wiki");
+    expect(div.textContent).toContain("操作手冊");
+    expect(div.textContent).toContain("快速上手");
+  });
+
+  it("深連結 /wiki?ch=calc → 指定章（?ch= 深連結）", async () => {
+    seedDone();
+    const div = await mountAt("/wiki?ch=calc");
+    expect(div.textContent).toContain("計算原理速查");
+  });
+
   it("專案功能隱藏（FEATURES.projects=false）→ /projects 導回每月薪資作業、不白屏", async () => {
     seedDone();
     const div = await mountAt("/projects");
