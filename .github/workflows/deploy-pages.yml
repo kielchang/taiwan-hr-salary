@@ -14,6 +14,10 @@ on:
       - main
       - stage
       - claude/salary-calculator-react-shadcn-stxjp7
+    # 操作手冊獨立部署（deploy-manual.yml）：manual/** 變更不重佈 app
+    paths-ignore:
+      - "manual/**"
+      - ".github/workflows/deploy-manual.yml"
   workflow_dispatch:
 
 # gh-pages 部署以 git push 寫入 gh-pages 分支，需 contents: write

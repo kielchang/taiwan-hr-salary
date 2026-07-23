@@ -15,3 +15,7 @@ storybook-static
 
 # local screenshot/verification scratchpad (not shipped)
 scratchpad/
+
+# Docusaurus（manual/ 操作手冊站）
+manual/build/
+manual/.docusaurus/

@@ -27,6 +27,12 @@ export const ENV_BADGE: { label: string; tone: "stage" | "dev" } | null =
     : APP_ENV === "dev" ? { label: "DEV", tone: "dev" }
       : null; // prod（或未知）不顯示
 
+/** 操作手冊（獨立 Docusaurus 站，隨環境掛 <env>/manual/）：側邊欄外連＋HelpHint「完整說明」用 */
+export const MANUAL_URL: string =
+  APP_ENV === "prod" ? "https://kielchang.github.io/taiwan-hr-salary/manual/"
+    : APP_ENV === "stage" ? "https://kielchang.github.io/taiwan-hr-salary/stage/manual/"
+      : "https://kielchang.github.io/taiwan-hr-salary/dev/manual/";
+
 /** GitHub 上對應此版本的 commit 連結（本地 dev 為 repo 首頁） */
 export const COMMIT_URL = IS_RELEASE
   ? `https://github.com/kielchang/taiwan-hr-salary/commit/${GIT_SHA}`

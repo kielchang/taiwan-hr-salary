@@ -1,0 +1,80 @@
+name: Deploy Manual (操作手冊)
+
+# 操作手冊獨立部署：只有 manual/** 變更才觸發；發佈到各環境的 /manual 子路徑。
+#   main  → gh-pages /manual        → /manual/
+#   stage → gh-pages /stage/manual  → /stage/manual/
+#   dev   → gh-pages /dev/manual    → /dev/manual/
+# 與 app 部署（deploy-pages.yml，已 paths-ignore manual/**）互不觸發：
+# 改手冊 md → 只重佈手冊；改 app → 只重佈 app。keep_files 保留彼此與其他環境。
+# Storybook 隨手冊發佈到 /manual/storybook（手冊頁 iframe 嵌 story 用；避免正式手冊依賴 dev 專用路徑）。
+on:
+  push:
+    branches:
+      - main
+      - stage
+      - claude/salary-calculator-react-shadcn-stxjp7
+    paths:
+      - "manual/**"
+      - ".github/workflows/deploy-manual.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 與 app 部署共用同一 concurrency group：序列化對 gh-pages 的寫入
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-manual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve environment（依分支決定子路徑與 baseUrl）
+        id: env
+        run: |
+          case "${{ github.ref_name }}" in
+            main)
+              echo "dest=manual" >> "$GITHUB_OUTPUT"
+              echo "base=/taiwan-hr-salary/manual/" >> "$GITHUB_OUTPUT"
+              echo "app=https://kielchang.github.io/taiwan-hr-salary/" >> "$GITHUB_OUTPUT" ;;
+            stage)
+              echo "dest=stage/manual" >> "$GITHUB_OUTPUT"
+              echo "base=/taiwan-hr-salary/stage/manual/" >> "$GITHUB_OUTPUT"
+              echo "app=https://kielchang.github.io/taiwan-hr-salary/stage/" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "dest=dev/manual" >> "$GITHUB_OUTPUT"
+              echo "base=/taiwan-hr-salary/dev/manual/" >> "$GITHUB_OUTPUT"
+              echo "app=https://kielchang.github.io/taiwan-hr-salary/dev/" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Build manual（Docusaurus，注入環境 baseUrl / appUrl）
+        working-directory: manual
+        run: |
+          npm ci
+          npm run build
+        env:
+          MANUAL_BASE_URL: ${{ steps.env.outputs.base }}
+          MANUAL_APP_URL: ${{ steps.env.outputs.app }}
+
+      # Storybook 隨手冊出貨（手冊頁 iframe 嵌互動 story）：用 app 依賴建置 → manual/build/storybook
+      - name: Build Storybook into manual
+        run: |
+          npm ci
+          npm run build-storybook -- -o manual/build/storybook
+
+      - name: Publish manual to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./manual/build
+          destination_dir: ${{ steps.env.outputs.dest }}
+          keep_files: true
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_message: "deploy manual @ ${{ github.sha }}"

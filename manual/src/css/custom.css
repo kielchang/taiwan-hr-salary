@@ -1,0 +1,23 @@
+/* 操作手冊主題：主色對齊系統的冷靛藍（app --primary 家族），深色由 Docusaurus 內建切換。 */
+:root {
+  --ifm-color-primary: #1e293b;
+  --ifm-color-primary-dark: #1b2434;
+  --ifm-color-primary-darker: #192231;
+  --ifm-color-primary-darkest: #151c29;
+  --ifm-color-primary-light: #223047;
+  --ifm-color-primary-lighter: #24334c;
+  --ifm-color-primary-lightest: #2b3d5a;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #93b4e8;
+  --ifm-color-primary-dark: #74a0e2;
+  --ifm-color-primary-darker: #6496df;
+  --ifm-color-primary-darkest: #3577d5;
+  --ifm-color-primary-light: #b2c8ee;
+  --ifm-color-primary-lighter: #c2d2f1;
+  --ifm-color-primary-lightest: #f0f4fc;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
