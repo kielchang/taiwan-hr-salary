@@ -3,6 +3,7 @@
   "position": 1,
   "link": {
     "type": "generated-index",
-    "description": "第一次使用從這裡開始：初始設定、認識畫面骨架、發薪月份與工作台。"
+    "description": "第一次使用從這裡開始：初始設定、認識畫面骨架、發薪月份與工作台。",
+    "slug": "/quickstart"
   }
 }

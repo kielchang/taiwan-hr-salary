@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FEATURES } from "@/config/features";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { TOUR_LIST } from "@/content/tours";
+import { MANUAL_URL } from "@/version";
 import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings, BarChart3, Compass, BookMarked } from "lucide-react";
 
 const ANALYTICS_GUIDE: [string, string][] = [
@@ -102,9 +103,11 @@ export function HelpView() {
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <p className="text-sm font-semibold">完整操作手冊</p>
-            <p className="text-sm text-muted-foreground">逐章逐畫面的完整說明：8 章涵蓋每月作業、基本資料、報表申報、系統設定與計算原理，可搜尋、可列印、可直接跳到畫面或啟動導覽。</p>
+            <p className="text-sm text-muted-foreground">逐章逐畫面的完整說明：8 章涵蓋每月作業、基本資料、報表申報、系統設定與計算原理，可搜尋、可獨立更新，並可在手冊頁直接試玩元件；於新分頁開啟。</p>
           </div>
-          <Button onClick={() => navigate("/wiki")}><BookMarked /> 開啟操作手冊</Button>
+          <Button asChild>
+            <a href={MANUAL_URL} target="_blank" rel="noreferrer"><BookMarked /> 開啟操作手冊 ↗</a>
+          </Button>
         </CardContent>
       </Card>
 

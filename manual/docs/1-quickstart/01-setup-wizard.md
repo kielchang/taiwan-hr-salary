@@ -23,3 +23,9 @@ title: "初始設定精靈（五步）"
 :::
 
 <AppLink to="/settings">重新執行初始設定</AppLink>
+
+## 試玩：步驟導引元件
+
+精靈使用的五步「步驟列」長這樣（可實際點擊切換步驟）：
+
+<StoryFrame id="元件-基礎-stepper--互動" height={220} title="步驟列（可互動）" />

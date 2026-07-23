@@ -16,3 +16,9 @@ title: "說明資源地圖：導覽、FAQ、法規"
 :::
 
 <AppLink to="/help">使用說明與FAQ</AppLink> · <AppLink to="/help">啟動導覽：系統總覽（於系統「使用說明」頁啟動）</AppLink> · <AppLink to="/sources">法規依據</AppLink>
+
+## 試玩：互動導覽的聚光卡
+
+系統導覽會用「聚光卡」圈住該點的位置；驗收導覽還能逐步標記「通過／有問題」。下面是可互動的實物：
+
+<StoryFrame id="元件-導引-coachmark--驗收標記" height={420} title="導覽聚光卡（驗收標記，可互動）" />

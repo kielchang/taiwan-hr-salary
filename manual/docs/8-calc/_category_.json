@@ -3,6 +3,7 @@
   "position": 8,
   "link": {
     "type": "generated-index",
-    "description": "系統怎麼算錢：白話速查。法源條號見系統的「法規依據」頁。"
+    "description": "系統怎麼算錢：白話速查。法源條號見系統的「法規依據」頁。",
+    "slug": "/calc"
   }
 }

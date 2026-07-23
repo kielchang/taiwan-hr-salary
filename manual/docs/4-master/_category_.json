@@ -3,6 +3,7 @@
   "position": 4,
   "link": {
     "type": "generated-index",
-    "description": "員工資料採「情境申請單」：挑情境、只填該情境欄位、必填原因、留稽核可回復。"
+    "description": "員工資料採「情境申請單」：挑情境、只填該情境欄位、必填原因、留稽核可回復。",
+    "slug": "/master"
   }
 }

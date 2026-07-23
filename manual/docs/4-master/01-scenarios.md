@@ -15,3 +15,9 @@ title: "情境申請單總覽"
 :::
 
 <AppLink to="/master">前往基本資料</AppLink> · <AppLink to="/help">啟動導覽：主檔情境（於系統「使用說明」頁啟動）</AppLink>
+
+## 試玩：逐欄編輯元件
+
+員工檔案的欄位是「唯讀 → 點擊才編輯 → 變更標色」的逐欄編輯，實際操作看看：
+
+<StoryFrame id="元件-表單-editablefield--互動" height={260} title="逐欄編輯欄位（可互動）" />

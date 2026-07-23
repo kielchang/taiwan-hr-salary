@@ -3,6 +3,7 @@
   "position": 5,
   "link": {
     "type": "generated-index",
-    "description": "對外報表的單一出口：月結報表（含薪資條）與年度申報名冊。"
+    "description": "對外報表的單一出口：月結報表（含薪資條）與年度申報名冊。",
+    "slug": "/reports"
   }
 }

@@ -41,20 +41,19 @@ import { MasterDataView } from "@/views/MasterDataView";
 import { PayrollFlow, type PayrollStep } from "@/views/PayrollFlow";
 import { HelpView } from "@/views/HelpView";
 import { SourcesView } from "@/views/SourcesView";
-import { WikiView } from "@/views/WikiView";
 import { AttendanceView } from "@/views/AttendanceView";
 import { AnalyticsView } from "@/views/AnalyticsView";
 import { ProjectsView } from "@/views/ProjectsView";
 import { ReportsHubView } from "@/views/ReportsHubView";
 import { DashboardView } from "@/views/DashboardView";
-import { VERSION_LABEL, COMMIT_URL, ENV_BADGE } from "@/version";
+import { VERSION_LABEL, COMMIT_URL, ENV_BADGE, MANUAL_URL } from "@/version";
 import { FEATURES } from "@/config/features";
 import {
   CalendarClock, Users, Settings, BookOpen, Scale, Building2, Clock, BarChart3,
   FileText, FolderKanban, Menu, LayoutDashboard, X, Compass, ShieldCheck, ShieldAlert, BookMarked,
 } from "lucide-react";
 
-type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算"; feature?: keyof typeof FEATURES };
+type NavItem = { to: string; match: string; label: string; icon: React.ElementType; tag?: "例行" | "試算"; feature?: keyof typeof FEATURES; external?: boolean };
 
 /** 側邊欄：依領域分區（每月作業／規劃分析／專案／報表申報／主檔設定／說明） */
 const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
@@ -78,7 +77,8 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   ] },
   { title: "說明", items: [
     { to: "/help", match: "/help", label: "使用說明", icon: BookOpen },
-    { to: "/wiki", match: "/wiki", label: "操作手冊", icon: BookMarked },
+    // 操作手冊＝獨立 Docusaurus 站（隨環境掛 <env>/manual/，manual/** 變更獨立部署），外連開新分頁
+    { to: MANUAL_URL, match: "/__manual", label: "操作手冊", icon: BookMarked, external: true },
     { to: "/sources", match: "/sources", label: "法規依據", icon: Scale },
   ] },
 ];
@@ -107,7 +107,6 @@ export default function App() {
         <Route path="/settings" element={<SettingsView />} />
         <Route path="/help" element={<HelpView />} />
         <Route path="/sources" element={<SourcesView />} />
-        <Route path="/wiki" element={<WikiView />} />
         <Route path="*" element={<Navigate to="/payroll/monthly" replace />} />
       </Route>
     </Routes>
@@ -224,6 +223,16 @@ function Layout() {
                 <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{sec.title}</p>
                 <div className="space-y-0.5">
                   {sec.items.map((m) => {
+                    if (m.external) {
+                      return (
+                        <a key={m.to} href={m.to} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                          <m.icon className="size-4 shrink-0" />
+                          <span className="flex-1">{m.label}</span>
+                          <span className="text-[10px] text-muted-foreground/70">↗</span>
+                        </a>
+                      );
+                    }
                     const active = m.to === "/" ? location.pathname === "/" : location.pathname.startsWith(m.match);
                     return (
                       <NavLink
