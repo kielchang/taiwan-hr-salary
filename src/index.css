@@ -215,12 +215,14 @@
   }
 }
 
-/* 頁首僅於列印時顯示 */
-.print-header {
+/* 頁首/頁尾僅於列印時顯示（頁尾曾漏此規則→螢幕上所有報表頁頂端多一行版本戳記） */
+.print-header,
+.print-footer {
   display: none;
 }
 @media print {
-  .print-header {
+  .print-header,
+  .print-footer {
     display: block;
   }
 }

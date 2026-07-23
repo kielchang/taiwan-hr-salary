@@ -91,7 +91,8 @@ src/
 ├── data/demoCompany.ts 62 人示範公司（開箱預設；含離職/留停/停職半薪/復職邊界/多月快照/確認/稽核/申報基準）
 ├── components/ui/     DataTable/ChartCard/Delta/EmptyState/table(zebra/sticky/SortHead)/…
 ├── components/charts/ 零相依 SVG 圖表（StackedBar/Pareto/Heatmap 含圖例/TrendChart/Bullet…）
-├── content/help.tsx   情境式說明內容（HelpHint ℹ 用；鍵：payroll/master/analytics/projects/reports/settings/attendance）
+├── content/help.tsx   情境式說明內容（HelpHint ℹ 用；鍵：payroll/master/analytics/projects/reports/settings/attendance；wiki 欄＝手冊章深連結）
+├── content/wiki/      操作手冊內容註冊表（8 章；宣告式 WikiChapter/WikiSection/WikiAction，動作 to/tour 由 WikiView 解析；內容層禁 import store，tests/wiki.test.tsx 守衛；section id＝?ch=&sec= 深連結契約勿改名）
 ├── version.ts         版本資訊單一來源（vite define 注入版號/SHA/建置時間；側邊欄/設定「關於」/列印頁尾共用）
 └── views/
     ├── DashboardView  「本月工作台」＝首頁 /：待辦卡（含停保/復保）＋排程調薪＋深連結（?tab=、?emp=）
@@ -102,7 +103,8 @@ src/
     └── MasterDataView(情境化申請單：員工清單/批次薪資/異動紀錄三分頁＋員工檔案面板挑情境→聚焦表單＋原因→applyChangeTicket；
         批次薪資＝BatchSalaryPanel 族群選擇→調整既有%/定額·新增津貼·區間補貼→預覽→即時套用/排程)/AttendanceView/
         SettingsView(公司分頁含 年資計算方式〔seniorityBasis：fixedDate 固定基準日／hireDate 依到職日算至當月，僅影響年資/特休顯示、TC-9 不變〕＋LeavePolicyCard＋SalaryDefaultsCard 新進預設)/
-        SetupWizard(五步：歡迎/公司設定/薪資結構預設〔伙食津貼預帶 3000→salaryDefaults，空白模式快速新增即帶入〕/員工資料/完成)/HelpView/SourcesView
+        SetupWizard(五步：歡迎/公司設定/薪資結構預設〔伙食津貼預帶 3000→salaryDefaults，空白模式快速新增即帶入〕/員工資料/完成)/HelpView/SourcesView/
+        WikiView(/wiki 操作手冊：桌機 sticky 章節 TOC＋行動版 Select、?ch=&sec= 深連結保留於網址、關鍵字搜尋、列印本章、動作鈕跳頁/啟動導覽)
 ```
 
 **員工生命週期**（使用者拍板）：`EmployeeStatus` 5 種＝在職/離職/留停/停職/暫離。
@@ -113,7 +115,7 @@ src/
 舊資料與 TC-9 逐位元不變；store `migrate` v2→v3 已自動回填）。勞保費到/離職當月按 `employmentDaysFactor`（在職天數）比例、
 健保與勞退整月。復職＝補填該段復職日，之後自動全薪（不必改回在職）。**主檔基本分頁下方「區間紀錄」逐段編輯**。
 
-側邊欄 IA（App.tsx `NAV_SECTIONS`）：每月作業（工作台/薪資結算/出勤）／規劃與分析／專案／報表與申報／主檔與設定／說明。
+側邊欄 IA（App.tsx `NAV_SECTIONS`）：每月作業（工作台/薪資結算/出勤）／規劃與分析／專案／報表與申報／主檔與設定／說明（使用說明/操作手冊/法規依據）。
 
 **功能開關（`src/config/features.ts` `FEATURES`）**（使用者拍板）：讓人事先專注薪資作業驗收，**「出勤打卡」與「專案」
 目前全環境隱藏 UI 入口**（`attendance:false`／`projects:false`，純布林、與 APP_ENV 無關）。**只隱藏入口、不刪碼/資料/計算**：

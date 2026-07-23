@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FEATURES } from "@/config/features";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { TOUR_LIST } from "@/content/tours";
-import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings, BarChart3, Compass } from "lucide-react";
+import { Wand2, CalendarClock, ClipboardCheck, FileSpreadsheet, Users, Settings, BarChart3, Compass, BookMarked } from "lucide-react";
 
 const ANALYTICS_GUIDE: [string, string][] = [
   ["成本結構", "看人事總成本由本薪/加給/加班/獎金/雇主負擔的組成、部門別比較與成本集中度（Pareto），抓結構失衡。"],
@@ -97,6 +97,16 @@ export function HelpView() {
           所得稅扣繳到薪資條一次完成。
         </p>
       </div>
+
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <p className="text-sm font-semibold">完整操作手冊</p>
+            <p className="text-sm text-muted-foreground">逐章逐畫面的完整說明：8 章涵蓋每月作業、基本資料、報表申報、系統設定與計算原理，可搜尋、可列印、可直接跳到畫面或啟動導覽。</p>
+          </div>
+          <Button onClick={() => navigate("/wiki")}><BookMarked /> 開啟操作手冊</Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

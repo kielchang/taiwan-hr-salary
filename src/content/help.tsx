@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 
-/** 情境式說明內容（各區一鍵叫出）；精簡、操作導向。 */
-export const HELP: Record<string, { title: string; body: ReactNode }> = {
+/** 情境式說明內容（各區一鍵叫出）；精簡、操作導向。wiki＝操作手冊對應章深連結（HelpHint 底部「完整說明」）。 */
+export const HELP: Record<string, { title: string; body: ReactNode; wiki?: string }> = {
   analytics: {
     title: "薪酬分析怎麼用",
+    wiki: "/wiki?ch=analytics",
     body: (
       <>
         <p>分三群：<strong>月報</strong>（依「檢視月份」看該月實際/試算的成本·分布·級距）、<strong>規劃試算</strong>（獎金、調薪沙盒，不寫回薪資）、<strong>年報</strong>（當年累計＋模擬全年＋預算）。</p>
@@ -23,6 +24,7 @@ export const HELP: Record<string, { title: string; body: ReactNode }> = {
   },
   reports: {
     title: "報表與申報",
+    wiki: "/wiki?ch=reports",
     body: (
       <>
         <p>對外（員工／主管機關）的<strong>實際</strong>報表單一出口。</p>
@@ -34,6 +36,7 @@ export const HELP: Record<string, { title: string; body: ReactNode }> = {
   },
   settings: {
     title: "系統設定",
+    wiki: "/wiki?ch=settings",
     body: (
       <>
         <p>分三區：<strong>法定參數</strong>（115 年度費率/金額與投保級距，通常每年 1 月更新一次）、<strong>公司</strong>（職保費率、<strong>年資／特休計算方式</strong>、新進薪資預設、非在職給薪比例）、<strong>資料與安全</strong>（整檔備份/還原、操作者與變更紀錄、還原範例/載入示範/清空）。</p>
@@ -54,6 +57,7 @@ export const HELP: Record<string, { title: string; body: ReactNode }> = {
   },
   master: {
     title: "基本資料怎麼維護",
+    wiki: "/wiki?ch=master",
     body: (
       <>
         <p>員工檔案改<strong>依情境維護</strong>：點員工列開啟檔案面板，挑一個<strong>情境</strong>→只顯示該情境欄位＋必填「<strong>異動原因</strong>」→送出即更新，並在「<strong>異動紀錄</strong>」分頁留下可稽核紀錄（含原因、前後值、操作者，可逐筆<strong>回復</strong>、可匯出 CSV）。不必再在一張大表裡找欄位。</p>
@@ -67,6 +71,7 @@ export const HELP: Record<string, { title: string; body: ReactNode }> = {
   },
   payroll: {
     title: "每月薪資作業（例行結算）",
+    wiki: "/wiki?ch=monthly",
     body: (
       <>
         <p>兩步驟：<strong>① 輸入當月異動</strong>（只替有加班/請假/獎金者編輯；其餘維持固定薪資）→ <strong>② 查核與確認</strong>。</p>
