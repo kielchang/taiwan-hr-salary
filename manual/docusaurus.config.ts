@@ -30,6 +30,14 @@ const config: Config = {
         docs: {
           routeBasePath: "/", // 手冊即整站：docs 掛根
           sidebarPath: "./sidebars.ts",
+          // 版本對映系統版號（SemVer）：發佈 app 新版時同步 `npm run docusaurus docs:version <版號>`
+          // （SOP 見 docs/versioning.md）。預設顯示最新快照＝與正式站系統版本吻合；
+          // current（未快照的最新內容）＝「開發中」，掛 /next、帶未發佈橫幅。
+          lastVersion: "1.10.0",
+          versions: {
+            current: { label: "開發中（下一版）", path: "next", banner: "unreleased" },
+            "1.10.0": { label: "系統 v1.10.0", banner: "none" },
+          },
         },
         blog: false,
         pages: false,
@@ -49,7 +57,10 @@ const config: Config = {
     colorMode: { respectPrefersColorScheme: true },
     navbar: {
       title: "薪資管理系統 操作手冊",
-      items: [{ href: APP_URL, label: "回系統 ↗", position: "right" }],
+      items: [
+        { type: "docsVersionDropdown", position: "right", dropdownActiveClassDisabled: true },
+        { href: APP_URL, label: "回系統 ↗", position: "right" },
+      ],
     },
     footer: {
       style: "dark",

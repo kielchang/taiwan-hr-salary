@@ -50,3 +50,25 @@ __BUILD_TIME__  = new Date().toISOString()
 
 > - CI runner 內建 `GITHUB_SHA`，build 步驟自動取用注入版號 SHA；`release` job 用 `github.token`（`contents: write`）建立 tag/Release，不受本地環境限制。
 > - 手動補 tag（需要時）：`git tag -a vX.Y.Z <sha> -m vX.Y.Z && git push origin vX.Y.Z`（若你的環境允許推 tag）。
+
+## 操作手冊版本對映（manual/）
+
+手冊（Docusaurus）以 **docs versioning** 對映系統版號，確保「文件內容＝該版系統行為」：
+
+- 預設顯示**最新快照版**（＝正式站系統版本）；`/next/` ＝「開發中（下一版）」內容、帶未發佈橫幅；右上版本下拉可切換。
+- **發佈新版（bump `package.json` version）時，同步快照手冊**：
+
+```bash
+cd manual && npm run docusaurus docs:version <X.Y.Z>
+```
+
+再把 `manual/docusaurus.config.ts` 的 `lastVersion` 與 `versions` 標籤補上 `系統 v<X.Y.Z>`。
+- UI 畫面改版時（元件/畫面外觀變更），重錄手冊的操作畫面素材：
+
+```bash
+npm run build && npx vite preview --port 4179 &   # 起已建置的系統
+node manual/scripts/capture-flows.mjs              # 重錄 → manual/static/flows/
+```
+
+- 守衛：`tests/manualStories.test.ts` 確保手冊引用的 Storybook story 與流程素材存在；
+  `deploy-manual.yml` 在 `src/components/**`／`.storybook/**` 變更時也會重佈手冊（內嵌 storybook 同步）。

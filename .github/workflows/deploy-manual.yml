@@ -16,6 +16,10 @@ on:
     paths:
       - "manual/**"
       - ".github/workflows/deploy-manual.yml"
+      # Storybook↔UI 掛勾：元件庫或 Storybook 設定變更 → 手冊隨附的 storybook 也要重佈，
+      # 手冊內嵌 story／FlowPlayer 畫面才不會與現行 UI 脫鉤
+      - "src/components/**"
+      - ".storybook/**"
   workflow_dispatch:
 
 permissions:

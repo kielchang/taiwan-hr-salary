@@ -2,5 +2,6 @@
 import MDXComponents from "@theme-original/MDXComponents";
 import AppLink from "@site/src/components/AppLink";
 import StoryFrame from "@site/src/components/StoryFrame";
+import FlowPlayer from "@site/src/components/FlowPlayer";
 
-export default { ...MDXComponents, AppLink, StoryFrame };
+export default { ...MDXComponents, AppLink, StoryFrame, FlowPlayer };
