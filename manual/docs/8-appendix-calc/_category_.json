@@ -1,9 +1,0 @@
-{
-  "label": "附錄 計算原理（補充）",
-  "position": 8,
-  "link": {
-    "type": "generated-index",
-    "slug": "/calc",
-    "description": "系統怎麼算錢的白話補充，附互動試算。日常操作不需要讀完這章。"
-  }
-}

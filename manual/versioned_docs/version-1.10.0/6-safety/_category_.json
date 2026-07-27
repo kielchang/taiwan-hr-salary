@@ -1,0 +1,9 @@
+{
+  "label": "第6章 資料安全與問題排解",
+  "position": 6,
+  "link": {
+    "type": "generated-index",
+    "slug": "/safety",
+    "description": "備份還原、看懂資料檢查訊息、誤操作救援。"
+  }
+}

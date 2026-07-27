@@ -39,7 +39,9 @@ function collectStoryIds(): Set<string> {
     for (const m of src.matchAll(/export const (\S+?)\s*[:=]/g)) {
       const name = m[1];
       if (name === "default" || name === "meta") continue;
-      ids.add(`${t}--${sanitize(name)}`);
+      // storyNameFromExport 近似：底線→空白、camelCase 斷詞（DataTable→Data Table）再 sanitize
+      const spaced = name.replace(/_/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+      ids.add(`${t}--${sanitize(spaced)}`);
     }
   }
   return ids;

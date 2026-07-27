@@ -108,6 +108,8 @@ await shot("③ 往下確認薪資與眷屬扣繳欄位，送出後名冊會提�
 await p.keyboard.press("Escape");
 await p.waitForTimeout(500);
 
+finish();
+
 // ── 流程 5：批次調薪 ─────────────────────────────
 start("batch-salary", "人事事件：批次調薪與補貼");
 await p.evaluate(() => { location.hash = "#/master?tab=batch"; });
@@ -122,6 +124,8 @@ await p.waitForTimeout(400);
 await shot("③ 核對預覽無誤後「立即套用」或選未來月「排程」；每筆都留異動紀錄");
 await p.evaluate(() => window.scrollTo(0, 0));
 
+finish();
+
 // ── 流程 6：發薪資條 ─────────────────────────────
 start("payslip", "每月例行：發薪資條");
 await p.evaluate(() => { location.hash = "#/reports?tab=payslip"; });
@@ -133,6 +137,8 @@ await shot("② 預覽內容：應發/代扣/實發、公司負擔，外幣另�
 await p.evaluate(() => window.scrollTo(0, 0));
 await p.waitForTimeout(300);
 await shot("③ 「下載 PDF」單發（密碼＝身分證大寫）或「批次下載 ZIP」全員一次發");
+
+finish();
 
 // ── 流程 7：申報名冊走一輪 ─────────────────────────────
 start("filing", "申報與繳費：四類名冊");
@@ -149,6 +155,8 @@ const tabEn = p.getByRole("button", { name: "加退保作業清單" });
 if (await tabEn.count()) { await tabEn.first().click(); await p.waitForTimeout(800); }
 await shot("④ 加退保作業清單：本月應加保/退保/停保/復保（提醒性質，供人工辦理）");
 
+finish();
+
 // ── 流程 8：年度費率更新（生效月版本） ─────────────────────────────
 start("settings-version", "年度維護：更新法定費率（不回溯歷史）");
 await p.evaluate(() => { location.hash = "#/settings"; });
@@ -161,6 +169,8 @@ await p.evaluate(() => window.scrollBy(0, 300));
 await p.waitForTimeout(400);
 await shot("③ 更新公告的新費率——先前已申報月份維持原費率，不會被改動");
 await p.evaluate(() => window.scrollTo(0, 0));
+
+finish();
 
 // ── 流程 9：外幣薪資設定 ─────────────────────────────
 start("currency-setup", "設定：啟用外幣薪資");
@@ -176,6 +186,7 @@ await shot("② 新增幣別（代碼/名稱/符號）");
 await p.evaluate(() => window.scrollBy(0, 300));
 await p.waitForTimeout(400);
 await shot("③ 逐月維護匯率：未設匯率＝該月台幣約當以 0 計（旁有「未設匯率」提醒）");
+finish();
 
 await b.close();
 console.log("capture done →", OUT);
