@@ -70,6 +70,15 @@ describe("手冊 ↔ Storybook／流程素材 掛鉤", () => {
     }
   });
 
+  it("每節至少一個互動/視覺輔助（PM 規範：不只是文字說明）", () => {
+    for (const f of docs) {
+      if (f.endsWith("index.md")) continue;
+      const src = readFileSync(f, "utf8");
+      const hasAid = /<(Demo\w+|Calc\w+|FlowPlayer|StoryFrame|AppLink)/.test(src);
+      expect(hasAid, `${f} 缺互動/視覺輔助（FlowPlayer/Demo/Calc/StoryFrame/AppLink 擇一）`).toBe(true);
+    }
+  });
+
   it("FlowPlayer 引用的流程素材皆存在（manifest+首格截圖）", () => {
     for (const f of docs) {
       const src = readFileSync(f, "utf8");

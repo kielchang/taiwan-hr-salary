@@ -93,5 +93,89 @@ await p.waitForTimeout(900);
 await shot("③ 匯出完成：提醒卡消失、側欄轉「今日已備份」（備份檔請另存雲端/隨身碟）");
 finish();
 
+
+// ── 流程 4：新人報到 ─────────────────────────────
+start("onboard", "人事事件：有新人報到");
+await p.evaluate(() => { location.hash = "#/master"; });
+await p.waitForTimeout(1200);
+await shot("① 到「基本資料」：右上「新進到職」建立新員工");
+await p.getByRole("button", { name: /新進到職/ }).first().click();
+await p.waitForTimeout(900);
+await shot("② 填基本資料與到職日；固定薪資會自動帶入公司預設（可改）");
+await p.evaluate(() => { const d = document.querySelector('[role=dialog]'); if (d) d.scrollTop = d.scrollHeight; });
+await p.waitForTimeout(500);
+await shot("③ 往下確認薪資與眷屬扣繳欄位，送出後名冊會提醒辦理加保");
+await p.keyboard.press("Escape");
+await p.waitForTimeout(500);
+
+// ── 流程 5：批次調薪 ─────────────────────────────
+start("batch-salary", "人事事件：批次調薪與補貼");
+await p.evaluate(() => { location.hash = "#/master?tab=batch"; });
+await p.waitForTimeout(1200);
+await shot("① 「批次薪資」：先選族群（全公司／部門／成本中心）");
+const pct = p.getByRole("dialog").locator('input[type="number"]');
+const pctMain = p.locator('input[type="number"]').first();
+if (await pctMain.count()) { await pctMain.fill("3"); await p.waitForTimeout(800); }
+await shot("② 設定調整方式（例：本薪 +3%）——下方立即出現影響預覽（前→後、低於最低工資標示）");
+await p.evaluate(() => window.scrollBy(0, 400));
+await p.waitForTimeout(400);
+await shot("③ 核對預覽無誤後「立即套用」或選未來月「排程」；每筆都留異動紀錄");
+await p.evaluate(() => window.scrollTo(0, 0));
+
+// ── 流程 6：發薪資條 ─────────────────────────────
+start("payslip", "每月例行：發薪資條");
+await p.evaluate(() => { location.hash = "#/reports?tab=payslip"; });
+await p.waitForTimeout(1400);
+await shot("① 「報表與申報 → 薪資條」：左側選員工、右側即時預覽");
+await p.evaluate(() => window.scrollBy(0, 500));
+await p.waitForTimeout(400);
+await shot("② 預覽內容：應發/代扣/實發、公司負擔，外幣另列（不含台幣實發）");
+await p.evaluate(() => window.scrollTo(0, 0));
+await p.waitForTimeout(300);
+await shot("③ 「下載 PDF」單發（密碼＝身分證大寫）或「批次下載 ZIP」全員一次發");
+
+// ── 流程 7：申報名冊走一輪 ─────────────────────────────
+start("filing", "申報與繳費：四類名冊");
+await p.evaluate(() => { location.hash = "#/reports?tab=withholding"; });
+await p.waitForTimeout(1400);
+await shot("① 年度扣繳憑單：逐人全年應發/應稅/代扣稅，可匯出 CSV");
+const tabIns = p.getByRole("button", { name: "勞健退繳費清單" });
+if (await tabIns.count()) { await tabIns.first().click(); await p.waitForTimeout(800); }
+await shot("② 勞健退繳費清單：當期投保金額與員工自付/雇主負擔");
+const tabBr = p.getByRole("button", { name: "投保級距申報調整" });
+if (await tabBr.count()) { await tabBr.first().click(); await p.waitForTimeout(800); }
+await shot("③ 投保級距申報調整：2月/8月比對「現在 vs 已申報」，列出需調整者");
+const tabEn = p.getByRole("button", { name: "加退保作業清單" });
+if (await tabEn.count()) { await tabEn.first().click(); await p.waitForTimeout(800); }
+await shot("④ 加退保作業清單：本月應加保/退保/停保/復保（提醒性質，供人工辦理）");
+
+// ── 流程 8：年度費率更新（生效月版本） ─────────────────────────────
+start("settings-version", "年度維護：更新法定費率（不回溯歷史）");
+await p.evaluate(() => { location.hash = "#/settings"; });
+await p.waitForTimeout(1200);
+await shot("① 「系統設定 → 法定參數」：已有已確認月時費率鎖定、出現黃色提示卡");
+const verBtn = p.getByRole("button", { name: /新增生效版本/ });
+if (await verBtn.count()) { await verBtn.first().click(); await p.waitForTimeout(900); }
+await shot("② 選生效月按「新增生效版本」：之後欄位解鎖，只影響生效月起的月份");
+await p.evaluate(() => window.scrollBy(0, 300));
+await p.waitForTimeout(400);
+await shot("③ 更新公告的新費率——先前已申報月份維持原費率，不會被改動");
+await p.evaluate(() => window.scrollTo(0, 0));
+
+// ── 流程 9：外幣薪資設定 ─────────────────────────────
+start("currency-setup", "設定：啟用外幣薪資");
+await p.evaluate(() => { location.hash = "#/settings?tab=currency"; });
+await p.waitForTimeout(1200);
+const fxToggle = p.locator('[data-tour="fx-enable-toggle"] button, [data-tour="fx-enable-toggle"] [role=switch]');
+if (await fxToggle.count()) { await fxToggle.first().click(); await p.waitForTimeout(800); }
+await shot("① 「幣別與匯率」：打開「啟用多幣別」才會出現維護中心");
+const codeInput = p.getByPlaceholder(/USD|代碼/).first();
+if (await codeInput.count()) { await codeInput.fill("USD"); }
+await p.waitForTimeout(400);
+await shot("② 新增幣別（代碼/名稱/符號）");
+await p.evaluate(() => window.scrollBy(0, 300));
+await p.waitForTimeout(400);
+await shot("③ 逐月維護匯率：未設匯率＝該月台幣約當以 0 計（旁有「未設匯率」提醒）");
+
 await b.close();
 console.log("capture done →", OUT);

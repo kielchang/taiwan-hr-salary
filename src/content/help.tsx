@@ -24,7 +24,7 @@ export const HELP: Record<string, { title: string; body: ReactNode; wiki?: strin
   },
   reports: {
     title: "報表與申報",
-    wiki: "reports",
+    wiki: "filing",
     body: (
       <>
         <p>對外（員工／主管機關）的<strong>實際</strong>報表單一出口。</p>
@@ -36,7 +36,7 @@ export const HELP: Record<string, { title: string; body: ReactNode; wiki?: strin
   },
   settings: {
     title: "系統設定",
-    wiki: "settings",
+    wiki: "annual",
     body: (
       <>
         <p>分三區：<strong>法定參數</strong>（115 年度費率/金額與投保級距，通常每年 1 月更新一次）、<strong>公司</strong>（職保費率、<strong>年資／特休計算方式</strong>、新進薪資預設、非在職給薪比例）、<strong>資料與安全</strong>（整檔備份/還原、操作者與變更紀錄、還原範例/載入示範/清空）。</p>
@@ -57,7 +57,7 @@ export const HELP: Record<string, { title: string; body: ReactNode; wiki?: strin
   },
   master: {
     title: "基本資料怎麼維護",
-    wiki: "master",
+    wiki: "hr-events",
     body: (
       <>
         <p>員工檔案改<strong>依情境維護</strong>：點員工列開啟檔案面板，挑一個<strong>情境</strong>→只顯示該情境欄位＋必填「<strong>異動原因</strong>」→送出即更新，並在「<strong>異動紀錄</strong>」分頁留下可稽核紀錄（含原因、前後值、操作者，可逐筆<strong>回復</strong>、可匯出 CSV）。不必再在一張大表裡找欄位。</p>
