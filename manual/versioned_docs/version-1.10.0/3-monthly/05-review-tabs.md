@@ -16,6 +16,12 @@ title: "第二步：查核三分頁"
 
 <AppLink to="/payroll/review">前往查核與確認</AppLink>
 
+## 試玩：分頁列元件
+
+查核頁的三分頁用的分頁列（元件本尊）：
+
+<DemoTabPills />
+
 ## 實際操作畫面
 
 <FlowPlayer name="review-confirm" />

@@ -59,6 +59,17 @@ describe("手冊 ↔ Storybook／流程素材 掛鉤", () => {
     }
   });
 
+  it("kit.css tokens 副本涵蓋 tailwind 設定引用的全部變數（防手冊活示例樣式漂移）", () => {
+    const twConfig = readFileSync(join(ROOT, "tailwind.config.js"), "utf8");
+    const kitCss = readFileSync(join(ROOT, "manual", "src", "css", "kit.css"), "utf8");
+    // --radix-* 為 Radix 元件執行期注入的變數（非設計 token），不需入副本
+    const wanted = new Set([...twConfig.matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]).filter((v) => !v.startsWith("--radix")));
+    expect(wanted.size).toBeGreaterThan(10);
+    for (const v of wanted) {
+      expect(kitCss.includes(`${v}:`), `manual/src/css/kit.css 缺 token ${v}（自 src/index.css 同步）`).toBe(true);
+    }
+  });
+
   it("FlowPlayer 引用的流程素材皆存在（manifest+首格截圖）", () => {
     for (const f of docs) {
       const src = readFileSync(f, "utf8");

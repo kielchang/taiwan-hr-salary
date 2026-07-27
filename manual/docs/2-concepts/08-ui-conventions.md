@@ -18,3 +18,16 @@ title: "畫面慣例：欄位顏色與尾差"
 :::
 
 <AppLink to="/sources">查看法規依據</AppLink>
+
+
+## 試玩：畫面慣例的元件本尊
+
+「可編輯欄位（淡冷底＋邊框）→ 改動後轉琥珀＝未送出」的完整循環，直接操作：
+
+<DemoEditableField />
+
+<DemoNumberInput />
+
+狀態語意四色（成功／警告／資訊／危險）：
+
+<DemoCallout />

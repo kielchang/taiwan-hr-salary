@@ -3,5 +3,6 @@ import MDXComponents from "@theme-original/MDXComponents";
 import AppLink from "@site/src/components/AppLink";
 import StoryFrame from "@site/src/components/StoryFrame";
 import FlowPlayer from "@site/src/components/FlowPlayer";
+import { DemoEditableField, DemoDelta, DemoStepper, DemoTabPills, DemoCallout, DemoNumberInput } from "@site/src/components/demos";
 
-export default { ...MDXComponents, AppLink, StoryFrame, FlowPlayer };
+export default { ...MDXComponents, AppLink, StoryFrame, FlowPlayer, DemoEditableField, DemoDelta, DemoStepper, DemoTabPills, DemoCallout, DemoNumberInput };

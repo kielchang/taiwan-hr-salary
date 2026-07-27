@@ -62,7 +62,7 @@ __BUILD_TIME__  = new Date().toISOString()
 cd manual && npm run docusaurus docs:version <X.Y.Z>
 ```
 
-再把 `manual/docusaurus.config.ts` 的 `lastVersion` 與 `versions` 標籤補上 `系統 v<X.Y.Z>`。
+（config 會動態讀 `versions.json` 自動掛「系統 v<X.Y.Z>」標籤與 lastVersion，**不必手改 config**。）
 - UI 畫面改版時（元件/畫面外觀變更），重錄手冊的操作畫面素材：
 
 ```bash
