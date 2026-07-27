@@ -2,6 +2,8 @@
 title: "輸入當月異動"
 ---
 
+📍 位置：側邊欄 →「薪資結算」
+
 ## 先看一遍實際操作
 
 <FlowPlayer name="monthly-edit" />

@@ -201,6 +201,7 @@ await p.evaluate(() => window.scrollBy(0, 500));
 await p.waitForTimeout(400);
 await shot("③ 往下還有排程調薪與快捷入口；卡片歸零代表本月無待辦");
 await p.evaluate(() => window.scrollTo(0, 0));
+finish();
 
 // ── 流程 11：主檔情境操作 ─────────────────────────────
 start("master-scenario", "基本資料：情境申請單怎麼用");
@@ -215,6 +216,7 @@ if (await scenBtn.count()) { await scenBtn.first().click(); await p.waitForTimeo
 await shot("③ 選情境後只出現該情境欄位＋必填「異動原因」；填好按送出即留稽核紀錄");
 await p.keyboard.press("Escape");
 await p.waitForTimeout(400);
+finish();
 
 await b.close();
 console.log("capture done →", OUT);

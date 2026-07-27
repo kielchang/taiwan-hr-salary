@@ -10,7 +10,7 @@ title: "更新投保級距表"
 
 級距表長這樣，可搜尋查閱：
 
-<StoryFrame id="元件-其他--投保級距表-分頁版-bracket-tables" height={420} />
+<StoryFrame id="元件-其他--投保級距表-分頁版-bracket-tables" height={420} title="投保級距表（可搜尋）" />
 
 ## 操作步驟
 
