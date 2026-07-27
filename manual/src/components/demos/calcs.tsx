@@ -52,13 +52,17 @@ export function CalcOvertime() {
   const [salary, setSalary] = useState(45800);
   const [w1, setW1] = useState(8);
   const [w2, setW2] = useState(0);
+  const [r1, setR1] = useState(0);
+  const [r2, setR2] = useState(0);
   const [hol, setHol] = useState(0);
-  const pay = useMemo(() => overtimePay(salary, blankEvent({ overtimeWeekday1: w1, overtimeWeekday2: w2, overtimeHoliday: hol }), P), [salary, w1, w2, hol]);
+  const pay = useMemo(() => overtimePay(salary, blankEvent({ overtimeWeekday1: w1, overtimeWeekday2: w2, overtimeRestday1: r1, overtimeRestday2: r2, overtimeHoliday: hol }), P), [salary, w1, w2, r1, r2, hol]);
   return (
     <CalcCard title="加班費試算" result={<>本月加班費 ≈ <strong>{ntd(pay)}</strong>（時薪 {ntd(hourlyWage(salary, P))} × 倍率）</>}>
       <Field label="月薪資總額"><NumberInput value={salary} onChange={setSalary} min={0} /></Field>
       <Field label="平日前2h"><NumberInput value={w1} onChange={setW1} min={0} /></Field>
       <Field label="平日3-4h"><NumberInput value={w2} onChange={setW2} min={0} /></Field>
+      <Field label="休息日前2h"><NumberInput value={r1} onChange={setR1} min={0} /></Field>
+      <Field label="休息日3h起"><NumberInput value={r2} onChange={setR2} min={0} /></Field>
       <Field label="國定假日"><NumberInput value={hol} onChange={setHol} min={0} /></Field>
     </CalcCard>
   );

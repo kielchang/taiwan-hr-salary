@@ -175,7 +175,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                   <Sparkles className="mb-2 size-5 text-warning" />
                   <p className="font-medium">載入範例公司體驗</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    內含 8 名範例員工與完整薪資情境，適合先熟悉操作，之後可隨時清空改填自己的資料。
+                    內含約 60 名範例員工與 13 個月歷史（含已確認月份），適合體驗完整月結、查核與分析；之後可隨時清空改填自己的資料。
                   </p>
                 </button>
                 <button
@@ -304,7 +304,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-bold">員工資料</h2>
-                <p className="text-sm text-muted-foreground">已載入 8 名範例員工，涵蓋常見情境：</p>
+                <p className="text-sm text-muted-foreground">已載入 {employees.length} 名範例員工，涵蓋常見情境：</p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {employees.map((e) => (

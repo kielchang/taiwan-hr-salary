@@ -130,13 +130,13 @@ finish();
 start("payslip", "每月例行：發薪資條");
 await p.evaluate(() => { location.hash = "#/reports?tab=payslip"; });
 await p.waitForTimeout(1400);
-await shot("① 「報表與申報 → 薪資條」：左側選員工、右側即時預覽");
+await shot("① 「報表與申報 → 薪資條」：用下拉選單選員工、下方即時預覽");
 await p.evaluate(() => window.scrollBy(0, 500));
 await p.waitForTimeout(400);
 await shot("② 預覽內容：應發/代扣/實發、公司負擔，外幣另列（不含台幣實發）");
 await p.evaluate(() => window.scrollTo(0, 0));
 await p.waitForTimeout(300);
-await shot("③ 「下載 PDF」單發（密碼＝身分證大寫）或「批次下載 ZIP」全員一次發");
+await shot("③ 「下載加密 PDF」單發（密碼＝身分證大寫）或「批次下載全部（ZIP）」一次發");
 
 finish();
 
@@ -187,6 +187,34 @@ await p.evaluate(() => window.scrollBy(0, 300));
 await p.waitForTimeout(400);
 await shot("③ 逐月維護匯率：未設匯率＝該月台幣約當以 0 計（旁有「未設匯率」提醒）");
 finish();
+
+
+// ── 流程 10：工作台導覽 ─────────────────────────────
+start("dashboard", "工作台：今天要處理什麼");
+await p.evaluate(() => { location.hash = "#/"; });
+await p.waitForTimeout(1200);
+await shot("① 工作台首頁：本月摘要四卡（結算人數/應發/實發/公司總成本）＋確認狀態");
+await p.evaluate(() => window.scrollBy(0, 420));
+await p.waitForTimeout(400);
+await shot("② 待辦卡逐張看：數字＝待處理件數，按卡片上的按鈕直達處理位置");
+await p.evaluate(() => window.scrollBy(0, 500));
+await p.waitForTimeout(400);
+await shot("③ 往下還有排程調薪與快捷入口；卡片歸零代表本月無待辦");
+await p.evaluate(() => window.scrollTo(0, 0));
+
+// ── 流程 11：主檔情境操作 ─────────────────────────────
+start("master-scenario", "基本資料：情境申請單怎麼用");
+await p.evaluate(() => { location.hash = "#/master"; });
+await p.waitForTimeout(1200);
+await shot("① 「基本資料 → 員工清單」：點任一位員工開啟檔案面板");
+const row = p.locator("tbody tr").first();
+if (await row.count()) { await row.click(); await p.waitForTimeout(900); }
+await shot("② 檔案面板：上方是基本資料，下方兩排「情境」按鈕——挑要辦的事");
+const scenBtn = p.getByRole("button", { name: /薪資結構調整/ });
+if (await scenBtn.count()) { await scenBtn.first().click(); await p.waitForTimeout(800); }
+await shot("③ 選情境後只出現該情境欄位＋必填「異動原因」；填好按送出即留稽核紀錄");
+await p.keyboard.press("Escape");
+await p.waitForTimeout(400);
 
 await b.close();
 console.log("capture done →", OUT);
