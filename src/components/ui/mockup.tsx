@@ -12,7 +12,7 @@ export function Placeholder({
 }: { w?: number | string; h?: number; label?: string; className?: string }) {
   return (
     <div
-      className={cn("flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-md bg-muted text-[11px] text-muted-foreground", className)}
+      className={cn("mock-ph flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-md bg-muted text-[11px] text-muted-foreground", className)}
       style={{ width: w ?? "100%", height: h }}
     >
       {label ?? ""}

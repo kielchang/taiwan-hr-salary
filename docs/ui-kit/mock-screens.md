@@ -31,7 +31,7 @@
 | 模式 | 策略 | 落點 |
 |---|---|---|
 | 亮色/深色 | 全走語意 token；kit.css 對映 `[data-theme="dark"]` | `mockup.tsx`＋`manual/src/css/kit.css` |
-| 列印/匯出 PDF | 全步驟展開＋各步字幕；控制列/計數/展開鈕隱藏；StoryFrame 換替代說明框 | `manual/src/css/custom.css` `@media print` |
+| 列印/匯出 PDF | 全步驟展開＋各步字幕；控制列/計數/展開鈕隱藏；StoryFrame 換替代說明框。**背景色跟隨當下主題**（深色模式印深色）：`@media print` 對全元素 `print-color-adjust: exact`——底色是內容不是裝飾，即使瀏覽器未勾「背景圖形」也照印；佔位塊另補列印邊框保底（`.mock-ph`） | `manual/src/css/custom.css` `@media print` |
 | 輪播（預設） | 自動輪播 4.2s、hover 暫停、前後步/圓點 | `MockFlow` |
 | 展開全部 | 標頭切換鈕；展開＝全步驟＋字幕、停輪播（與列印同樣式） | `.mockflow-expanded` |
 | 減少動態偏好 | `prefers-reduced-motion` → 預設展開、不輪播；聚光脈動降級靜態環 | `MockFlow` effect＋`.tour-pulse-ring` 降級 |

@@ -54,6 +54,16 @@
 .mockflow-expanded .mockflow-controls { display: none !important; }
 
 @media print {
+  /* 畫面底色＝內容而非裝飾：使用者未勾「背景圖形」也要印出（佔位塊/徽章/按鈕/提示框
+     全靠底色辨義，被剝掉會整塊消失）。print-color-adjust: exact 逐元素強制列印色彩。 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* 佔位塊保底：部分瀏覽器/印表機仍會剝背景 → 補淡邊框，至少保留形狀與標籤 */
+  .mock-ph {
+    border: 1px solid var(--ifm-color-emphasis-400);
+  }
   /* 隱藏站台外殼與互動控制：印出＝乾淨文件 */
   .navbar,
   .theme-doc-sidebar-container,

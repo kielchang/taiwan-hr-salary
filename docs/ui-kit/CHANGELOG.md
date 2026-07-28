@@ -3,6 +3,12 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.17.1] - 2026-07-28
+
+### 修正（Placeholder 列印保底）
+- `Placeholder` 加掛 `mock-ph` class：瀏覽器列印預設不印背景色（「背景圖形」未勾）時佔位塊會整塊消失——
+  消費端（手冊）以此 class 於 `@media print` 補淡邊框保底；搭配 `print-color-adjust: exact` 強制列印底色。
+
 ## [0.17.0] - 2026-07-28
 
 ### 新增（模擬畫面積木 Mockup：文件「零截圖」操作示意的基礎元件）
