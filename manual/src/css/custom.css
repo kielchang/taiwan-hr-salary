@@ -46,6 +46,13 @@
 .mockflow-step.mockflow-step-active { display: block; }
 .mockflow-step .mockflow-print-caption { display: none; }
 
+/* 螢幕端「展開全部」：與列印同一套展開樣式（全步驟＋各步字幕），停用輪播控制 */
+.mockflow-expanded .mockflow-step { display: block; }
+.mockflow-expanded .mockflow-step .mockflow-print-caption { display: block; font-weight: 600; }
+.mockflow-expanded .mockflow-counter { display: none; }
+/* !important：figcaption 帶 inline display:flex，需蓋過 */
+.mockflow-expanded .mockflow-controls { display: none !important; }
+
 @media print {
   /* 隱藏站台外殼與互動控制：印出＝乾淨文件 */
   .navbar,
@@ -61,7 +68,8 @@
   footer,
   .doc-print-bar,
   .mockflow-controls,
-  .mockflow-counter {
+  .mockflow-counter,
+  .mockflow-expand {
     display: none !important;
   }
   main,

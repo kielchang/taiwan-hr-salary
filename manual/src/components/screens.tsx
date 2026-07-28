@@ -764,27 +764,33 @@ export function MockScreen({ name }: { name: string }) {
   );
 }
 
-/** 流程播放器（React 排版、零截圖）：自動輪播＋字幕＋前後步＋直達入口 */
+/** 流程播放器（React 排版、零截圖）：自動輪播＋字幕＋前後步＋直達入口；可「展開全部」逐步閱讀（列印恆展開） */
 export default function MockFlow({ name, interval = 4200 }: { name: string; interval?: number }) {
   const flow = MOCK_FLOWS[name];
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const timer = useRef<number | null>(null);
   useEffect(() => {
-    if (!flow || paused) return;
+    if (!flow || paused || expanded) return;
     timer.current = window.setTimeout(() => setI((x) => (x + 1) % flow.steps.length), interval);
     return () => { if (timer.current) window.clearTimeout(timer.current); };
-  }, [flow, i, paused, interval]);
+  }, [flow, i, paused, expanded, interval]);
   if (!flow) return <div>未知流程：{name}</div>;
   const step = flow.steps[i];
   return (
-    <figure className="mockflow" style={{ margin: "1rem 0", border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 8, overflow: "hidden" }}
+    <figure className={`mockflow${expanded ? " mockflow-expanded" : ""}`} style={{ margin: "1rem 0", border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 8, overflow: "hidden" }}
       onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", background: "var(--ifm-color-emphasis-100)", fontSize: 13 }}>
         <strong>{flow.title}</strong>
         <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {/* 列印時全步驟展開，計數失義 → custom.css @media print 隱藏 */}
+          {/* 列印時全步驟展開，計數失義 → custom.css @media print 隱藏；螢幕展開時同理（.mockflow-expanded） */}
           <span className="mockflow-counter" style={{ color: "var(--ifm-color-emphasis-600)" }}>{i + 1} / {flow.steps.length}{paused ? "（暫停）" : ""}</span>
+          <button type="button" className="mockflow-expand" aria-pressed={expanded}
+            onClick={() => setExpanded((x) => !x)}
+            style={{ border: "1px solid var(--ifm-color-emphasis-300)", background: "transparent", color: "inherit", borderRadius: 6, cursor: "pointer", padding: "2px 8px", fontSize: 12 }}>
+            {expanded ? "收合輪播" : "展開全部"}
+          </button>
           {flow.to && <AppLink to={flow.to}>開啟此作業</AppLink>}
         </span>
       </div>
