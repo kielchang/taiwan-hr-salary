@@ -64,6 +64,14 @@ storage undefined 時先想到這裡，不要改測試本身。
    MasterDataView「異動紀錄」分頁＝`auditLog.filter(scenario)` 透鏡（回復沿用既有機制）；`AuditRestoreKind` 增 `dependents`
    （整份眷屬名冊回復）。**這是與稽核整合、非平行資料源**——不要另建 ticket slice。
 8. 「帶入上月異動」**不帶獎金與代扣稅**（使用者拍板，防誤重發）；累計獎金由 `ytdBonusBefore` 自動帶入。
+8.5. **設計上游＝doping-design-book（唯讀鐵律，使用者拍板）**：介面設計語言與操作邏輯的單一真實來源在
+   <https://github.com/kielchang/doping-design-book>（另一個 repo）。**本專案不得寫入上游**（環境上 push 也會 403）。
+   ⇒ 動介面/元件前先讀 **`docs/design-book/`**：`README.md`（怎麼讀上游＋離線摘要）、**`conformance.md`（符合性台帳：
+   每個元件是「遵循／自製／刻意偏離」）**、`proposals/`（給上游的提案）。取得上游：`./scripts/design-book.sh`
+   （唯讀 clone 到 repo 外部；`--list` 列章節、`--show <章節>` 直接讀）。**注意**：GitHub Pages 站與 GitHub MCP
+   在本環境讀不到（proxy 擋 github.io、MCP scope 僅本 repo），只能走 git clone。
+   **新增/改元件的動作**：先查上游有無 → 有則遵循並記台帳；無則自製並記台帳，具通用性者寫提案。
+   要改上游一律 **提案 → PR → 上游確認合併 → 才回寫台帳與本地實作**（**未合併不得先行實作**）。
 9. **元件庫邊界不可耦合 app**（使用者拍板：未來要切成共用套件統一介面風格）：`src/components/{ui,form,charts}`＋
    `NumberInput/Stepper/ErrorBoundary`＋支撐工具（`lib/utils`・`useSort`・`csv`・`forms/diff`・`download`）**只能**依賴設計 token
    與彼此，**禁止** import `@/store`／`@/data`／`@/views`／`@/content`／`@/version`／`@/lib/types`／`@/lib/calc`… 等 app 模組。
@@ -182,3 +190,6 @@ gating 點：App 側邊欄+路由（隱藏時 `*` fallback 導回 `/payroll/mont
 「讀 CLAUDE.md 後續作：⟨任務⟩。遵守鐵律：TC-9 不動、硬鎖定語意、DataTable 標準；
 完成後 tsc --force＋vitest 全綠，commit 到 claude/salary-calculator-react-shadcn-stxjp7，
 merge main 部署前先問我。」
+
+**若任務會動到介面/元件**：先讀 `docs/design-book/`（上游規範與符合性台帳，鐵律 8.5），
+需要上游原文時跑 `./scripts/design-book.sh`。

@@ -4,6 +4,17 @@
 目前採「**in-repo 獨立版控**」：元件仍住在本 repo 的 `src/components`，但已有獨立版號、CHANGELOG 與
 對外邊界，隨時可 lift-and-shift 抽出。
 
+> **上游已誕生。** 本檔開頭那個「未來」已經實現為獨立 repo
+> [doping-design-book](https://github.com/kielchang/doping-design-book)：跨專案共用的設計 token、
+> 通用元件參考實作與操作模式手冊。
+>
+> **兩者關係**：上游＝**規範**（設計語言與模式的單一真實來源）；本地 `src/components`＝本專案的**實作**。
+> 目前**不裝上游套件**（平行實作），靠 [`docs/design-book/conformance.md`](../design-book/conformance.md)
+> 逐元件記錄「遵循／自製／刻意偏離」來對齊。
+>
+> **唯讀鐵律**：本專案不得寫入上游；要改上游走 [提案](../design-book/proposals/) → PR → 合併後才動本地。
+> 本檔的 CHANGELOG 記「本地改了什麼」，台帳記「與上游的關係」——兩本帳分工，別混。
+
 ## 版本
 
 - 單一來源：[`src/components/version.ts`](../../src/components/version.ts) 的 `UI_KIT = { name, version }`。
