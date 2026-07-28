@@ -2,6 +2,9 @@
 // 設計原則（使用者指定）：重點按鈕/圖表＝真元件＋聚光高亮；其餘畫面＝灰色佔位留白。
 // MockFlow＝步驟播放器（自動輪播＋字幕＋前後步），內容為 React 排版、非圖片；
 // 每條流程可配 to（直達系統作業的入口連結）。元件更新＝畫面自動同步（同一份元件庫）。
+// 積木（Placeholder/Spotlight/MockScreenFrame/MockRow）＝元件庫 ui/mockup（Storybook-first 管理，
+// 聚光=tour-pulse 主色脈動環）；本檔只負責「內容排版＋註冊表＋播放器」（AppLink 為 Docusaurus glue）。
+// 作者規範見 docs/ui-kit/mock-screens.md。
 import React, { useEffect, useRef, useState } from "react";
 import AppLink from "@site/src/components/AppLink";
 import { Button } from "@/components/ui/button";
@@ -12,60 +15,12 @@ import { NumberInput } from "@/components/NumberInput";
 import { TabPills } from "@/components/ui/tab-pills";
 import { Delta } from "@/components/ui/delta";
 import { EditableField } from "@/components/form/EditableField";
-
-/* ── 基礎積木 ───────────────────────────── */
-
-/** 佔位塊：非重點區域一律留白（灰色圓角塊，可帶淡字標籤） */
-function Ph({ w, h = 14, label }: { w?: number | string; h?: number; label?: string }) {
-  return (
-    <div style={{ width: w ?? "100%", height: h, borderRadius: 6, background: "var(--ifm-color-emphasis-200)",
-      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
-      color: "var(--ifm-color-emphasis-500)", overflow: "hidden", whiteSpace: "nowrap", flexShrink: 0 }}>
-      {label ?? ""}
-    </div>
-  );
-}
-
-/** 聚光：包住「重點元件」——琥珀高亮框＋微光暈，視覺語言與系統內導覽一致 */
-function Spot({ children, label }: { children: React.ReactNode; label?: string }) {
-  return (
-    <span style={{ position: "relative", display: "inline-block", borderRadius: 10, padding: 4,
-      boxShadow: "0 0 0 3px #f59e0b, 0 0 14px rgba(245,158,11,.45)" }}>
-      {children}
-      {label && (
-        <span style={{ position: "absolute", top: -10, left: 8, transform: "translateY(-100%)",
-          background: "#f59e0b", color: "#fff", fontSize: 11, padding: "2px 8px", borderRadius: 6, whiteSpace: "nowrap" }}>
-          {label}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/** 畫面框：模擬系統版面（側欄/頂欄＝佔位），content 放該步驟的排版 */
-function ScreenFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-background text-foreground" style={{ display: "flex", gap: 10, padding: 12, minHeight: 230 }}>
-      <div style={{ width: 90, display: "flex", flexDirection: "column", gap: 6 }}>
-        <Ph h={22} label="選單" /><Ph h={14} /><Ph h={14} /><Ph h={14} /><Ph h={14} /><Ph h={14} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-        <Ph h={20} label="頂部狀態列" />
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "stretch" }}>{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/** 表格假列（帶重點格 focus） */
-function Row({ focus }: { focus?: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      <Ph w={64} /><Ph w={90} /><Ph /><Ph w={70} />
-      {focus ?? <Ph w={64} h={22} />}
-    </div>
-  );
-}
+import {
+  Placeholder as Ph,
+  Spotlight as Spot,
+  MockScreenFrame as ScreenFrame,
+  MockRow as Row,
+} from "@/components/ui/mockup";
 
 /* ── 各步驟排版（重點＝真元件） ───────────────────────────── */
 
@@ -73,18 +28,18 @@ const S = {
   /* 每月結算：輸入異動 */
   monthlyList: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 8 }}><Ph w={180} h={26} label="搜尋員工…" /><Ph /></div>
+      <div className="flex gap-2"><Ph w={180} h={26} label="搜尋員工…" /><Ph /></div>
       <Row /><Row focus={<Spot label="按這裡"><Button size="sm" variant="outline">編輯</Button></Spot>} /><Row />
     </ScreenFrame>
   ),
   monthlyDialog: (
     <ScreenFrame>
-      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-2.5 rounded-lg border border-border p-3">
         <Ph h={18} label="蔡佩珊｜本月異動" />
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 13 }}>平日加班・前 2 小時</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[13px]">平日加班・前 2 小時</span>
           <Spot label="填時數"><NumberInput value={8} onChange={() => {}} /></Spot>
-          <span style={{ fontSize: 13, color: "var(--ifm-color-emphasis-600)" }}>本月加班費試算：<strong>8,889 元</strong>（即時更新）</span>
+          <span className="text-[13px] text-muted-foreground">本月加班費試算：<strong>8,889 元</strong>（即時更新）</span>
         </div>
         <Ph h={40} label="請假／獎金／代扣稅…（略）" />
       </div>
@@ -92,9 +47,9 @@ const S = {
   ),
   monthlySave: (
     <ScreenFrame>
-      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-2.5 rounded-lg border border-border p-3">
         <Ph h={54} label="（異動欄位…）" />
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <div className="flex justify-end gap-2">
           <Button size="sm" variant="ghost">取消</Button>
           <Spot label="儲存"><Button size="sm">儲存本月異動</Button></Spot>
         </div>
@@ -104,7 +59,7 @@ const S = {
   monthlyDone: (
     <ScreenFrame>
       <Row />
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div className="flex items-center gap-2">
         <Ph w={64} /><Spot label="完成後你會看到"><Badge variant="secondary">加班 8 小時</Badge></Spot><Ph /><Ph w={70} /><Ph w={64} h={22} />
       </div>
       <Row />
@@ -126,7 +81,7 @@ const S = {
   ),
   reviewConfirm: (
     <ScreenFrame>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="flex items-center justify-between">
         <Ph w={220} h={22} label="摘要卡（人數/應發/實發）" />
         <Spot label="無誤後按"><Button size="sm">確認本月結算</Button></Spot>
       </div>
@@ -146,7 +101,7 @@ const S = {
   backupExport: (
     <ScreenFrame>
       <Ph h={18} label="系統設定 → 資料與安全" />
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="flex gap-2">
         <Spot label="匯出"><Button size="sm" variant="outline">匯出備份檔（JSON）</Button></Spot>
         <Button size="sm" variant="outline">從備份檔還原</Button>
       </div>
@@ -162,7 +117,7 @@ const S = {
   /* 新人報到 */
   onboardBtn: (
     <ScreenFrame>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <div className="flex justify-between">
         <Ph w={200} h={26} label="員工清單" />
         <Spot label="從這裡建檔"><Button size="sm">新進到職</Button></Spot>
       </div>
@@ -171,7 +126,7 @@ const S = {
   ),
   onboardForm: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+      <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
         <EditableField label="姓名" kind="text" value="王小新" onChange={() => {}} />
         <EditableField label="到職日" kind="date" value="2026-07-01" onChange={() => {}} />
       </div>
@@ -181,26 +136,26 @@ const S = {
   onboardDone: (
     <ScreenFrame>
       <Callout variant="info" title="完成後你會看到">員工清單多出這位新人；工作台「本月應加保」+1——記得到名冊辦加保。</Callout>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}><Spot><Button size="sm">建立員工</Button></Spot></div>
+      <div className="flex justify-end"><Spot><Button size="sm">建立員工</Button></Spot></div>
     </ScreenFrame>
   ),
   /* 批次調薪 */
   batchPick: (
     <ScreenFrame>
       <TabPills tabs={[{ key: "a", label: "批次調整" }, { key: "b", label: "外幣薪資" }, { key: "c", label: "區間補貼" }, { key: "d", label: "排程" }]} value="a" onChange={() => {}} />
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13 }}>族群</span><Ph w={140} h={26} label="全公司 ▾" />
-        <span style={{ fontSize: 13 }}>本薪</span><Spot label="調幅"><NumberInput value={3} onChange={() => {}} /></Spot><span style={{ fontSize: 13 }}>%</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-[13px]">族群</span><Ph w={140} h={26} label="全公司 ▾" />
+        <span className="text-[13px]">本薪</span><Spot label="調幅"><NumberInput value={3} onChange={() => {}} /></Spot><span className="text-[13px]">%</span>
       </div>
     </ScreenFrame>
   ),
   batchPreview: (
     <ScreenFrame>
       <Ph h={16} label="影響預覽（前 → 後）" />
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+      <div className="flex items-center gap-2 text-[13px]">
         <Ph w={64} /><span>36,000 →</span><strong>37,080</strong><Delta value={1080} />
       </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+      <div className="flex items-center gap-2 text-[13px]">
         <Ph w={64} /><span>29,000 →</span><strong>29,870</strong><Badge variant="warning">低於最低工資</Badge>
       </div>
     </ScreenFrame>
@@ -208,7 +163,7 @@ const S = {
   batchApply: (
     <ScreenFrame>
       <Ph h={44} label="（預覽…）" />
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="flex justify-end">
         <Spot label="生效月為當月時"><Button size="sm">立即套用</Button></Spot>
       </div>
       <Callout variant="info" title="未來月">同一顆按鈕會顯示「排程套用」，到期於「排程」分頁按「套用」。</Callout>
@@ -217,25 +172,25 @@ const S = {
   /* 薪資條 */
   payslipPick: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span style={{ fontSize: 13 }}>員工</span><Spot label="下拉選人"><Ph w={160} h={28} label="蔡佩珊 ▾" /></Spot>
+      <div className="flex items-center gap-2">
+        <span className="text-[13px]">員工</span><Spot label="下拉選人"><Ph w={160} h={28} label="蔡佩珊 ▾" /></Spot>
       </div>
       <Ph h={64} label="薪資條即時預覽（略）" />
     </ScreenFrame>
   ),
   payslipContent: (
     <ScreenFrame>
-      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 12, fontSize: 13, display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}><span>應發合計</span><strong>238,889</strong></div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}><span>代扣合計</span><strong>−21,378</strong></div>
-        <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--ifm-color-emphasis-300)", paddingTop: 6 }}><span><strong>實發金額</strong></span><strong>217,511</strong></div>
+      <div className="flex flex-col gap-1.5 rounded-lg border border-border p-3 text-[13px]">
+        <div className="flex justify-between"><span>應發合計</span><strong>238,889</strong></div>
+        <div className="flex justify-between"><span>代扣合計</span><strong>−21,378</strong></div>
+        <div className="flex justify-between border-t border-border pt-1.5"><span><strong>實發金額</strong></span><strong>217,511</strong></div>
       </div>
     </ScreenFrame>
   ),
   payslipExport: (
     <ScreenFrame>
       <Ph h={44} label="（預覽…）" />
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="flex flex-wrap gap-2">
         <Spot label="單發"><Button size="sm" variant="outline">下載加密 PDF</Button></Spot>
         <Button size="sm" variant="outline">批次下載全部（ZIP）</Button>
       </div>
@@ -252,10 +207,10 @@ const S = {
   filingBracket: (
     <ScreenFrame>
       <TabPills tabs={[{ key: "a", label: "年度扣繳憑單" }, { key: "b", label: "勞健退繳費清單" }, { key: "c", label: "投保級距申報調整" }, { key: "d", label: "加退保作業清單" }]} value="c" onChange={() => {}} />
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+      <div className="flex items-center gap-2 text-[13px]">
         <Ph w={64} /><span>現 45,800 ／ 報 43,900</span><Badge variant="warning">需調整</Badge>
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="flex justify-end">
         <Spot label="申報完成後按"><Button size="sm" variant="outline">以目前為申報基準</Button></Spot>
       </div>
     </ScreenFrame>
@@ -279,16 +234,16 @@ const S = {
   ),
   versionAdd: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span style={{ fontSize: 13 }}>自</span><Ph w={110} h={28} label="2027-01" /><span style={{ fontSize: 13 }}>起生效</span>
+      <div className="flex items-center gap-2">
+        <span className="text-[13px]">自</span><Ph w={110} h={28} label="2027-01" /><span className="text-[13px]">起生效</span>
         <Spot><Button size="sm">新增生效版本</Button></Spot>
       </div>
     </ScreenFrame>
   ),
   versionEdit: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <span style={{ fontSize: 13 }}>健保費率</span><Spot label="照公告百分比填"><NumberInput value={5.17} onChange={() => {}} step={0.01} /></Spot><span style={{ fontSize: 13 }}>%</span>
+      <div className="flex items-center gap-3">
+        <span className="text-[13px]">健保費率</span><Spot label="照公告百分比填"><NumberInput value={5.17} onChange={() => {}} step={0.01} /></Spot><span className="text-[13px]">%</span>
       </div>
       <Callout variant="info" title="不回溯">新費率只影響生效月起；先前已申報月份維持原費率。</Callout>
     </ScreenFrame>
@@ -296,16 +251,17 @@ const S = {
   /* 外幣設定 */
   fxEnable: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <span style={{ fontSize: 13 }}>啟用多幣別</span>
-        <Spot label="先打開這個"><Button size="sm" variant="outline">關 → 開</Button></Spot>
+      <div className="flex items-center gap-2.5">
+        <Spot label="先打開這個">
+          <EditableField label="啟用多幣別" kind="checkbox" alwaysEdit value={true} onChange={() => {}} />
+        </Spot>
       </div>
       <Ph h={44} label="啟用後才會出現維護中心" />
     </ScreenFrame>
   ),
   fxCurrency: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="flex flex-wrap items-center gap-2">
         <Spot label="代碼"><Input className="col-input h-8 w-24" value="USD" onChange={() => {}} /></Spot>
         <Input className="col-input h-8 w-24" value="美金" onChange={() => {}} />
         <Button size="sm">新增幣別</Button>
@@ -314,17 +270,17 @@ const S = {
   ),
   fxRate: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span style={{ fontSize: 13 }}>1 US$ =</span>
+      <div className="flex items-center gap-2">
+        <span className="text-[13px]">1 US$ =</span>
         <Spot label="逐月維護"><NumberInput value={32} onChange={() => {}} /></Spot>
-        <span style={{ fontSize: 13 }}>元</span><Badge variant="warning">未設匯率＝約當 0</Badge>
+        <span className="text-[13px]">元</span><Badge variant="warning">未設匯率＝約當 0</Badge>
       </div>
     </ScreenFrame>
   ),
   /* 工作台 */
   dashCards: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(4,1fr)", fontSize: 12 }}>
+      <div className="grid grid-cols-4 gap-2 text-xs">
         <Ph h={44} label="結算人數 61" /><Ph h={44} label="應發 5,393,394" /><Ph h={44} label="實發 4,991,973" /><Ph h={44} label="總成本 6,154,779" />
       </div>
       <div><Badge variant="warning">本月未確認</Badge></div>
@@ -332,21 +288,21 @@ const S = {
   ),
   dashTodos: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(2,1fr)" }}>
-        <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 10, fontSize: 13 }}>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-border p-2.5 text-[13px]">
           未填代扣所得稅 <strong>29 人</strong>
-          <div style={{ marginTop: 6 }}><Spot label="點卡片直達"><Button size="sm" variant="outline">前往所得稅清單 →</Button></Spot></div>
+          <div className="mt-1.5"><Spot label="點卡片直達"><Button size="sm" variant="outline">前往所得稅清單 →</Button></Spot></div>
         </div>
-        <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 10, fontSize: 13 }}>
+        <div className="rounded-lg border border-border p-2.5 text-[13px]">
           本月應加保 <strong>1 人</strong>
-          <div style={{ marginTop: 6 }}><Button size="sm" variant="outline">前往加退保名冊 →</Button></div>
+          <div className="mt-1.5"><Button size="sm" variant="outline">前往加退保名冊 →</Button></div>
         </div>
       </div>
     </ScreenFrame>
   ),
   dashZero: (
     <ScreenFrame>
-      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 10, fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
+      <div className="flex items-center gap-2 rounded-lg border border-border p-2.5 text-[13px]">
         <Badge variant="success">✓</Badge> 目前沒有待辦。
       </div>
       <Ph h={40} label="排程調薪／快捷入口（略）" />
@@ -356,14 +312,14 @@ const S = {
   masterList: (
     <ScreenFrame>
       <Ph h={16} label="員工清單" />
-      <Spot label="點任一列開檔案"><div style={{ display: "flex", gap: 8, alignItems: "center", padding: 4 }}><Ph w={64} label="蔡佩珊" /><Ph w={90} /><Ph /></div></Spot>
+      <Spot label="點任一列開檔案"><div className="flex items-center gap-2 p-1"><Ph w={64} label="蔡佩珊" /><Ph w={90} /><Ph /></div></Spot>
       <Row />
     </ScreenFrame>
   ),
   masterScenarios: (
     <ScreenFrame>
       <Ph h={16} label="員工檔案：基本資料（上）" />
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant="outline">離職</Button>
         <Button size="sm" variant="outline">留停/停職</Button>
         <Spot label="挑要辦的事"><Button size="sm" variant="outline">薪資結構調整</Button></Spot>
@@ -374,36 +330,36 @@ const S = {
   ),
   masterSubmit: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+      <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
         <EditableField label="本薪（月）" kind="money" value={48000} original={45800} onChange={() => {}} />
         <EditableField label="異動原因（必填）" kind="text" value="年度調薪" onChange={() => {}} />
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}><Spot><Button size="sm">送出異動</Button></Spot></div>
+      <div className="flex justify-end"><Spot><Button size="sm">送出異動</Button></Spot></div>
     </ScreenFrame>
   ),
   /* 快速上手：認識畫面／選月份／精靈／欄位齊備 */
   shellTour: (
     // paddingTop 加高：Spot 浮動標籤在元素上方，需留頭部空間才不會蓋到 MockScreen 標題列
-    <div className="bg-background text-foreground" style={{ display: "flex", gap: 10, padding: 12, paddingTop: 34, minHeight: 230 }}>
+    <div className="flex min-w-[460px] gap-2.5 bg-background p-3 pt-[34px] text-foreground" style={{ minHeight: 230 }}>
       <Spot label="① 功能選單：依工作性質分區">
-        <div style={{ width: 150, display: "flex", flexDirection: "column", gap: 4, fontSize: 12, padding: 4 }}>
-          <strong style={{ fontSize: 11, opacity: 0.6 }}>每月作業</strong>
+        <div className="flex w-[150px] flex-col gap-1 p-1 text-xs">
+          <strong className="text-[11px] opacity-60">每月作業</strong>
           <span>工作台</span>
-          <span style={{ display: "flex", gap: 4, alignItems: "center" }}>薪資結算 <Badge variant="secondary">例行</Badge></span>
-          <strong style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>規劃與分析</strong>
-          <span style={{ display: "flex", gap: 4, alignItems: "center" }}>薪酬分析 <Badge variant="outline">試算</Badge></span>
-          <strong style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>報表與申報</strong>
+          <span className="flex items-center gap-1">薪資結算 <Badge variant="secondary">例行</Badge></span>
+          <strong className="mt-1 text-[11px] opacity-60">規劃與分析</strong>
+          <span className="flex items-center gap-1">薪酬分析 <Badge variant="outline">試算</Badge></span>
+          <strong className="mt-1 text-[11px] opacity-60">報表與申報</strong>
           <span>月結報表・申報名冊</span>
-          <strong style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>主檔與設定</strong>
+          <strong className="mt-1 text-[11px] opacity-60">主檔與設定</strong>
           <span>基本資料・系統設定</span>
         </div>
       </Spot>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
         <Spot label="② 本月狀態：月份／資料／月結">
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 4 }}>
+          <div className="flex flex-wrap items-center gap-2 p-1">
             <Badge variant="outline">DEV</Badge>
             <Button size="sm" variant="ghost">導引</Button>
-            <span style={{ fontSize: 13 }}>本月 <strong>2026-07</strong></span>
+            <span className="text-[13px]">本月 <strong>2026-07</strong></span>
             <Badge variant="success">資料正常</Badge>
             <Badge variant="warning">未確認</Badge>
           </div>
@@ -414,11 +370,11 @@ const S = {
   ),
   periodPicker: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13 }}>本月</span>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span className="text-[13px]">本月</span>
         <Spot label="先選對發薪月份"><Ph w={110} h={28} label="2026-07 ▾" /></Spot>
         <Badge variant="warning">未確認</Badge>
-        <span style={{ fontSize: 12, color: "var(--ifm-color-emphasis-600)" }}>已確認的月份會顯示 <Badge variant="success">已確認</Badge></span>
+        <span className="text-xs text-muted-foreground">已確認的月份會顯示 <Badge variant="success">已確認</Badge></span>
       </div>
       <Ph h={90} label="之後所有輸入與報表都算在選定的月份" />
     </ScreenFrame>
@@ -426,8 +382,8 @@ const S = {
   wizardDefaults: (
     <ScreenFrame>
       <Ph h={16} label="初始設定精靈：③ 薪資結構預設" />
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13 }}>伙食津貼（新進預設）</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-[13px]">伙食津貼（新進預設）</span>
         <Spot label="之後新增員工自動帶入"><NumberInput value={3000} onChange={() => {}} /></Spot>
       </div>
       <Callout variant="info" title="只是預設值">每位員工建檔後仍可逐人調整；改預設不影響已建檔員工。</Callout>
@@ -435,7 +391,7 @@ const S = {
   ),
   employeeReady: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+      <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
         <EditableField label="身分證字號" kind="text" value="A123456789" onChange={() => {}} />
         <EditableField label="Email" kind="text" value="" placeholder="未填" onChange={() => {}} />
       </div>
@@ -447,11 +403,11 @@ const S = {
   /* 每月作業：省時技巧／獎金／確認鎖定 */
   monthlyShortcuts: (
     <ScreenFrame>
-      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-2.5 rounded-lg border border-border p-3">
         <Ph h={44} label="（本月異動欄位…）" />
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <div className="flex flex-wrap justify-between gap-2">
           <Spot label="複製上月再微調"><Button size="sm" variant="outline">帶入上月異動</Button></Spot>
-          <span style={{ display: "flex", gap: 8 }}>
+          <span className="flex gap-2">
             <Spot label="Shift+Enter"><Button size="sm" variant="outline">儲存並下一位</Button></Spot>
             <Button size="sm">儲存本月異動</Button>
           </span>
@@ -461,11 +417,11 @@ const S = {
   ),
   bonusEntry: (
     <ScreenFrame>
-      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13 }}>本月獎金</span>
+      <div className="flex flex-col gap-2.5 rounded-lg border border-border p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[13px]">本月獎金</span>
           <Spot label="填這裡"><NumberInput value={60000} onChange={() => {}} /></Spot>
-          <span style={{ fontSize: 13, color: "var(--ifm-color-emphasis-600)" }}>今年累計獎金（自動）：<strong>120,000</strong></span>
+          <span className="text-[13px] text-muted-foreground">今年累計獎金（自動）：<strong>120,000</strong></span>
         </div>
         <Callout variant="info" title="累計不用手填">二代健保 4 倍門檻用的「今年累計」由系統自動加總，年中導入才需要一次性補登。</Callout>
       </div>
@@ -473,8 +429,8 @@ const S = {
   ),
   confirmDo: (
     <ScreenFrame>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>2026-07 <Badge variant="warning">未確認</Badge></span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-[13px]">2026-07 <Badge variant="warning">未確認</Badge></span>
         <Spot label="紅字清空後按"><Button size="sm">確認本月結算</Button></Spot>
       </div>
       <Ph h={70} label="（試算總覽…）" />
@@ -482,8 +438,8 @@ const S = {
   ),
   confirmLocked: (
     <ScreenFrame>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>2026-07 <Badge variant="success">已確認</Badge></span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-[13px]">2026-07 <Badge variant="success">已確認</Badge></span>
         <Spot label="要改資料先按這裡"><Button size="sm" variant="outline">取消確認</Button></Spot>
       </div>
       <Callout variant="warning" title="本月已凍結">異動、薪資、眷屬與法定參數都改不動；相關頁面會提示「先取消確認」。</Callout>
@@ -493,7 +449,7 @@ const S = {
   offboardScenario: (
     <ScreenFrame>
       <Ph h={16} label="員工檔案：基本資料（上）" />
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div className="flex flex-wrap gap-1.5">
         <Spot label="選這個情境"><Button size="sm" variant="outline">離職</Button></Spot>
         <Button size="sm" variant="outline">留停/停職</Button>
         <Button size="sm" variant="outline">薪資結構調整</Button>
@@ -503,11 +459,11 @@ const S = {
   ),
   offboardForm: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+      <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
         <EditableField label="離職日" kind="date" value="2026-07-15" onChange={() => {}} />
         <EditableField label="異動原因（必填）" kind="text" value="自請離職" onChange={() => {}} />
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}><Spot><Button size="sm">送出異動</Button></Spot></div>
+      <div className="flex justify-end"><Spot><Button size="sm">送出異動</Button></Spot></div>
     </ScreenFrame>
   ),
   offboardDone: (
@@ -522,21 +478,21 @@ const S = {
     <ScreenFrame>
       <Ph h={16} label="員工檔案：區間紀錄（基本分頁下方）" />
       <Spot label="一段＝一次留停/停職；可多段">
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 4, fontSize: 13 }}>
+        <div className="flex flex-wrap items-center gap-2 p-1 text-[13px]">
           <Ph w={70} h={26} label="留停 ▾" />
           <span>生效</span><Ph w={96} h={26} label="2026-03-01" />
           <span>復職</span><Ph w={96} h={26} label="（未復職）" />
           <span>給薪</span><Ph w={64} h={26} label="政策預設" />
         </div>
       </Spot>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}><Button size="sm" variant="outline">新增一段</Button></div>
+      <div className="flex justify-end"><Button size="sm" variant="outline">新增一段</Button></div>
       <Callout variant="info" title="復職＝補填該段復職日">之後自動回全薪，不必手動改回「在職」。</Callout>
     </ScreenFrame>
   ),
   contactScenario: (
     <ScreenFrame>
       <Ph h={16} label="員工檔案：基本資料（上）" />
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant="outline">離職</Button>
         <Button size="sm" variant="outline">薪資結構調整</Button>
         <Spot label="調職／改部門走這裡"><Button size="sm" variant="outline">基本聯絡資料</Button></Spot>
@@ -548,7 +504,7 @@ const S = {
     <ScreenFrame>
       <Ph h={16} label="眷屬異動：王媽媽" />
       <Spot label="兩個勾選是分開的">
-        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", padding: 4 }}>
+        <div className="grid gap-2.5 p-1 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
           <EditableField label="依附健保" kind="checkbox" value={true} onChange={() => {}} />
           <EditableField label="報稅扶養" kind="checkbox" value={false} onChange={() => {}} />
         </div>
@@ -558,7 +514,7 @@ const S = {
   ),
   withholdingForm: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" }}>
+      <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
         <Spot label="選扣繳方式">
           <EditableField label="扣繳方式" kind="radio" alwaysEdit value="table" onChange={() => {}}
             options={[{ value: "table", label: "依稅額表" }, { value: "fixed", label: "固定 5%" }]} />
@@ -570,8 +526,8 @@ const S = {
   auditRestore: (
     <ScreenFrame>
       <Ph h={16} label="異動紀錄（基本資料分頁）" />
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
-        <Ph w={80} label="07-10" /><span>薪資結構調整・蔡佩珊</span><span style={{ color: "var(--ifm-color-emphasis-600)" }}>45,800 → 48,000</span>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
+        <Ph w={80} label="07-10" /><span>薪資結構調整・蔡佩珊</span><span className="text-muted-foreground">45,800 → 48,000</span>
         <Spot label="一鍵還原成變更前"><Button size="sm" variant="outline">回復</Button></Spot>
       </div>
       <Callout variant="info" title="回復也留紀錄">回復本身會再記一筆；已確認月份的回復會被鎖定擋下。</Callout>
@@ -581,10 +537,10 @@ const S = {
   filingInsurance: (
     <ScreenFrame>
       <TabPills tabs={[{ key: "a", label: "年度扣繳憑單" }, { key: "b", label: "勞健退繳費清單" }, { key: "c", label: "投保級距申報調整" }, { key: "d", label: "加退保作業清單" }]} value="b" onChange={() => {}} />
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+      <div className="flex items-center gap-2 text-[13px]">
         <Ph w={64} /><span>勞保 58,132／健保 46,870／勞退 32,410</span><strong>合計 137,412</strong>
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="flex justify-end">
         <Spot label="與繳款單對帳"><Button size="sm" variant="outline">匯出 CSV</Button></Spot>
       </div>
     </ScreenFrame>
@@ -592,10 +548,10 @@ const S = {
   filingTax: (
     <ScreenFrame>
       <Ph h={16} label="代扣所得稅清單（月結報表）" />
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+      <div className="flex items-center gap-2 text-[13px]">
         <Ph w={64} /><span>應扣 2,000</span><Badge variant="success">已填</Badge>
       </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+      <div className="flex items-center gap-2 text-[13px]">
         <Ph w={64} /><span>應扣 —</span><Spot label="最常見的漏填在這裡看"><Badge variant="warning">未填</Badge></Spot>
       </div>
     </ScreenFrame>
@@ -604,7 +560,7 @@ const S = {
   bracketImport: (
     <ScreenFrame>
       <Ph h={16} label="系統設定 → 投保級距" />
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline">逐格編輯</Button>
         <Spot label="年度公告整批更新用"><Button size="sm" variant="outline">匯入 CSV</Button></Spot>
         <Button size="sm" variant="ghost">下載模板</Button>
@@ -614,7 +570,7 @@ const S = {
   ),
   policyCards: (
     <ScreenFrame>
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" }}>
+      <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <Spot label="影響年資/特休顯示">
           <EditableField label="年資／特休計算方式" kind="radio" alwaysEdit value="hire" onChange={() => {}}
             options={[{ value: "fixed", label: "固定基準日" }, { value: "hire", label: "依到職日（週年制）" }]} />
@@ -628,11 +584,11 @@ const S = {
   analyticsBadges: (
     <ScreenFrame>
       <Spot label="先看徽章再讀數字">
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 4, fontSize: 13 }}>
+        <div className="flex flex-wrap items-center gap-2 p-1 text-[13px]">
           <Badge variant="warning">試算暫定</Badge><span>本月未確認，數字會隨輸入變動</span>
         </div>
       </Spot>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 13 }}>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <Badge variant="success">已確認實際</Badge><span>本月已凍結快照</span>
         <Badge variant="secondary">歷史實際</Badge><span>過去月份的留存快照</span>
       </div>
@@ -640,10 +596,10 @@ const S = {
   ),
   raisePlan: (
     <ScreenFrame>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+      <div className="flex items-center gap-2 text-[13px]">
         <Ph w={72} label="方案 A" /><span>全員 +3%</span><span>年成本</span><Delta value={1860000} goodWhen="negative" />
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="flex justify-end">
         <Spot label="沙盒→實際生效只差這一步"><Button size="sm">核定並套用</Button></Spot>
       </div>
       <Callout variant="danger" title="套用後無法一鍵回復">核定會逐人寫入薪資主檔；要撤回只能逐筆從異動紀錄回復。</Callout>
@@ -771,6 +727,11 @@ export default function MockFlow({ name, interval = 4200 }: { name: string; inte
   const [paused, setPaused] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const timer = useRef<number | null>(null);
+  // 偏好減少動態（prefers-reduced-motion）＝預設展開全部、不自動輪播；
+  // 於 hydration 後套用（SSR 無 matchMedia，初始 state 直接讀會造成 hydration mismatch）。
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) setExpanded(true);
+  }, []);
   useEffect(() => {
     if (!flow || paused || expanded) return;
     timer.current = window.setTimeout(() => setI((x) => (x + 1) % flow.steps.length), interval);
@@ -783,7 +744,7 @@ export default function MockFlow({ name, interval = 4200 }: { name: string; inte
       onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", background: "var(--ifm-color-emphasis-100)", fontSize: 13 }}>
         <strong>{flow.title}</strong>
-        <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <span className="flex items-center gap-2.5">
           {/* 列印時全步驟展開，計數失義 → custom.css @media print 隱藏；螢幕展開時同理（.mockflow-expanded） */}
           <span className="mockflow-counter" style={{ color: "var(--ifm-color-emphasis-600)" }}>{i + 1} / {flow.steps.length}{paused ? "（暫停）" : ""}</span>
           <button type="button" className="mockflow-expand" aria-pressed={expanded}

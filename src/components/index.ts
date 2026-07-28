@@ -23,6 +23,7 @@ export * from "./ui/dialog";
 export * from "./ui/empty-state";
 export * from "./ui/input";
 export * from "./ui/label";
+export * from "./ui/mockup";
 export * from "./ui/select";
 export * from "./ui/table";
 export * from "./ui/tabs";

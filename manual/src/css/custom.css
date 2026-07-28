@@ -43,11 +43,11 @@
 
 /* MockFlow：畫面只顯示當前步；列印時全部展開（見下方 @media print） */
 .mockflow-step { display: none; }
-.mockflow-step.mockflow-step-active { display: block; }
+.mockflow-step.mockflow-step-active { display: block; overflow-x: auto; }
 .mockflow-step .mockflow-print-caption { display: none; }
 
 /* 螢幕端「展開全部」：與列印同一套展開樣式（全步驟＋各步字幕），停用輪播控制 */
-.mockflow-expanded .mockflow-step { display: block; }
+.mockflow-expanded .mockflow-step { display: block; overflow-x: auto; }
 .mockflow-expanded .mockflow-step .mockflow-print-caption { display: block; font-weight: 600; }
 .mockflow-expanded .mockflow-counter { display: none; }
 /* !important：figcaption 帶 inline display:flex，需蓋過 */
@@ -85,6 +85,11 @@
   .main-wrapper {
     height: auto !important;
     min-height: 0 !important;
+  }
+  /* 聚光環動畫在列印時不執行 → 改印靜態主色環（同 reduced-motion 降級樣式） */
+  .tour-pulse-ring {
+    animation: none !important;
+    box-shadow: 0 0 0 3px hsl(var(--primary)), 0 0 0 6px hsl(var(--primary) / 0.3) !important;
   }
   /* MockFlow 全步驟展開＋各步字幕（匯出＝完整逐步文件） */
   .mockflow-step { display: block !important; break-inside: avoid; }

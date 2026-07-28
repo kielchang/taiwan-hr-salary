@@ -3,6 +3,17 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.17.0] - 2026-07-28
+
+### 新增（模擬畫面積木 Mockup：文件「零截圖」操作示意的基礎元件）
+- UX 稽核落地（規範見 `docs/ui-kit/mock-screens.md`）：操作手冊的模擬畫面 primitives 自 manual 端**收編入元件庫**，
+  納入 Storybook-first 管理——`Placeholder`（佔位塊）/`Spotlight`（聚光）/`MockScreenFrame`（畫面框）/`MockRow`（假列）。
+- **聚光視覺改用主色脈動環**（使用者拍板）：與系統內導覽 Coachmark 同一套 `tour-pulse` 視覺語言（含
+  `prefers-reduced-motion` 靜態降級）；捨棄原硬編琥珀——琥珀專屬「已改動未送出」語意（鐵律 4）。
+- 全部走 tailwind 語意 token（bg-muted/bg-background/primary…），亮暗模式自動同步；`MockScreenFrame`
+  設最小寬度，小螢幕由外層容器橫向捲動、不擠壞排版。
+- Storybook「元件/模擬畫面」：佔位塊/聚光互動 playground＋假列重點格＋完整組合示例。
+
 ## [0.16.0] - 2026-07-15
 
 ### 新增（Coachmark 可縮小：騰出空間操作）
