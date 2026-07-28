@@ -1,0 +1,9 @@
+{
+  "label": "附錄 法規依據（法源查核）",
+  "position": 9,
+  "link": {
+    "type": "generated-index",
+    "slug": "/legal",
+    "description": "系統每一條計算規則的法源與 115 年度採用值。每個項目都連到「全國法規資料庫」的對應條文，方便核對或回覆稽核提問。"
+  }
+}

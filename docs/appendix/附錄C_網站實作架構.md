@@ -116,7 +116,7 @@ config（參數/級距） ──► store（主檔：員工·眷屬·薪資結�
 | 資料治理 | `SettingsView`／`MasterDataView` 內 | 整檔 JSON 備份/還原（`lib/backup.ts`＋persist `version/migrate`）／員工 CSV 批次匯入含驗證預覽（`lib/import/employeeCsv.ts`）／員工生命週期（status 5 種＋生效日 `leaveDate`／復職日 `returnDate`／給薪比例 `leavePaidRatio`∥公司 `leavePolicy`）與破月精算（`calc/wage.ts payFactor` 逐日、勞保費按在職天數 `employmentDaysFactor`；以 `opts.period` opt-in、無 period／全月＝factor 1 不破壞 TC-9）／調薪試算核定寫回（store `applyRaise`）／變更稽核軌跡（store `auditLog`＋操作者姓名） |
 | 出勤匯入 | `AttendanceView`／`lib/import/attendanceCsv.ts` | 出勤/工時 CSV 批次匯入：打卡格式（上/下班）或工時格式（每日工時→合成上下班、扣午休）；驗證預覽後 `importPunches` 寫入 punches（去重），供「由出勤帶入」分攤 |
 | 出勤打卡 | `AttendanceView` 出勤打卡（額外模組） | GPS 軟性圍欄＋選用 IP 限制的上下班打卡、彈性上下班每日彙整（遲到/工時不足/缺卡）、CSV 匯出；前端定位/IP 僅供輔助稽核、非強制 |
-| 說明 | `HelpView` 使用說明／操作手冊（外連獨立 Docusaurus 站 `manual/`，`<env>/manual/` 獨立部署、嵌 Storybook 互動示例）／`SourcesView` 法規與費率依據 | 純操作說明＋FAQ＋薪酬分析指引；法源出處卡片（法條連結指向全國法規資料庫條文＋主管機關），即來源01–05 的使用者版 |
+| 說明 | `HelpView` 使用說明／操作手冊（外連獨立 Docusaurus 站 `manual/`，`<env>/manual/` 獨立部署、嵌 Storybook 互動示例）／法規依據（**外連手冊附錄 `legal/`**；原 `SourcesView` 已移除、內容移入手冊 9-legal 五節） | 純操作說明＋FAQ＋薪酬分析指引；法源查核表（法條連結指向全國法規資料庫條文）改由手冊維護，可列印匯出、隨手冊獨立更新 |
 
 顏色語意沿用附錄B §B3.7：橘＝輸入欄（`.col-input`）、黃＝公司自訂（`.col-assumption`）、其餘為自動計算。
 

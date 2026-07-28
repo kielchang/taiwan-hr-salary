@@ -27,4 +27,4 @@ title: "每月：代扣稅清單"
 
 :::
 
-<AppLink to="/reports?tab=tax">開啟代扣稅清單</AppLink> · <AppLink to="/sources">法規依據</AppLink>
+<AppLink to="/reports?tab=tax">開啟代扣稅清單</AppLink> · [法規依據：所得稅扣繳](/legal/tax)

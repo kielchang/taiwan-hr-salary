@@ -17,7 +17,7 @@ title: "遇到不會的怎麼辦"
 
 :::
 
-<AppLink to="/help">使用說明與FAQ</AppLink> · <AppLink to="/help">啟動導覽：系統總覽（於系統「使用說明」頁啟動）</AppLink> · <AppLink to="/sources">法規依據</AppLink>
+<AppLink to="/help">使用說明與FAQ</AppLink> · <AppLink to="/help">啟動導覽：系統總覽（於系統「使用說明」頁啟動）</AppLink> · [法規依據（本手冊附錄）](/legal)
 
 ## 先看看長什麼樣子
 

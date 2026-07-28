@@ -11,7 +11,6 @@ import { FilingView } from "@/views/FilingView";
 import { SettingsView } from "@/views/SettingsView";
 import { SetupWizard } from "@/views/SetupWizard";
 import { HelpView } from "@/views/HelpView";
-import { SourcesView } from "@/views/SourcesView";
 
 // 完整畫面（讀取 store 內建 62 人示範公司；Router 由 preview decorator 提供）。
 const meta: Meta = {
@@ -34,5 +33,4 @@ export const 出勤打卡_Attendance: S = wrap(<AttendanceView />);
 export const 法規申報_Filing: S = wrap(<FilingView />);
 export const 系統設定_Settings: S = wrap(<SettingsView />);
 export const 使用說明_Help: S = wrap(<HelpView />);
-export const 法規依據_Sources: S = wrap(<SourcesView />);
 export const 初始設定精靈_Setup: S = wrap(<SetupWizard onDone={() => {}} />);

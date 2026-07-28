@@ -25,4 +25,4 @@ title: "眷屬與扶養變動"
 
 保費怎麼算見[附錄](/calc/insurance)；眷屬缺出生年月日會出黃字（[訊息對照](/safety/messages)）。
 
-<AppLink to="/sources">查看法規依據</AppLink>
+[查看法規依據：社會保險](/legal/insurance)

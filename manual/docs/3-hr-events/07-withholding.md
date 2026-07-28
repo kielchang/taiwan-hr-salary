@@ -26,4 +26,4 @@ title: "扣繳設定變更"
 
 :::
 
-<AppLink to="/sources">查看法規依據</AppLink>
+[查看法規依據：所得稅扣繳](/legal/tax)

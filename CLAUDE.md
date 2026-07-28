@@ -113,7 +113,7 @@ src/
 舊資料與 TC-9 逐位元不變；store `migrate` v2→v3 已自動回填）。勞保費到/離職當月按 `employmentDaysFactor`（在職天數）比例、
 健保與勞退整月。復職＝補填該段復職日，之後自動全薪（不必改回在職）。**主檔基本分頁下方「區間紀錄」逐段編輯**。
 
-側邊欄 IA（App.tsx `NAV_SECTIONS`）：每月作業（工作台/薪資結算/出勤）／規劃與分析／專案／報表與申報／主檔與設定／說明（使用說明/操作手冊〔外連〕/法規依據）。
+側邊欄 IA（App.tsx `NAV_SECTIONS`）：每月作業（工作台/薪資結算/出勤）／規劃與分析／專案／報表與申報／主檔與設定／說明（使用說明/操作手冊〔外連〕/法規依據〔外連手冊附錄 `legal/`，原 SourcesView 已移除〕）。
 **操作手冊＝獨立 Docusaurus 站（`manual/`，使用者拍板：通用框架、獨立更新維護）**：8 章 55 節 Markdown（`manual/docs/`）＋
 中文搜尋（@easyops-cn/docusaurus-search-local）＋StoryFrame 嵌 Storybook 互動 story（隨手冊發佈 `<env>/manual/storybook`）＋
 AppLink 依環境開系統畫面＋MockFlow 逐步操作示意（**零截圖鐵律，使用者拍板**：畫面＝`manual/src/components/screens.tsx` 以元件庫真元件＋placeholder 佔位排版、重點 Spot 高亮，隨元件庫自動同步；守衛禁 FlowPlayer/截圖回歸）＋每頁「🖨 列印此頁」（DocItem/Content swizzle＋@media print，MockFlow 列印時全步驟展開）。**docs versioning 對映系統版號**（預設＝最新快照/正式站版本、`/next/`＝開發中；發佈時快照，見 docs/versioning.md）。**獨立部署**：`deploy-manual.yml` 於 `manual/**`＋`src/components/**`＋`.storybook/**` 變更時建置→gh-pages `<env>/manual`（keep_files；元件變更重佈＝內嵌 storybook 與 UI 掛鉤，守衛 `tests/manualStories.test.ts`）；

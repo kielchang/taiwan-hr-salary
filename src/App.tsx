@@ -40,7 +40,6 @@ import { SettingsView } from "@/views/SettingsView";
 import { MasterDataView } from "@/views/MasterDataView";
 import { PayrollFlow, type PayrollStep } from "@/views/PayrollFlow";
 import { HelpView } from "@/views/HelpView";
-import { SourcesView } from "@/views/SourcesView";
 import { AttendanceView } from "@/views/AttendanceView";
 import { AnalyticsView } from "@/views/AnalyticsView";
 import { ProjectsView } from "@/views/ProjectsView";
@@ -79,7 +78,8 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     { to: "/help", match: "/help", label: "使用說明", icon: BookOpen },
     // 操作手冊＝獨立 Docusaurus 站（隨環境掛 <env>/manual/，manual/** 變更獨立部署），外連開新分頁
     { to: MANUAL_URL, match: "/__manual", label: "操作手冊", icon: BookMarked, external: true },
-    { to: "/sources", match: "/sources", label: "法規依據", icon: Scale },
+    // 法規依據＝手冊附錄（法源查核內容已移入獨立 Docusaurus 站），比照操作手冊外連開新分頁
+    { to: `${MANUAL_URL}legal/`, match: "/__legal", label: "法規依據", icon: Scale, external: true },
   ] },
 ];
 
@@ -106,7 +106,6 @@ export default function App() {
         <Route path="/master" element={<MasterDataView />} />
         <Route path="/settings" element={<SettingsView />} />
         <Route path="/help" element={<HelpView />} />
-        <Route path="/sources" element={<SourcesView />} />
         <Route path="*" element={<Navigate to="/payroll/monthly" replace />} />
       </Route>
     </Routes>

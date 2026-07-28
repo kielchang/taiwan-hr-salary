@@ -48,11 +48,10 @@ describe("client mount + 路由（白屏防護）", () => {
     expect(div.textContent).toContain("本月應加保");
   });
 
-  it("深連結 /sources → 法規依據頁", async () => {
+  it("法規依據已移至手冊（外連）→ 舊深連結 /sources 導回每月薪資、不白屏", async () => {
     seedDone();
     const div = await mountAt("/sources");
-    expect(div.textContent).toContain("法規與費率依據");
-    expect(div.textContent).toContain("投保級距表（四險）");
+    expect(div.textContent).toContain("輸入當月異動");
   });
 
 

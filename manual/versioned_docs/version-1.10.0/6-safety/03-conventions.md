@@ -37,4 +37,4 @@ title: "畫面通用規則"
 
 <DemoCallout />
 
-<AppLink to="/sources">查看法規依據</AppLink>
+[查看法規依據](/legal)
