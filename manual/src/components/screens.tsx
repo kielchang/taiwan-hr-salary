@@ -383,7 +383,8 @@ const S = {
   ),
   /* 快速上手：認識畫面／選月份／精靈／欄位齊備 */
   shellTour: (
-    <div className="bg-background text-foreground" style={{ display: "flex", gap: 10, padding: 12, minHeight: 230 }}>
+    // paddingTop 加高：Spot 浮動標籤在元素上方，需留頭部空間才不會蓋到 MockScreen 標題列
+    <div className="bg-background text-foreground" style={{ display: "flex", gap: 10, padding: 12, paddingTop: 34, minHeight: 230 }}>
       <Spot label="① 功能選單：依工作性質分區">
         <div style={{ width: 150, display: "flex", flexDirection: "column", gap: 4, fontSize: 12, padding: 4 }}>
           <strong style={{ fontSize: 11, opacity: 0.6 }}>每月作業</strong>
@@ -782,7 +783,8 @@ export default function MockFlow({ name, interval = 4200 }: { name: string; inte
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", background: "var(--ifm-color-emphasis-100)", fontSize: 13 }}>
         <strong>{flow.title}</strong>
         <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ color: "var(--ifm-color-emphasis-600)" }}>{i + 1} / {flow.steps.length}{paused ? "（暫停）" : ""}</span>
+          {/* 列印時全步驟展開，計數失義 → custom.css @media print 隱藏 */}
+          <span className="mockflow-counter" style={{ color: "var(--ifm-color-emphasis-600)" }}>{i + 1} / {flow.steps.length}{paused ? "（暫停）" : ""}</span>
           {flow.to && <AppLink to={flow.to}>開啟此作業</AppLink>}
         </span>
       </div>

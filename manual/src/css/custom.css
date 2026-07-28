@@ -60,7 +60,8 @@
   .theme-last-updated,
   footer,
   .doc-print-bar,
-  .mockflow-controls {
+  .mockflow-controls,
+  .mockflow-counter {
     display: none !important;
   }
   main,
@@ -69,11 +70,28 @@
     max-width: 100% !important;
     width: 100% !important;
   }
+  /* 版面高度回歸內容：min-height 100vh 會多印一張空白尾頁 */
+  html,
+  body,
+  #__docusaurus,
+  .main-wrapper {
+    height: auto !important;
+    min-height: 0 !important;
+  }
   /* MockFlow 全步驟展開＋各步字幕（匯出＝完整逐步文件） */
   .mockflow-step { display: block !important; break-inside: avoid; }
   .mockflow-step .mockflow-print-caption { display: block !important; font-weight: 600; }
   .mockflow { break-inside: avoid; }
-  /* iframe 內嵌 story 列印無意義：以邊框佔位即可 */
-  iframe { max-height: 240px; }
+  /* 內嵌 story iframe 互動內容印不出來：改顯示替代說明框（誠實標示、不印半殘 iframe） */
+  .storyframe-iframe { display: none !important; }
+  .storyframe-print-note {
+    display: block !important;
+    border: 1px dashed var(--ifm-color-emphasis-400);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    color: var(--ifm-color-emphasis-700);
+    break-inside: avoid;
+  }
   a[target="_blank"]::after { content: ""; }
 }
