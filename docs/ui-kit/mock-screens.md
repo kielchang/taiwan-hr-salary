@@ -32,7 +32,7 @@
 |---|---|---|
 | 亮色/深色 | 全走語意 token；kit.css 對映 `[data-theme="dark"]` | `mockup.tsx`＋`manual/src/css/kit.css` |
 | 列印/匯出 PDF | 全步驟展開＋各步字幕；控制列/計數/展開鈕隱藏；StoryFrame 換替代說明框。**背景色跟隨當下主題**（深色模式印深色）：`@media print` 對全元素 `print-color-adjust: exact`——底色是內容不是裝飾，即使瀏覽器未勾「背景圖形」也照印；佔位塊另補列印邊框保底（`.mock-ph`）。**分頁規則**：段落/清單項/元件卡（figure）/提示框/表格不跨頁截斷（`break-inside: avoid`）、標題不孤懸頁底（`break-after: avoid`）、超長段落防孤行（orphans/widows 3）；整卡超過一頁時退回逐步分頁 | `manual/src/css/custom.css` `@media print` |
-| 輪播（預設） | 自動輪播 4.2s、hover 暫停、前後步/圓點 | `MockFlow` |
+| 輪播（預設） | 自動輪播 4.2s、hover 暫停；控制列＝字幕獨立一行＋下排「上一步／圓點／下一步」**文字按鈕**（桌機 36px 高、觸控由 `.tap-target` 撐到 44px；圓點 28px 命中區）——小箭頭難點擊，勿退回純箭頭 | `MockFlow`＋`custom.css` `.mockflow-nav`/`.mockflow-dot` |
 | 展開全部 | 標頭切換鈕；展開＝全步驟＋字幕、停輪播（與列印同樣式） | `.mockflow-expanded` |
 | 減少動態偏好 | `prefers-reduced-motion` → 預設展開、不輪播；聚光脈動降級靜態環 | `MockFlow` effect＋`.tour-pulse-ring` 降級 |
 | 小螢幕 | 步驟容器 `overflow-x:auto`＋畫面框 `min-w-[460px]`：橫向捲動、不擠壞排版 | `custom.css`＋`MockScreenFrame` |

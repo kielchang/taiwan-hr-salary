@@ -747,9 +747,8 @@ export default function MockFlow({ name, interval = 4200 }: { name: string; inte
         <span className="flex items-center gap-2.5">
           {/* 列印時全步驟展開，計數失義 → custom.css @media print 隱藏；螢幕展開時同理（.mockflow-expanded） */}
           <span className="mockflow-counter" style={{ color: "var(--ifm-color-emphasis-600)" }}>{i + 1} / {flow.steps.length}{paused ? "（暫停）" : ""}</span>
-          <button type="button" className="mockflow-expand" aria-pressed={expanded}
-            onClick={() => setExpanded((x) => !x)}
-            style={{ border: "1px solid var(--ifm-color-emphasis-300)", background: "transparent", color: "inherit", borderRadius: 6, cursor: "pointer", padding: "2px 8px", fontSize: 12 }}>
+          <button type="button" className="mockflow-expand mockflow-nav tap-target-y" aria-pressed={expanded}
+            onClick={() => setExpanded((x) => !x)}>
             {expanded ? "收合輪播" : "展開全部"}
           </button>
           {flow.to && <AppLink to={flow.to}>開啟此作業</AppLink>}
@@ -762,19 +761,26 @@ export default function MockFlow({ name, interval = 4200 }: { name: string; inte
           {s.node}
         </div>
       ))}
-      <figcaption className="mockflow-controls" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 14, background: "var(--ifm-color-emphasis-100)" }}>
-        <button aria-label="上一步" onClick={() => setI((x) => (x - 1 + flow.steps.length) % flow.steps.length)}
-          style={{ border: "1px solid var(--ifm-color-emphasis-300)", background: "transparent", borderRadius: 6, cursor: "pointer", padding: "2px 8px" }}>‹</button>
-        <span style={{ flex: 1 }}>{step.caption}</span>
-        <button aria-label="下一步" onClick={() => setI((x) => (x + 1) % flow.steps.length)}
-          style={{ border: "1px solid var(--ifm-color-emphasis-300)", background: "transparent", borderRadius: 6, cursor: "pointer", padding: "2px 8px" }}>›</button>
-        <span style={{ display: "flex", gap: 4 }}>
-          {flow.steps.map((_, d) => (
-            <button key={d} aria-label={`第 ${d + 1} 步`} onClick={() => setI(d)}
-              style={{ width: 8, height: 8, borderRadius: 999, border: "none", cursor: "pointer",
-                background: d === i ? "var(--ifm-color-primary)" : "var(--ifm-color-emphasis-300)" }} />
-          ))}
-        </span>
+      {/* 控制列：字幕獨立一行（不與按鈕擠），下排為「上一步／圓點／下一步」——
+          按鈕帶文字標籤＋足夠內距（觸控裝置由 .tap-target-y 撐到 44px），不再是難點的小箭頭。 */}
+      <figcaption className="mockflow-controls" style={{ padding: "10px 12px", fontSize: 14, background: "var(--ifm-color-emphasis-100)" }}>
+        <div style={{ marginBottom: 8 }}>{step.caption}</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <button type="button" className="mockflow-nav tap-target-y" onClick={() => setI((x) => (x - 1 + flow.steps.length) % flow.steps.length)}>
+            ‹ 上一步
+          </button>
+          <span style={{ display: "flex", gap: 2 }}>
+            {flow.steps.map((_, d) => (
+              <button key={d} type="button" className="mockflow-dot tap-target" aria-label={`第 ${d + 1} 步`} aria-current={d === i}
+                onClick={() => setI(d)}>
+                <span className="mockflow-dot-mark" style={{ background: d === i ? "var(--ifm-color-primary)" : "var(--ifm-color-emphasis-400)" }} />
+              </button>
+            ))}
+          </span>
+          <button type="button" className="mockflow-nav tap-target-y" onClick={() => setI((x) => (x + 1) % flow.steps.length)}>
+            下一步 ›
+          </button>
+        </div>
       </figcaption>
     </figure>
   );

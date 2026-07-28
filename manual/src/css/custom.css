@@ -46,6 +46,39 @@
 .mockflow-step.mockflow-step-active { display: block; overflow-x: auto; }
 .mockflow-step .mockflow-print-caption { display: none; }
 
+/* MockFlow 步驟控制：足夠大的點擊目標（小箭頭難點）——文字按鈕＋放大圓點 */
+.mockflow-nav {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--ifm-color-emphasis-400);
+  border-radius: 8px;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+  font-size: 14px;
+  cursor: pointer;
+}
+.mockflow-nav:hover { background: var(--ifm-color-emphasis-200); }
+.mockflow-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.mockflow-dot-mark {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+.mockflow-dot:hover .mockflow-dot-mark { outline: 2px solid var(--ifm-color-emphasis-400); outline-offset: 2px; }
+
 /* 螢幕端「展開全部」：與列印同一套展開樣式（全步驟＋各步字幕），停用輪播控制 */
 .mockflow-expanded .mockflow-step { display: block; overflow-x: auto; }
 .mockflow-expanded .mockflow-step .mockflow-print-caption { display: block; font-weight: 600; }
