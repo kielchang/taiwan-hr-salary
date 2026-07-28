@@ -21,3 +21,59 @@
   --ifm-color-primary-lightest: #f0f4fc;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
+
+/* ── 每頁列印／匯出（DocItem/Content swizzle 的列印列） ───────────────── */
+.doc-print-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+.doc-print-bar button {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: transparent;
+  color: var(--ifm-font-color-base);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.doc-print-bar button:hover {
+  background: var(--ifm-color-emphasis-100);
+}
+
+/* MockFlow：畫面只顯示當前步；列印時全部展開（見下方 @media print） */
+.mockflow-step { display: none; }
+.mockflow-step.mockflow-step-active { display: block; }
+.mockflow-step .mockflow-print-caption { display: none; }
+
+@media print {
+  /* 隱藏站台外殼與互動控制：印出＝乾淨文件 */
+  .navbar,
+  .theme-doc-sidebar-container,
+  .theme-doc-toc-desktop,
+  .theme-doc-toc-mobile,
+  .pagination-nav,
+  .theme-doc-breadcrumbs,
+  .theme-doc-version-banner,
+  .theme-doc-version-badge,
+  .theme-edit-this-page,
+  .theme-last-updated,
+  footer,
+  .doc-print-bar,
+  .mockflow-controls {
+    display: none !important;
+  }
+  main,
+  .container,
+  .row .col {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  /* MockFlow 全步驟展開＋各步字幕（匯出＝完整逐步文件） */
+  .mockflow-step { display: block !important; break-inside: avoid; }
+  .mockflow-step .mockflow-print-caption { display: block !important; font-weight: 600; }
+  .mockflow { break-inside: avoid; }
+  /* iframe 內嵌 story 列印無意義：以邊框佔位即可 */
+  iframe { max-height: 240px; }
+  a[target="_blank"]::after { content: ""; }
+}

@@ -6,7 +6,7 @@ title: "發薪資條給員工"
 
 ## 先看一遍實際操作
 
-<FlowPlayer name="payslip" />
+<MockFlow name="payslip" />
 
 當月結算確認後，到「報表與申報」的**薪資條**分頁把薪資條發給員工——可以印紙本、寄加密 PDF，或全公司批次打包。
 

@@ -32,6 +32,6 @@ title: "申報作業總覽與時程"
 
 ## 實際操作畫面
 
-<FlowPlayer name="filing" />
+<MockFlow name="filing" />
 
 <AppLink to="/reports">前往報表與申報</AppLink>

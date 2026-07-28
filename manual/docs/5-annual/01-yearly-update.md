@@ -10,7 +10,7 @@ title: "每年 1 月：更新法定費率與級距"
 
 ## 先看一遍：實際操作畫面
 
-<FlowPlayer name="settings-version" />
+<MockFlow name="settings-version" />
 
 ## 操作步驟
 

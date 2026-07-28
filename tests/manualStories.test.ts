@@ -1,10 +1,10 @@
 // 手冊↔Storybook 掛鉤守衛：manual/docs 內 <StoryFrame id="..."> 引用的 story 必須存在於
 // src/components/**/*.stories.tsx（依 Storybook 的 id 規則自 meta.title + export 名推導）。
 // 改名/移除 story 而未同步手冊 → 本測試紅 → 防手冊嵌入變死連結。
-// FlowPlayer 素材守衛：manual/docs 引用的 <FlowPlayer name="..."> 必須有對應
-// manual/static/flows/<name>/manifest.json（UI 改版後由 manual/scripts/capture-flows.mjs 重錄）。
+// MockFlow 守衛：manual/docs 引用的 <MockFlow name="..."> 必須存在於
+// manual/src/components/screens.tsx 的 MOCK_FLOWS 註冊表（零截圖：畫面＝元件庫排版，改名需同步）。
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(__dirname, "..");
@@ -76,21 +76,28 @@ describe("手冊 ↔ Storybook／流程素材 掛鉤", () => {
     for (const f of docs) {
       if (f.endsWith("index.md")) continue;
       const src = readFileSync(f, "utf8");
-      const hasAid = /<(Demo\w+|Calc\w+|FlowPlayer|StoryFrame|AppLink)/.test(src);
-      expect(hasAid, `${f} 缺互動/視覺輔助（FlowPlayer/Demo/Calc/StoryFrame/AppLink 擇一）`).toBe(true);
+      const hasAid = /<(Demo\w+|Calc\w+|MockFlow|StoryFrame|AppLink)/.test(src);
+      expect(hasAid, `${f} 缺互動/視覺輔助（MockFlow/Demo/Calc/StoryFrame/AppLink 擇一）`).toBe(true);
     }
   });
 
-  it("FlowPlayer 引用的流程素材皆存在（manifest+首格截圖）", () => {
+  it("MockFlow 引用的流程皆已在 MOCK_FLOWS 註冊（零截圖：畫面＝元件庫排版）", () => {
+    const screens = readFileSync(join(ROOT, "manual", "src", "components", "screens.tsx"), "utf8");
+    const registered = new Set([...screens.matchAll(/^ {2}"([a-z-]+)":\s*\{/gm)].map((m) => m[1]));
+    expect(registered.size).toBeGreaterThan(5);
+    let used = 0;
     for (const f of docs) {
       const src = readFileSync(f, "utf8");
-      for (const m of src.matchAll(/<FlowPlayer[^>]*name="([^"]+)"/g)) {
-        const dir = join(ROOT, "manual", "static", "flows", m[1]);
-        expect(existsSync(join(dir, "manifest.json")), `${f} 引用缺素材的流程：${m[1]}`).toBe(true);
-        const mf = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
-        expect(mf.steps.length, `${m[1]} manifest 無步驟`).toBeGreaterThan(0);
-        expect(existsSync(join(dir, mf.steps[0].img)), `${m[1]} 首格截圖缺檔`).toBe(true);
+      for (const m of src.matchAll(/<MockFlow[^>]*name="([^"]+)"/g)) {
+        used++;
+        expect(registered.has(m[1]), `${f} 引用未註冊的流程：${m[1]}（見 manual/src/components/screens.tsx MOCK_FLOWS）`).toBe(true);
       }
+    }
+    expect(used, "manual/docs 應至少嵌一個 MockFlow").toBeGreaterThan(0);
+    // 零截圖鐵律：手冊不得再出現 FlowPlayer 或截圖素材引用
+    for (const f of docs) {
+      const src = readFileSync(f, "utf8");
+      expect(/<FlowPlayer|\/flows\//.test(src), `${f} 仍引用截圖式 FlowPlayer/flows 素材（已廢除，改用 MockFlow）`).toBe(false);
     }
   });
 });

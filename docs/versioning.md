@@ -63,12 +63,7 @@ cd manual && npm run docusaurus docs:version <X.Y.Z>
 ```
 
 （config 會動態讀 `versions.json` 自動掛「系統 v<X.Y.Z>」標籤與 lastVersion，**不必手改 config**。）
-- UI 畫面改版時（元件/畫面外觀變更），重錄手冊的操作畫面素材：
-
-```bash
-npm run build && npx vite preview --port 4179 &   # 起已建置的系統
-node manual/scripts/capture-flows.mjs              # 重錄 → manual/static/flows/
-```
-
-- 守衛：`tests/manualStories.test.ts` 確保手冊引用的 Storybook story 與流程素材存在；
+- 操作示意（MockFlow）＝**零截圖**：畫面由 `manual/src/components/screens.tsx` 以元件庫真元件排版，
+  元件外觀改版＝手冊畫面自動同步（同一份元件庫），**沒有截圖素材需要重錄**。
+- 守衛：`tests/manualStories.test.ts` 確保手冊引用的 Storybook story 與 MOCK_FLOWS 流程存在（並禁止截圖式素材回歸）；
   `deploy-manual.yml` 在 `src/components/**`／`.storybook/**` 變更時也會重佈手冊（內嵌 storybook 同步）。

@@ -10,7 +10,7 @@ title: "需要發外幣薪資時"
 
 ## 先看一遍：實際操作畫面
 
-<FlowPlayer name="currency-setup" />
+<MockFlow name="currency-setup" />
 
 ## 先懂一件事：外幣是獨立金流
 
