@@ -2,12 +2,12 @@
 import MDXComponents from "@theme-original/MDXComponents";
 import AppLink from "@site/src/components/AppLink";
 import StoryFrame from "@site/src/components/StoryFrame";
-import MockFlow from "@site/src/components/screens";
+import MockFlow, { MockScreen } from "@site/src/components/screens";
 import { DemoEditableField, DemoDelta, DemoStepper, DemoTabPills, DemoCallout, DemoNumberInput } from "@site/src/components/demos";
 import { CalcOvertime, CalcLeaveDeduct, CalcBracket, CalcInsurance, CalcSupplementary, CalcTax, CalcPayFactor, CalcEmployerCost, CalcSeniority, CalcValidation } from "@site/src/components/demos/calcs";
 
 export default {
-  ...MDXComponents, AppLink, StoryFrame, MockFlow,
+  ...MDXComponents, AppLink, StoryFrame, MockFlow, MockScreen,
   DemoEditableField, DemoDelta, DemoStepper, DemoTabPills, DemoCallout, DemoNumberInput,
   CalcOvertime, CalcLeaveDeduct, CalcBracket, CalcInsurance, CalcSupplementary, CalcTax, CalcPayFactor, CalcEmployerCost, CalcSeniority, CalcValidation,
 };

@@ -57,6 +57,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
 
+      # 手冊建置依賴 app 的依賴（tailwind preset 需 tailwindcss-animate、元件庫 import lucide-react 等
+      # 皆自 repo 根 node_modules 解析）——必須先裝 app 依賴，否則手冊 build 直接炸模組找不到。
+      - name: Install app dependencies（手冊 kit pipeline 需要）
+        run: npm ci
+
       - name: Build manual（Docusaurus，注入環境 baseUrl / appUrl）
         working-directory: manual
         run: |
@@ -68,9 +73,21 @@ jobs:
 
       # Storybook 隨手冊出貨（手冊頁 iframe 嵌互動 story）：用 app 依賴建置 → manual/build/storybook
       - name: Build Storybook into manual
+        run: npm run build-storybook -- -o manual/build/storybook
+
+      # keep_files 只保護「其他環境」目錄；本環境 manual/ 內的舊頁（改章節結構後的死連結，
+      # 例如舊 /concepts/**）要先清掉再發佈，否則殘留頁面永遠掛在線上誤導使用者。
+      - name: Clean stale manual files on gh-pages（清除本環境殘留舊頁）
         run: |
-          npm ci
-          npm run build-storybook -- -o manual/build/storybook
+          git fetch origin gh-pages || exit 0
+          git worktree add /tmp/ghp gh-pages
+          cd /tmp/ghp
+          if [ -d "${{ steps.env.outputs.dest }}" ]; then
+            git rm -r -q "${{ steps.env.outputs.dest }}"
+            git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit -m "clean stale manual @ ${{ steps.env.outputs.dest }}"
+            git push origin gh-pages
+          fi
 
       - name: Publish manual to gh-pages
         uses: peaceiris/actions-gh-pages@v4

@@ -76,24 +76,38 @@ describe("手冊 ↔ Storybook／流程素材 掛鉤", () => {
     for (const f of docs) {
       if (f.endsWith("index.md")) continue;
       const src = readFileSync(f, "utf8");
-      const hasAid = /<(Demo\w+|Calc\w+|MockFlow|StoryFrame|AppLink)/.test(src);
-      expect(hasAid, `${f} 缺互動/視覺輔助（MockFlow/Demo/Calc/StoryFrame/AppLink 擇一）`).toBe(true);
+      const hasAid = /<(Demo\w+|Calc\w+|MockFlow|MockScreen|StoryFrame|AppLink)/.test(src);
+      expect(hasAid, `${f} 缺互動/視覺輔助（MockFlow/MockScreen/Demo/Calc/StoryFrame/AppLink 擇一）`).toBe(true);
     }
   });
 
-  it("MockFlow 引用的流程皆已在 MOCK_FLOWS 註冊（零截圖：畫面＝元件庫排版）", () => {
+  it("MockFlow/MockScreen 引用皆已在 screens.tsx 註冊（零截圖：畫面＝元件庫排版）", () => {
     const screens = readFileSync(join(ROOT, "manual", "src", "components", "screens.tsx"), "utf8");
-    const registered = new Set([...screens.matchAll(/^ {2}"([a-z-]+)":\s*\{/gm)].map((m) => m[1]));
-    expect(registered.size).toBeGreaterThan(5);
+    // 各註冊表分段取 key（同為 2 空縮排 "kebab-key": {，以 export const 分界）
+    const section = (name: string) => {
+      const start = screens.indexOf(`export const ${name}`);
+      expect(start, `screens.tsx 缺 ${name}`).toBeGreaterThan(-1);
+      const next = screens.indexOf("export ", start + 10);
+      const body = screens.slice(start, next === -1 ? undefined : next);
+      return new Set([...body.matchAll(/^ {2}"([a-z-]+)":\s*\{/gm)].map((m) => m[1]));
+    };
+    const flows = section("MOCK_FLOWS");
+    const shots = section("MOCK_SCREENS");
+    expect(flows.size).toBeGreaterThan(5);
+    expect(shots.size).toBeGreaterThan(10);
     let used = 0;
     for (const f of docs) {
       const src = readFileSync(f, "utf8");
       for (const m of src.matchAll(/<MockFlow[^>]*name="([^"]+)"/g)) {
         used++;
-        expect(registered.has(m[1]), `${f} 引用未註冊的流程：${m[1]}（見 manual/src/components/screens.tsx MOCK_FLOWS）`).toBe(true);
+        expect(flows.has(m[1]), `${f} 引用未註冊的流程：${m[1]}（見 screens.tsx MOCK_FLOWS）`).toBe(true);
+      }
+      for (const m of src.matchAll(/<MockScreen[^>]*name="([^"]+)"/g)) {
+        used++;
+        expect(shots.has(m[1]), `${f} 引用未註冊的畫面：${m[1]}（見 screens.tsx MOCK_SCREENS）`).toBe(true);
       }
     }
-    expect(used, "manual/docs 應至少嵌一個 MockFlow").toBeGreaterThan(0);
+    expect(used, "manual/docs 應至少嵌一個 MockFlow/MockScreen").toBeGreaterThan(0);
     // 零截圖鐵律：手冊不得再出現 FlowPlayer 或截圖素材引用
     for (const f of docs) {
       const src = readFileSync(f, "utf8");

@@ -381,6 +381,273 @@ const S = {
       <div style={{ display: "flex", justifyContent: "flex-end" }}><Spot><Button size="sm">送出異動</Button></Spot></div>
     </ScreenFrame>
   ),
+  /* 快速上手：認識畫面／選月份／精靈／欄位齊備 */
+  shellTour: (
+    <div className="bg-background text-foreground" style={{ display: "flex", gap: 10, padding: 12, minHeight: 230 }}>
+      <Spot label="① 功能選單：依工作性質分區">
+        <div style={{ width: 150, display: "flex", flexDirection: "column", gap: 4, fontSize: 12, padding: 4 }}>
+          <strong style={{ fontSize: 11, opacity: 0.6 }}>每月作業</strong>
+          <span>工作台</span>
+          <span style={{ display: "flex", gap: 4, alignItems: "center" }}>薪資結算 <Badge variant="secondary">例行</Badge></span>
+          <strong style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>規劃與分析</strong>
+          <span style={{ display: "flex", gap: 4, alignItems: "center" }}>薪酬分析 <Badge variant="outline">試算</Badge></span>
+          <strong style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>報表與申報</strong>
+          <span>月結報表・申報名冊</span>
+          <strong style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>主檔與設定</strong>
+          <span>基本資料・系統設定</span>
+        </div>
+      </Spot>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        <Spot label="② 本月狀態：月份／資料／月結">
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 4 }}>
+            <Badge variant="outline">DEV</Badge>
+            <Button size="sm" variant="ghost">導引</Button>
+            <span style={{ fontSize: 13 }}>本月 <strong>2026-07</strong></span>
+            <Badge variant="success">資料正常</Badge>
+            <Badge variant="warning">未確認</Badge>
+          </div>
+        </Spot>
+        <Ph h={120} label="內容區（依選單切換）" />
+      </div>
+    </div>
+  ),
+  periodPicker: (
+    <ScreenFrame>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13 }}>本月</span>
+        <Spot label="先選對發薪月份"><Ph w={110} h={28} label="2026-07 ▾" /></Spot>
+        <Badge variant="warning">未確認</Badge>
+        <span style={{ fontSize: 12, color: "var(--ifm-color-emphasis-600)" }}>已確認的月份會顯示 <Badge variant="success">已確認</Badge></span>
+      </div>
+      <Ph h={90} label="之後所有輸入與報表都算在選定的月份" />
+    </ScreenFrame>
+  ),
+  wizardDefaults: (
+    <ScreenFrame>
+      <Ph h={16} label="初始設定精靈：③ 薪資結構預設" />
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13 }}>伙食津貼（新進預設）</span>
+        <Spot label="之後新增員工自動帶入"><NumberInput value={3000} onChange={() => {}} /></Spot>
+      </div>
+      <Callout variant="info" title="只是預設值">每位員工建檔後仍可逐人調整；改預設不影響已建檔員工。</Callout>
+    </ScreenFrame>
+  ),
+  employeeReady: (
+    <ScreenFrame>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+        <EditableField label="身分證字號" kind="text" value="A123456789" onChange={() => {}} />
+        <EditableField label="Email" kind="text" value="" placeholder="未填" onChange={() => {}} />
+      </div>
+      <Spot label="缺欄會在對應作業卡住">
+        <Callout variant="warning" title="Email 未填">薪資條寄送時這位員工會被略過——寄送前系統會列出未填名單。</Callout>
+      </Spot>
+    </ScreenFrame>
+  ),
+  /* 每月作業：省時技巧／獎金／確認鎖定 */
+  monthlyShortcuts: (
+    <ScreenFrame>
+      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+        <Ph h={44} label="（本月異動欄位…）" />
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+          <Spot label="複製上月再微調"><Button size="sm" variant="outline">帶入上月異動</Button></Spot>
+          <span style={{ display: "flex", gap: 8 }}>
+            <Spot label="Shift+Enter"><Button size="sm" variant="outline">儲存並下一位</Button></Spot>
+            <Button size="sm">儲存本月異動</Button>
+          </span>
+        </div>
+      </div>
+    </ScreenFrame>
+  ),
+  bonusEntry: (
+    <ScreenFrame>
+      <div style={{ border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13 }}>本月獎金</span>
+          <Spot label="填這裡"><NumberInput value={60000} onChange={() => {}} /></Spot>
+          <span style={{ fontSize: 13, color: "var(--ifm-color-emphasis-600)" }}>今年累計獎金（自動）：<strong>120,000</strong></span>
+        </div>
+        <Callout variant="info" title="累計不用手填">二代健保 4 倍門檻用的「今年累計」由系統自動加總，年中導入才需要一次性補登。</Callout>
+      </div>
+    </ScreenFrame>
+  ),
+  confirmDo: (
+    <ScreenFrame>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>2026-07 <Badge variant="warning">未確認</Badge></span>
+        <Spot label="紅字清空後按"><Button size="sm">確認本月結算</Button></Spot>
+      </div>
+      <Ph h={70} label="（試算總覽…）" />
+    </ScreenFrame>
+  ),
+  confirmLocked: (
+    <ScreenFrame>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>2026-07 <Badge variant="success">已確認</Badge></span>
+        <Spot label="要改資料先按這裡"><Button size="sm" variant="outline">取消確認</Button></Spot>
+      </div>
+      <Callout variant="warning" title="本月已凍結">異動、薪資、眷屬與法定參數都改不動；相關頁面會提示「先取消確認」。</Callout>
+    </ScreenFrame>
+  ),
+  /* 人事事件：離職／留停區間／調職／眷屬／扣繳／回復 */
+  offboardScenario: (
+    <ScreenFrame>
+      <Ph h={16} label="員工檔案：基本資料（上）" />
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <Spot label="選這個情境"><Button size="sm" variant="outline">離職</Button></Spot>
+        <Button size="sm" variant="outline">留停/停職</Button>
+        <Button size="sm" variant="outline">薪資結構調整</Button>
+        <Button size="sm" variant="outline">眷屬異動</Button>
+      </div>
+    </ScreenFrame>
+  ),
+  offboardForm: (
+    <ScreenFrame>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+        <EditableField label="離職日" kind="date" value="2026-07-15" onChange={() => {}} />
+        <EditableField label="異動原因（必填）" kind="text" value="自請離職" onChange={() => {}} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}><Spot><Button size="sm">送出異動</Button></Spot></div>
+    </ScreenFrame>
+  ),
+  offboardDone: (
+    <ScreenFrame>
+      <Callout variant="info" title="完成後你會看到">
+        該員狀態轉 <Badge variant="secondary">離職</Badge>、名冊列入「退保」、工作台「本月應退保」+1；當月薪資自動按在職天數計。
+      </Callout>
+      <Callout variant="warning" title="退保要自行辦理">名冊是提醒性質，系統不會自動向勞保局／健保署申報。</Callout>
+    </ScreenFrame>
+  ),
+  leaveSegments: (
+    <ScreenFrame>
+      <Ph h={16} label="員工檔案：區間紀錄（基本分頁下方）" />
+      <Spot label="一段＝一次留停/停職；可多段">
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 4, fontSize: 13 }}>
+          <Ph w={70} h={26} label="留停 ▾" />
+          <span>生效</span><Ph w={96} h={26} label="2026-03-01" />
+          <span>復職</span><Ph w={96} h={26} label="（未復職）" />
+          <span>給薪</span><Ph w={64} h={26} label="政策預設" />
+        </div>
+      </Spot>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}><Button size="sm" variant="outline">新增一段</Button></div>
+      <Callout variant="info" title="復職＝補填該段復職日">之後自動回全薪，不必手動改回「在職」。</Callout>
+    </ScreenFrame>
+  ),
+  contactScenario: (
+    <ScreenFrame>
+      <Ph h={16} label="員工檔案：基本資料（上）" />
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <Button size="sm" variant="outline">離職</Button>
+        <Button size="sm" variant="outline">薪資結構調整</Button>
+        <Spot label="調職／改部門走這裡"><Button size="sm" variant="outline">基本聯絡資料</Button></Spot>
+      </div>
+      <Callout variant="info" title="唯一不受月結鎖定的情境">部門、姓名、Email 等小修正即使當月已確認也能改。</Callout>
+    </ScreenFrame>
+  ),
+  dependentsForm: (
+    <ScreenFrame>
+      <Ph h={16} label="眷屬異動：王媽媽" />
+      <Spot label="兩個勾選是分開的">
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", padding: 4 }}>
+          <EditableField label="依附健保" kind="checkbox" value={true} onChange={() => {}} />
+          <EditableField label="報稅扶養" kind="checkbox" value={false} onChange={() => {}} />
+        </div>
+      </Spot>
+      <Callout variant="info" title="影響不同">依附健保→健保費眷屬口數；報稅扶養→代扣稅試算的免稅額。</Callout>
+    </ScreenFrame>
+  ),
+  withholdingForm: (
+    <ScreenFrame>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" }}>
+        <Spot label="選扣繳方式">
+          <EditableField label="扣繳方式" kind="radio" alwaysEdit value="table" onChange={() => {}}
+            options={[{ value: "table", label: "依稅額表" }, { value: "fixed", label: "固定 5%" }]} />
+        </Spot>
+        <EditableField label="勞退自提率" kind="rate" value={6} unit="%" onChange={() => {}} />
+      </div>
+    </ScreenFrame>
+  ),
+  auditRestore: (
+    <ScreenFrame>
+      <Ph h={16} label="異動紀錄（基本資料分頁）" />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
+        <Ph w={80} label="07-10" /><span>薪資結構調整・蔡佩珊</span><span style={{ color: "var(--ifm-color-emphasis-600)" }}>45,800 → 48,000</span>
+        <Spot label="一鍵還原成變更前"><Button size="sm" variant="outline">回復</Button></Spot>
+      </div>
+      <Callout variant="info" title="回復也留紀錄">回復本身會再記一筆；已確認月份的回復會被鎖定擋下。</Callout>
+    </ScreenFrame>
+  ),
+  /* 申報：繳費清單／代扣稅 */
+  filingInsurance: (
+    <ScreenFrame>
+      <TabPills tabs={[{ key: "a", label: "年度扣繳憑單" }, { key: "b", label: "勞健退繳費清單" }, { key: "c", label: "投保級距申報調整" }, { key: "d", label: "加退保作業清單" }]} value="b" onChange={() => {}} />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+        <Ph w={64} /><span>勞保 58,132／健保 46,870／勞退 32,410</span><strong>合計 137,412</strong>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <Spot label="與繳款單對帳"><Button size="sm" variant="outline">匯出 CSV</Button></Spot>
+      </div>
+    </ScreenFrame>
+  ),
+  filingTax: (
+    <ScreenFrame>
+      <Ph h={16} label="代扣所得稅清單（月結報表）" />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+        <Ph w={64} /><span>應扣 2,000</span><Badge variant="success">已填</Badge>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+        <Ph w={64} /><span>應扣 —</span><Spot label="最常見的漏填在這裡看"><Badge variant="warning">未填</Badge></Spot>
+      </div>
+    </ScreenFrame>
+  ),
+  /* 年度與設定：級距匯入／公司政策 */
+  bracketImport: (
+    <ScreenFrame>
+      <Ph h={16} label="系統設定 → 投保級距" />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Button size="sm" variant="outline">逐格編輯</Button>
+        <Spot label="年度公告整批更新用"><Button size="sm" variant="outline">匯入 CSV</Button></Spot>
+        <Button size="sm" variant="ghost">下載模板</Button>
+      </div>
+      <Callout variant="info" title="匯入前有預覽">逐列檢查（金額遞增、格式）通過才會套用；已確認月份引用的版本改不動，會導向「新增生效版本」。</Callout>
+    </ScreenFrame>
+  ),
+  policyCards: (
+    <ScreenFrame>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" }}>
+        <Spot label="影響年資/特休顯示">
+          <EditableField label="年資／特休計算方式" kind="radio" alwaysEdit value="hire" onChange={() => {}}
+            options={[{ value: "fixed", label: "固定基準日" }, { value: "hire", label: "依到職日（週年制）" }]} />
+        </Spot>
+        <EditableField label="留停給薪比例（政策預設）" kind="rate" value={0} unit="%" onChange={() => {}} />
+      </div>
+      <Callout variant="info" title="逐案可覆寫">員工「區間紀錄」每段可另設給薪比例，留白＝採此政策。</Callout>
+    </ScreenFrame>
+  ),
+  /* 分析：狀態徽章／調薪核定 */
+  analyticsBadges: (
+    <ScreenFrame>
+      <Spot label="先看徽章再讀數字">
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 4, fontSize: 13 }}>
+          <Badge variant="warning">試算暫定</Badge><span>本月未確認，數字會隨輸入變動</span>
+        </div>
+      </Spot>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 13 }}>
+        <Badge variant="success">已確認實際</Badge><span>本月已凍結快照</span>
+        <Badge variant="secondary">歷史實際</Badge><span>過去月份的留存快照</span>
+      </div>
+    </ScreenFrame>
+  ),
+  raisePlan: (
+    <ScreenFrame>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+        <Ph w={72} label="方案 A" /><span>全員 +3%</span><span>年成本</span><Delta value={1860000} goodWhen="negative" />
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <Spot label="沙盒→實際生效只差這一步"><Button size="sm">核定並套用</Button></Spot>
+      </div>
+      <Callout variant="danger" title="套用後無法一鍵回復">核定會逐人寫入薪資主檔；要撤回只能逐筆從異動紀錄回復。</Callout>
+    </ScreenFrame>
+  ),
 };
 
 /* ── 流程註冊表（key＝文件內 <MockFlow name="…">；tests/manualStories.test.ts 守衛存在性） ── */
@@ -442,7 +709,59 @@ export const MOCK_FLOWS: Record<string, { title: string; to?: string; steps: { c
     { caption: "② 檔案面板下方兩排「情境」按鈕——挑要辦的事", node: S.masterScenarios },
     { caption: "③ 只出現該情境欄位＋必填「異動原因」，送出即留稽核紀錄", node: S.masterSubmit },
   ]},
+  "offboard": { title: "人事事件：員工要離職", to: "/master", steps: [
+    { caption: "① 開啟員工檔案，情境選「離職」", node: S.offboardScenario },
+    { caption: "② 填離職日與異動原因，送出", node: S.offboardForm },
+    { caption: "③ 完成後：狀態轉離職、退保提醒＋當月按在職天數計薪", node: S.offboardDone },
+  ]},
+  "confirm-lock": { title: "確認本月結算：先存檔、再上鎖", to: "/payroll/review", steps: [
+    { caption: "① 紅字全數排除後按「確認本月結算」＝留存快照", node: S.confirmDo },
+    { caption: "② 徽章轉「已確認」＝該月凍結；要改資料先按「取消確認」（會刪快照，改完務必重新確認）", node: S.confirmLocked },
+  ]},
 };
+
+/* ── 單格畫面註冊表（key＝文件內 <MockScreen name="…">；守衛同 MOCK_FLOWS） ── */
+
+export const MOCK_SCREENS: Record<string, { title: string; caption: string; to?: string; node: React.ReactNode }> = {
+  "shell-tour": { title: "認識畫面：兩個固定區域", caption: "左＝功能選單（分區＋例行/試算徽章）；上＝本月狀態（環境/月份/資料/月結）", to: "/", node: S.shellTour },
+  "period-picker": { title: "先選對發薪月份", caption: "頂部「本月」選擇器決定之後所有輸入與報表算在哪個月", to: "/", node: S.periodPicker },
+  "wizard-defaults": { title: "精靈：薪資結構預設", caption: "這一步填的是「新進員工預設」，之後建檔自動帶入、可再逐人調整", to: "/", node: S.wizardDefaults },
+  "employee-ready": { title: "缺欄會在哪裡看到", caption: "欄位沒填齊時，對應作業（寄薪資條、加密 PDF…）會列出未填名單", to: "/master", node: S.employeeReady },
+  "monthly-dialog": { title: "異動欄位在對話框裡", caption: "點員工列「編輯」開啟；填數字時下方試算即時更新", to: "/payroll/monthly", node: S.monthlyDialog },
+  "monthly-shortcuts": { title: "省時三招的位置", caption: "左下「帶入上月異動」；右下「儲存並下一位」（Shift+Enter）", to: "/payroll/monthly", node: S.monthlyShortcuts },
+  "bonus-entry": { title: "獎金填哪裡", caption: "「本月獎金」欄；旁邊「今年累計」由系統自動加總、不用手填", to: "/payroll/monthly", node: S.bonusEntry },
+  "leave-segments": { title: "區間紀錄：一段＝一次留停", caption: "每段自己的生效日/復職日/給薪比例；復職＝補填該段復職日", to: "/master", node: S.leaveSegments },
+  "contact-scenario": { title: "調職走「基本聯絡資料」情境", caption: "部門異動屬聯絡資料小修正；唯一不受月結鎖定的情境", to: "/master", node: S.contactScenario },
+  "dependents-form": { title: "依附健保／報稅扶養分開勾", caption: "前者影響健保費口數、後者影響代扣稅免稅額——可只勾其一", to: "/master", node: S.dependentsForm },
+  "withholding-form": { title: "扣繳設定長這樣", caption: "扣繳方式二選一＋勞退自提率；影響下月起的代扣", to: "/master", node: S.withholdingForm },
+  "audit-restore": { title: "回復鈕在異動紀錄裡", caption: "逐欄編輯類的異動可一鍵還原成變更前值；回復本身也留紀錄", to: "/master?tab=audit", node: S.auditRestore },
+  "filing-insurance": { title: "勞健退繳費清單", caption: "三險合計對帳；「匯出 CSV」給會計或留存", to: "/reports?tab=insurance", node: S.filingInsurance },
+  "filing-tax": { title: "代扣稅清單的「未填」警示", caption: "最常見漏填在此顯示；點列可回去補", to: "/reports?tab=tax", node: S.filingTax },
+  "filing-bracket": { title: "級距申報調整", caption: "比對現→報；主管機關申報完成後才按「以目前為申報基準」", to: "/reports?tab=bracket", node: S.filingBracket },
+  "filing-enroll": { title: "加退保名冊＝提醒性質", caption: "供人工向勞健保單位辦理；系統不自動改保費", to: "/reports?tab=enrollment", node: S.filingEnroll },
+  "filing-tabs": { title: "年度扣繳憑單位置", caption: "申報名冊第一個分頁；逐人彙總、可匯出 CSV", to: "/reports?tab=withholding", node: S.filingTabs },
+  "bracket-import": { title: "級距表兩種改法", caption: "逐格編輯（微調）或 CSV 整批匯入（年度公告）；匯入前逐列檢查", to: "/settings?tab=brackets", node: S.bracketImport },
+  "policy-cards": { title: "公司政策設定", caption: "年資計算方式與留停給薪比例——影響全公司的兩個開關", to: "/settings?tab=company", node: S.policyCards },
+  "review-checks": { title: "紅字／黃字長這樣", caption: "紅＝必須處理（擋確認）；黃＝建議確認；點「前往修正」直達", to: "/payroll/review", node: S.reviewChecks },
+  "analytics-badges": { title: "先看資料狀態徽章", caption: "試算暫定／已確認實際／歷史實際——判讀數字前先確認資料狀態", to: "/analytics", node: S.analyticsBadges },
+  "raise-plan": { title: "核定並套用＝實際生效", caption: "沙盒比較不動薪資；按下這顆才寫入主檔，且無法一鍵回復", to: "/analytics?tab=raise", node: S.raisePlan },
+};
+
+/** 單格畫面（零截圖）：一張對位畫面＋字幕＋直達入口；列印樣式與 MockFlow 一致 */
+export function MockScreen({ name }: { name: string }) {
+  const sc = MOCK_SCREENS[name];
+  if (!sc) return <div>未知畫面：{name}</div>;
+  return (
+    <figure className="mockflow" style={{ margin: "1rem 0", border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: 8, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", background: "var(--ifm-color-emphasis-100)", fontSize: 13 }}>
+        <strong>{sc.title}</strong>
+        {sc.to && <AppLink to={sc.to}>開啟此作業</AppLink>}
+      </div>
+      <div className="mockflow-step mockflow-step-active" style={{ borderBottom: "1px solid var(--ifm-color-emphasis-200)" }}>{sc.node}</div>
+      <figcaption style={{ padding: "8px 12px", fontSize: 14, background: "var(--ifm-color-emphasis-100)" }}>{sc.caption}</figcaption>
+    </figure>
+  );
+}
 
 /** 流程播放器（React 排版、零截圖）：自動輪播＋字幕＋前後步＋直達入口 */
 export default function MockFlow({ name, interval = 4200 }: { name: string; interval?: number }) {
