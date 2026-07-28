@@ -105,6 +105,21 @@
   .mockflow-step { display: block !important; break-inside: avoid; }
   .mockflow-step .mockflow-print-caption { display: block !important; font-weight: 600; }
   .mockflow { break-inside: avoid; }
+  /* ── 分頁規則：元件與段落不跨頁截斷 ─────────────────────────
+     figure＝Calc/Demo/MockFlow/MockScreen 容器；admonition＝提示框。
+     整塊超過一頁時瀏覽器仍會就地分頁（avoid 是盡力而為），
+     此時 MockFlow 依步驟分頁（.mockflow-step 各自 avoid）。 */
+  p, li, blockquote, pre,
+  figure,
+  .theme-admonition, .alert,
+  table, tr,
+  .storyframe {
+    break-inside: avoid;
+  }
+  /* 標題不孤懸頁底：與後續內容同頁 */
+  h1, h2, h3, h4 { break-after: avoid; break-inside: avoid; }
+  /* 超長段落仍需跨頁時，至少保留首尾 3 行（防孤行） */
+  p { orphans: 3; widows: 3; }
   /* 內嵌 story iframe 互動內容印不出來：改顯示替代說明框（誠實標示、不印半殘 iframe） */
   .storyframe-iframe { display: none !important; }
   .storyframe-print-note {
