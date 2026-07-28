@@ -25,6 +25,15 @@
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
 
+    /* 動態時長（對齊上游 doping-design-book tokens）：介面回饋越即時越好，
+       超過 300ms 的動畫在後台系統只會讓人等。全部受 prefers-reduced-motion 保護。
+       fast＝顏色/透明度回饋（hover、focus）；normal＝浮層出現、展開收合；
+       slow＝循環式引導脈動（唯一允許的長動畫，且必須可停）。 */
+    --duration-instant: 0ms;
+    --duration-fast: 150ms;
+    --duration-normal: 200ms;
+    --duration-slow: 1500ms;
+
     /* 語意狀態色（單一來源；供全站 success/warning/info/danger 與「已變更」edit 使用，
        取代散落各處的 emerald/amber/sky/rose 硬編色）。值＝對應 Tailwind 色階換算 HSL。 */
     --success: 160 84% 39%;            /* ≈ emerald-600 */

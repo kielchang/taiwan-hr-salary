@@ -27,6 +27,10 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    --duration-instant: 0ms;
+    --duration-fast: 150ms;
+    --duration-normal: 200ms;
+    --duration-slow: 1500ms;
 
     /* 語意狀態色（單一來源；供全站 success/warning/info/danger 與「已變更」edit 使用，
        取代散落各處的 emerald/amber/sky/rose 硬編色）。值＝對應 Tailwind 色階換算 HSL。 */

@@ -3,7 +3,7 @@
 **這份台帳回答一個問題：本專案的每個元件，哪些是遵照上游規範、哪些是自製、哪些刻意不一樣。**
 
 上游＝[doping-design-book](https://github.com/kielchang/doping-design-book)（`@doping/react` **0.1.0**）
-本地＝`src/components`（`UI_KIT` **0.17.1**，見 [`src/components/version.ts`](../../src/components/version.ts)）
+本地＝`src/components`（`UI_KIT` **0.18.0**，見 [`src/components/version.ts`](../../src/components/version.ts)）
 
 > 本專案對上游**唯讀**。要改上游 → 寫 [提案](proposals/) → PR → 合併後才回寫本表與本地實作。
 
@@ -24,6 +24,7 @@
 | `callout` | 遵循 | `ui/callout` | 四種狀態語意 success/warning/info/danger |
 | `card` | 遵循 | `ui/card` | |
 | `checkbox` | 遵循 | `ui/checkbox` | |
+| `chips` | 遵循 | `ui/chips` | 多選標籤片。**原為 `EditableField` 內部私有函式，0.18.0 抽出對齊上游** |
 | `coachmark` | 遵循 | `ui/coachmark` | 含可縮小（避免擋住操作）與驗收標記 |
 | `delta` | 遵循 | `ui/delta` | 箭頭＋文字＋色三重編碼 |
 | `dialog` | 遵循 | `ui/dialog` | |
@@ -31,6 +32,7 @@
 | `input` | 遵循 | `ui/input` | |
 | `label` | 遵循 | `ui/label` | |
 | `mockup` | 遵循 | `ui/mockup` | 文件用積木；聚光＝主色脈動環 |
+| `seg-group` | 遵循 | `ui/seg-group` | 分段選擇。**原為 `EditableField` 內部私有函式，0.18.0 抽出對齊上游** |
 | `select` | 遵循 | `ui/select` | |
 | `table` | 遵循 | `ui/table` | |
 | `tooltip` | 遵循 | `ui/tooltip` | |
@@ -55,13 +57,6 @@
 | `Stepper` | 遵循 | `ui/stepper` | |
 | **`ErrorBoundary`** | **自製** | 上游刻意不收 | 上游理由：屬「應用外殼」職責，沒有視覺／互動決策要編碼。保留在本地是正確的 |
 | **`charts/`**（StackedBar／Pareto／Heatmap／TrendChart／Bullet…） | **自製** | 上游第 2 階段 | 上游判定圖表是自成一格的子系統（軸／圖例／互動／色盲驗證），第一版只收**圖表色票 token**。→ 已列[提案 0001](proposals/0001-charts.md) |
-
-## 上游有、本地尚無
-
-| 上游項目 | 本地狀態 | 說明 |
-|---|---|---|
-| `ui/seg-group` | 未獨立成件 | 本地埋在 `EditableField` 內部（radio 分段）。上游抽成獨立元件。→ 待評估對齊 |
-| `ui/chips` | 未獨立成件 | 同上（multiselect 標籤片）。→ 待評估對齊 |
 
 ## App glue（**不屬**元件庫範圍，刻意不入 barrel）
 

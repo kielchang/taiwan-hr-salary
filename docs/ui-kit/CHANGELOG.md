@@ -3,6 +3,25 @@
 本檔記錄**元件庫自己的版本**，與 app 版號（`package.json` / `CHANGELOG.md`）**獨立**。
 版號規則見 [README.md](README.md)。版號單一來源＝[`src/components/version.ts`](../../src/components/version.ts)。
 
+## [0.18.0] - 2026-07-28
+
+### 新增（SegGroup／Chips 抽成獨立元件——對齊設計上游）
+- 這兩個元件**本來就存在**，但是 `form/EditableField.tsx` 內部的私有函式（無匯出、無 story）。
+  上游 [doping-design-book](https://github.com/kielchang/doping-design-book) `@doping/react` 0.1.0
+  把它們收為獨立元件，本次比照抽出 → `ui/seg-group.tsx`、`ui/chips.tsx`，並列入 barrel。
+- **`SegGroup`**：少量互斥選項的分段選擇（2–5 個、標籤短時取代原生 radio；更多或會動態增減請用 Select）。
+  `role="radiogroup"`＋roving tabindex、方向鍵/Space/Enter/Esc、選中同時打勾與填色（不只靠顏色）。
+- **`Chips`**：多選標籤片（選項固定且 ≤12、需同時看見已選與未選時取代多選下拉）。
+  `role="group"` 內一組 `role="checkbox"`。
+- 對齊上游補齊：`className`、`changed` 改為選填（預設 `false`）、`emptyHint` 可覆寫無選項文案、
+  `Lock` 圖示補 `aria-hidden`（原本螢幕報讀器會唸出裝飾圖示）。
+- `EditableFieldOption` 改為上游 `SegOption` 的型別別名（結構相同，既有匯入不受影響）。
+- 行為零變更：元件本體沿用既有實作，僅改封裝。Storybook 新增「元件/選擇」（互動＋已改動＋鎖定＋無選項）。
+
+### 新增（動態時長 token）
+- `--duration-{instant,fast,normal,slow}`＝0/150/200/1500ms，對映 Tailwind `duration-*`（additive，
+  內建 `duration-150` 等不受影響）。上游 token 層的一部分；`fast` 與 Tailwind 預設同為 150ms，故無視覺變化。
+
 ## [0.17.1] - 2026-07-28
 
 ### 修正（Placeholder 列印保底）

@@ -59,6 +59,13 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      // 動態時長 token（對齊上游）：additive——Tailwind 內建的 duration-150/300… 仍可用。
+      transitionDuration: {
+        instant: "var(--duration-instant)",
+        fast: "var(--duration-fast)",
+        normal: "var(--duration-normal)",
+        slow: "var(--duration-slow)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

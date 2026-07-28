@@ -3,14 +3,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { SegGroup, type SegOption } from "@/components/ui/seg-group";
+import { Chips } from "@/components/ui/chips";
 import { eqValue, fmtValue, type FieldKind } from "@/lib/forms/diff";
 import { Tooltip, TruncatedText } from "@/components/ui/tooltip";
-import { Undo2, Redo2, Lock, ArrowRight, Check, Pencil } from "lucide-react";
+import { Undo2, Redo2, Lock, ArrowRight, Pencil } from "lucide-react";
 
-export interface EditableFieldOption {
-  value: string;
-  label: string;
-}
+/** 選項型別＝上游 `SegOption`（結構相同）；保留此名稱維持既有匯入相容。 */
+export type EditableFieldOption = SegOption;
 
 export interface EditableFieldProps {
   label: string;
@@ -330,143 +330,3 @@ function EditPencil() {
   );
 }
 
-/**
- * 分段選擇（是/否、單選 radio）：WAI-ARIA radiogroup。
- * 方向鍵於選項間移動焦點、Space/Enter 選定該項、Esc 取消；選中者高亮＋打勾（不只顏色）。
- */
-function SegGroup({
-  label, options, value, onPick, autoFocus, onEscape, disabled, lockHint, changed,
-}: {
-  label?: string; options: EditableFieldOption[]; value: string; onPick: (v: string) => void;
-  autoFocus?: boolean; onEscape?: () => void; disabled?: boolean; lockHint?: string; changed: boolean;
-}) {
-  const btns = useRef<(HTMLButtonElement | null)[]>([]);
-  const activeIdx = options.findIndex((o) => o.value === value);
-  const focusIdx = activeIdx >= 0 ? activeIdx : 0;
-
-  useEffect(() => {
-    if (autoFocus) btns.current[focusIdx]?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFocus]);
-
-  const move = (from: number, dir: number) => {
-    const n = options.length;
-    if (!n) return;
-    btns.current[(from + dir + n) % n]?.focus();
-  };
-  const onKey = (e: React.KeyboardEvent, idx: number) => {
-    if (disabled) return;
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(idx, 1); }
-    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(idx, -1); }
-    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); onPick(options[idx].value); }
-    else if (e.key === "Escape") { e.preventDefault(); onEscape?.(); }
-  };
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      title={disabled ? lockHint : undefined}
-      className={cn(
-        "inline-flex flex-wrap items-center gap-0.5 rounded-md border p-0.5",
-        changed ? "border-edit bg-edit-bg" : "border-input bg-background",
-        disabled && "cursor-not-allowed opacity-60",
-      )}
-    >
-      {options.map((o, idx) => {
-        const active = value === o.value;
-        return (
-          <button
-            key={o.value}
-            ref={(el) => { btns.current[idx] = el; }}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            tabIndex={disabled ? -1 : idx === focusIdx ? 0 : -1}
-            disabled={disabled}
-            onClick={() => !disabled && onPick(o.value)}
-            onKeyDown={(e) => onKey(e, idx)}
-            className={cn(
-              "tap-target-y inline-flex items-center justify-center gap-1 rounded px-3 py-1 text-sm transition-colors",
-              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
-            )}
-          >
-            {active && <Check aria-hidden className="size-3.5 shrink-0" />}
-            {o.label}
-          </button>
-        );
-      })}
-      {disabled && <Lock className="mx-1 size-3.5 opacity-60" />}
-    </div>
-  );
-}
-
-/**
- * 多選標籤片：一組 checkbox（`role="group"`）。方向鍵移焦點、Space/Enter 切換、Esc 收合；
- * 選中者填色＋打勾（不只顏色）。
- */
-function Chips({
-  label, options, selected, onToggle, autoFocus, onEscape, disabled, lockHint, changed,
-}: {
-  label?: string; options: EditableFieldOption[]; selected: string[]; onToggle: (v: string) => void;
-  autoFocus?: boolean; onEscape?: () => void; disabled?: boolean; lockHint?: string; changed: boolean;
-}) {
-  const btns = useRef<(HTMLButtonElement | null)[]>([]);
-
-  useEffect(() => {
-    if (autoFocus) btns.current[0]?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFocus]);
-
-  const move = (from: number, dir: number) => {
-    const n = options.length;
-    if (!n) return;
-    btns.current[(from + dir + n) % n]?.focus();
-  };
-  const onKey = (e: React.KeyboardEvent, idx: number) => {
-    if (disabled) return;
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(idx, 1); }
-    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(idx, -1); }
-    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); onToggle(options[idx].value); }
-    else if (e.key === "Escape") { e.preventDefault(); onEscape?.(); }
-  };
-
-  return (
-    <div
-      role="group"
-      aria-label={label}
-      title={disabled ? lockHint : undefined}
-      className={cn(
-        "flex flex-wrap items-center gap-1.5 rounded-md border p-1.5",
-        changed ? "border-edit bg-edit-bg" : "border-input bg-background",
-        disabled && "cursor-not-allowed opacity-60",
-      )}
-    >
-      {options.map((o, idx) => {
-        const on = selected.includes(o.value);
-        return (
-          <button
-            key={o.value}
-            ref={(el) => { btns.current[idx] = el; }}
-            type="button"
-            role="checkbox"
-            aria-checked={on}
-            tabIndex={disabled ? -1 : idx === 0 ? 0 : -1}
-            disabled={disabled}
-            onClick={() => !disabled && onToggle(o.value)}
-            onKeyDown={(e) => onKey(e, idx)}
-            className={cn(
-              "tap-target-y inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-              on ? "border-primary bg-primary/10 font-medium text-primary" : "border-input text-muted-foreground hover:bg-accent",
-            )}
-          >
-            {on && <Check aria-hidden className="size-3 shrink-0" />}
-            {o.label}
-          </button>
-        );
-      })}
-      {options.length === 0 && <span className="px-1 text-xs text-muted-foreground">（無選項）</span>}
-      {disabled && <Lock className="size-3.5 opacity-60" />}
-    </div>
-  );
-}

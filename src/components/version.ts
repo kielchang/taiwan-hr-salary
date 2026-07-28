@@ -7,5 +7,5 @@ export const UI_KIT = {
   /** 套件識別名（切割成 npm 套件時的 name 依據；可於發佈時改為 scoped name）。 */
   name: "hr-ui-kit",
   /** 元件庫語意化版號（獨立於 app）。 */
-  version: "0.17.1",
+  version: "0.18.0",
 } as const;
