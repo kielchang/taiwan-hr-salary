@@ -8,6 +8,7 @@
 |---|---|
 | [`conformance.md`](conformance.md) | **符合性台帳**：每個本地元件是「遵循／自製／刻意偏離」 |
 | [`proposals/`](proposals/) | 給上游的改進提案（走 PR，合併後才動本地） |
+| [`handoff/`](handoff/) | **可攜交付包**：帶去上游的草案（新頁／差異補充稿／方法論）＋放置清單。內容已去領域化，落地一律走 PR |
 | `../../scripts/design-book.sh` | 一行取得／閱讀上游規範 |
 
 ## 🔒 唯讀鐵律
