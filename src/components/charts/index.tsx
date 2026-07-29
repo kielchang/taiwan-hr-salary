@@ -48,6 +48,45 @@ function ChartTip({ pos, show, children }: { pos: { x: number; y: number }; show
 
 const selectHint = (on: boolean) => (on ? <div className="mt-0.5 text-[10px] text-muted-foreground">點擊看明細</div> : null);
 
+/* ───────────── 無障礙：圖表的文字等價 ─────────────
+ * `role="img"` 不是中性標記：它把 svg 當成一張圖，並使**子樹對輔助技術隱藏**——
+ * 圖內 <text> 畫的類別名與數值，螢幕報讀器一個都讀不到。因此凡是掛 role="img" 的圖，
+ * 都必須補「名稱（aria-label 摘要）」＋「資料出口（同資料的無障礙表格）」，否則
+ * 資訊對報讀器使用者等於完全消失（WCAG 1.1.1 Level A）。
+ *
+ * 為什麼用表格而不是讓 SVG 可逐點瀏覽：SVG 內部的焦點與無障礙樹支援在各瀏覽器 ×
+ * 各報讀器之間很不一致；<table> 的語意則是普世的（報讀器有專門的表格瀏覽指令）。
+ *
+ * 例外：數值**已經在鄰近的可見文字**裡（Bullet 的實際/目標、Heatmap 的格內數字）時，
+ * 圖形改標 aria-hidden，避免同一份資料被唸兩次。 */
+
+/** 螢幕報讀器專用的資料表（視覺上不可見，不佔版面）。首欄為列標頭。 */
+function SrTable({ caption, cols, rows }: { caption: string; cols: string[]; rows: (string | number)[][] }) {
+  if (rows.length === 0) return null;
+  return (
+    <table className="sr-only">
+      <caption>{caption}</caption>
+      <thead>
+        <tr>{cols.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i}>
+            {r.map((cell, j) => (j === 0
+              ? <th key={j} scope="row">{cell}</th>
+              : <td key={j}>{cell}</td>))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** 組出 aria-label 摘要：「圖種：主題，共 N 項，＜重點＞」。caption 未給時仍可用。 */
+function chartLabel(kind: string, caption: string | undefined, parts: (string | false | undefined)[]) {
+  return [caption ? `${kind}：${caption}` : kind, ...parts.filter(Boolean)].join("，");
+}
+
 export interface Segment {
   label: string;
   value: number;
@@ -56,12 +95,14 @@ export interface Segment {
 
 /** 水平堆疊長條（成本組成、部門成本）。每列一類別、內部分段；可點整列鑽取（onSelectRow）。 */
 export function StackedBar({
-  rows, height = 28, onSelectRow, selectedRow = null,
+  rows, height = 28, onSelectRow, selectedRow = null, caption,
 }: {
   rows: { label: string; segments: Segment[] }[];
   height?: number;
   onSelectRow?: (label: string) => void;
   selectedRow?: string | null;
+  /** 這張圖在講什麼（供螢幕報讀器的表格 caption 用）；未給時用通用字樣 */
+  caption?: string;
 }) {
   const [hover, setHover] = useState<{ ri: number; si: number } | null>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -71,6 +112,8 @@ export function StackedBar({
     setPos({ x: e.clientX - r.left, y: e.clientY - r.top });
   };
   const seg = hover ? rows[hover.ri]?.segments[hover.si] : null;
+  // 各列的分段名稱聯集（保留首見順序）＝ 無障礙表格的欄位
+  const segCols = [...new Set(rows.flatMap((r) => r.segments.map((s) => s.label)))];
   return (
     <div className="relative select-none" onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
       <div className="space-y-1.5">
@@ -85,7 +128,9 @@ export function StackedBar({
               onPointerDown={() => onSelectRow?.(r.label)}
             >
               <span className="w-28 shrink-0 truncate pl-1 text-xs text-muted-foreground" title={r.label}>{r.label}</span>
-              <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" className="h-6 flex-1" role="img">
+              {/* 每列的長條是「把數字畫成長度」的視覺呈現；列標籤與合計已是可見文字，
+                  分段明細由下方 SrTable 提供，故此處標裝飾性避免重複播報。 */}
+              <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" className="h-6 flex-1" aria-hidden="true">
                 {r.segments.map((s, si) => {
                   const w = max > 0 ? (s.value / max) * 100 : 0;
                   const active = hover?.ri === ri && hover?.si === si;
@@ -113,6 +158,16 @@ export function StackedBar({
           </>
         )}
       </ChartTip>
+      {/* 分段明細原本只有 hover 拿得到 → 補文字出口 */}
+      <SrTable
+        caption={caption ?? "堆疊長條圖資料"}
+        cols={["項目", ...segCols, "合計"]}
+        rows={rows.map((r) => [
+          r.label,
+          ...segCols.map((c) => ntd(r.segments.find((s) => s.label === c)?.value ?? 0)),
+          ntd(r.segments.reduce((a, s) => a + s.value, 0)),
+        ])}
+      />
     </div>
   );
 }
@@ -145,7 +200,7 @@ export function capItems(data: BarDatum[], max: number): BarDatum[] {
 
 /** 垂直長條圖（直方圖、部門中位、調幅%）。hover 高亮＋提示；可 onSelect 鑽取。 */
 export function BarChart({
-  data, height = 160, color = PALETTE[0], valueFmt = ntd, onSelect, selectedIndex = null, showValues = false, maxItems = 12,
+  data, height = 160, color = PALETTE[0], valueFmt = ntd, onSelect, selectedIndex = null, showValues = false, maxItems = 12, caption,
 }: {
   data: BarDatum[];
   height?: number;
@@ -155,10 +210,13 @@ export function BarChart({
   selectedIndex?: number | null;
   showValues?: boolean; // 於長條頂端標數值（列印/觸控不靠 hover 也能讀）
   maxItems?: number; // 類別過多時只顯示前 N，其餘彙總「其他」
+  /** 這張圖在講什麼（供 aria-label 摘要與無障礙表格用） */
+  caption?: string;
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   if (data.length === 0) return <Empty />;
   const shown = capItems(data, maxItems);
+  const top = shown.reduce((a, d) => (d.value > a.value ? d : a), shown[0]);
   const W = 320, H = height;
   const pad = { l: 8, r: 8, t: 10, b: 28 };
   const max = Math.max(1, ...shown.map((d) => d.value));
@@ -166,7 +224,8 @@ export function BarChart({
   const activeI = idx ?? selectedIndex;
   return (
     <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
+        aria-label={chartLabel("長條圖", caption, [`共 ${shown.length} 項`, `最高為 ${top.label} ${valueFmt(top.value)}`])}>
         {shown.map((d, i) => {
           const h = ((H - pad.t - pad.b) * d.value) / max;
           const x = pad.l + i * bw;
@@ -202,17 +261,23 @@ export function BarChart({
           </>
         )}
       </ChartTip>
+      <SrTable caption={caption ?? "長條圖資料"} cols={["項目", "數值"]}
+        rows={shown.map((d) => [d.label, valueFmt(d.value)])} />
     </div>
   );
 }
 
-/** 折線圖（Lorenz 曲線：可加對角線基準）。hover 顯示累積人口/薪資比。 */
+/** 折線圖（Lorenz 曲線：可加對角線基準）。hover 顯示累積比例。 */
 export function LineChart({
-  points, diagonal = false, height = 200,
+  points, diagonal = false, height = 200, xLabel = "累積人口", yLabel = "取得薪資", caption,
 }: {
   points: { x: number; y: number }[]; // x,y ∈ [0,1]
   diagonal?: boolean;
   height?: number;
+  /** 兩軸的意義；同時供提示泡泡與無障礙表格使用（預設值＝既有文案，不改行為） */
+  xLabel?: string;
+  yLabel?: string;
+  caption?: string;
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   const W = 240, H = height, pad = 24;
@@ -221,7 +286,8 @@ export function LineChart({
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
   return (
     <div className="relative select-none" onPointerMove={onMove} onPointerLeave={() => setIdx(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
+        aria-label={chartLabel("折線圖", caption, [`${xLabel} 對 ${yLabel}`, `共 ${points.length} 個點`])}>
         <rect x={pad} y={pad} width={W - 2 * pad} height={H - 2 * pad} fill="none" stroke={GRID} strokeWidth={0.5} />
         {diagonal && <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(1)} stroke={AXIS} strokeDasharray="3 2" strokeWidth={0.8} />}
         <path d={path} fill="none" stroke={PALETTE[0]} strokeWidth={1.5} />
@@ -234,20 +300,23 @@ export function LineChart({
         ))}
       </svg>
       <ChartTip pos={pos} show={idx !== null}>
-        {idx !== null && <div>累積人口 {(points[idx].x * 100).toFixed(0)}%<br />取得薪資 {(points[idx].y * 100).toFixed(0)}%</div>}
+        {idx !== null && <div>{xLabel} {(points[idx].x * 100).toFixed(0)}%<br />{yLabel} {(points[idx].y * 100).toFixed(0)}%</div>}
       </ChartTip>
+      <SrTable caption={caption ?? "折線圖資料"} cols={[`${xLabel}（%）`, `${yLabel}（%）`]}
+        rows={points.map((pt) => [(pt.x * 100).toFixed(0), (pt.y * 100).toFixed(0)])} />
     </div>
   );
 }
 
 /** Pareto：長條（由大到小）＋累積百分比折線。hover 提示佔比；可 onSelect 鑽取。 */
 export function Pareto({
-  data, height = 180, onSelect, maxItems = 12,
+  data, height = 180, onSelect, maxItems = 12, caption,
 }: {
   data: BarDatum[];
   height?: number;
   onSelect?: (item: BarDatum, index: number) => void;
   maxItems?: number; // 類別過多時只顯示前 N，其餘彙總「其他」
+  caption?: string;
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   if (data.length === 0) return <Empty />;
@@ -267,7 +336,9 @@ export function Pareto({
   const linePath = cumPts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   return (
     <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
+        aria-label={chartLabel("柏拉圖", caption, [`共 ${sorted.length} 項，由大到小排序`,
+          `前 ${Math.min(3, sorted.length)} 項累積 ${(cumArr[Math.min(2, cumArr.length - 1)] * 100).toFixed(0)}%`])}>
         {sorted.map((d, i) => {
           const h = ((H - pad.t - pad.b) * d.value) / max;
           const hl = idx === null || idx === i;
@@ -294,6 +365,9 @@ export function Pareto({
           </>
         )}
       </ChartTip>
+      <SrTable caption={caption ?? "柏拉圖資料"} cols={["項目", "數值", "佔比", "累積佔比"]}
+        rows={sorted.map((d, i) => [d.label, ntd(d.value),
+          `${((d.value / total) * 100).toFixed(1)}%`, `${(cumArr[i] * 100).toFixed(0)}%`])} />
     </div>
   );
 }
@@ -302,7 +376,7 @@ export interface ScatterPoint { x: number; y: number; label?: string; id?: strin
 
 /** 散布圖。hover 放大＋提示；可 onSelect 鑽取。 */
 export function Scatter({
-  points, xLabel, yLabel, height = 200, onSelect, color = PALETTE[0],
+  points, xLabel, yLabel, height = 200, onSelect, color = PALETTE[0], caption,
 }: {
   points: ScatterPoint[];
   xLabel?: string;
@@ -310,6 +384,7 @@ export function Scatter({
   height?: number;
   onSelect?: (point: ScatterPoint, index: number) => void;
   color?: string;
+  caption?: string;
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   if (points.length === 0) return <Empty />;
@@ -323,7 +398,8 @@ export function Scatter({
   const sy = (y: number) => H - pad.b - (yMax === yMin ? 0.5 : (y - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
   return (
     <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
+        aria-label={chartLabel("散布圖", caption, [xLabel && yLabel && `${xLabel} 對 ${yLabel}`, `共 ${points.length} 個點`])}>
         <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
         <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
         {points.map((p, i) => {
@@ -348,6 +424,8 @@ export function Scatter({
           </>
         )}
       </ChartTip>
+      <SrTable caption={caption ?? "散布圖資料"} cols={["項目", xLabel ?? "X", yLabel ?? "Y"]}
+        rows={points.map((pt, i) => [pt.label ?? `第 ${i + 1} 點`, pt.x, pt.y])} />
     </div>
   );
 }
@@ -363,7 +441,8 @@ export function Bullet({ value, target, label, height = 34 }: { value: number; t
   return (
     <div className="space-y-1 select-none">
       {label && <p className="text-xs text-muted-foreground">{label}</p>}
-      <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="h-7 w-full" role="img">
+      {/* 實際/目標/差額已是下方的可見文字，圖形只是「把差距畫成長度」→ 標裝飾性避免唸兩次 */}
+      <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="h-7 w-full" aria-hidden="true">
         <rect x={0} y={height * 0.25} width={W} height={height * 0.5} fill={GRID} rx={2} />
         <rect x={0} y={height * 0.3} width={Math.max(0, vW)} height={height * 0.4} fill={over ? "hsl(var(--danger))" : "hsl(var(--success))"} rx={2}>
           <title>{`實際 ${ntd(value)}`}</title>
@@ -386,7 +465,7 @@ function heatColor(v: number, domain: [number, number]) {
 }
 
 export function Heatmap({
-  rowLabels, colLabels, cells, domain, fmt = (n: number) => n.toFixed(2), onSelect, legend = true,
+  rowLabels, colLabels, cells, domain, fmt = (n: number) => n.toFixed(2), onSelect, legend = true, caption,
 }: {
   rowLabels: string[];
   colLabels: string[];
@@ -395,6 +474,7 @@ export function Heatmap({
   fmt?: (n: number) => string;
   onSelect?: (rowLabel: string, colLabel: string, value: number) => void;
   legend?: boolean;
+  caption?: string;
 }) {
   const flat = cells.flat().filter((v): v is number => v != null);
   const auto: [number, number] = flat.length ? [Math.min(...flat), Math.max(...flat)] : [0.8, 1.2];
@@ -403,17 +483,20 @@ export function Heatmap({
   return (
     <div className="space-y-2">
     <div className="overflow-auto select-none">
+      {/* 這張圖本來就是真表格：數值是可見文字、顏色只是輔助編碼。
+          因此不需要額外的 SrTable，只需把表格語意補正確（caption／scope／列標頭用 th）。 */}
       <table className="border-collapse text-xs">
+        <caption className="sr-only">{caption ?? "熱圖資料（顏色僅為輔助，數值以文字呈現）"}</caption>
         <thead>
           <tr>
-            <th className="p-1" />
-            {colLabels.map((c) => <th key={c} className="p-1 font-medium text-muted-foreground">{c}</th>)}
+            <th className="p-1" scope="col"><span className="sr-only">項目</span></th>
+            {colLabels.map((c) => <th key={c} scope="col" className="p-1 font-medium text-muted-foreground">{c}</th>)}
           </tr>
         </thead>
         <tbody>
           {rowLabels.map((r, ri) => (
             <tr key={r}>
-              <td className="whitespace-nowrap p-1 pr-2 text-muted-foreground">{r}</td>
+              <th scope="row" className="whitespace-nowrap p-1 pr-2 text-left font-normal text-muted-foreground">{r}</th>
               {colLabels.map((c, ci) => {
                 const v = cells[ri]?.[ci];
                 const clickable = onSelect && v != null;
@@ -452,7 +535,7 @@ export function Heatmap({
 
 /** 時間序列折線（趨勢用）：x 為類別標籤、y 自動縮放。hover 高亮＋提示；可 onSelect 鑽取。 */
 export function TrendChart({
-  data, height = 170, color = PALETTE[0], valueFmt = ntd, zeroBased = true, onSelect, selectedIndex = null,
+  data, height = 170, color = PALETTE[0], valueFmt = ntd, zeroBased = true, onSelect, selectedIndex = null, caption,
 }: {
   data: BarDatum[];
   height?: number;
@@ -461,6 +544,7 @@ export function TrendChart({
   zeroBased?: boolean;
   onSelect?: (item: BarDatum, index: number) => void;
   selectedIndex?: number | null;
+  caption?: string;
 }) {
   const { idx, setIdx, pos, onMove } = useHover();
   if (data.length === 0) return <Empty />;
@@ -479,7 +563,9 @@ export function TrendChart({
   const activeI = idx ?? selectedIndex;
   return (
     <div className="relative select-none" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setIdx(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
+        aria-label={chartLabel("趨勢圖", caption, [`${data.length} 個時間點`,
+          `從 ${data[0].label} ${valueFmt(data[0].value)} 到 ${data[data.length - 1].label} ${valueFmt(data[data.length - 1].value)}`])}>
         <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
         <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={AXIS} strokeWidth={0.5} />
         <text x={pad.l - 4} y={sy(yMax) + 3} textAnchor="end" fontSize="7" fill={TEXT}>{valueFmt(Math.round(yMax))}</text>
@@ -507,6 +593,8 @@ export function TrendChart({
           </>
         )}
       </ChartTip>
+      <SrTable caption={caption ?? "趨勢圖資料"} cols={["時間", "數值"]}
+        rows={data.map((d) => [d.label, valueFmt(d.value)])} />
     </div>
   );
 }

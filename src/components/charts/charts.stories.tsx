@@ -79,3 +79,38 @@ export const 熱區圖_Heatmap: S = {
     </div>
   ),
 };
+
+// ── 無障礙：文字等價（審查用）────────────────────────────────────────────
+// role="img" 會讓 svg 子樹對輔助技術隱藏，因此每張圖都必須另外提供
+// 「aria-label 摘要」＋「同資料的無障礙表格」。表格平常 sr-only（看不見、不佔版面），
+// 這支 story 把它顯形，方便人工審查內容是否正確——這是螢幕報讀器實際會唸到的東西。
+export const 無障礙_文字等價: S = {
+  parameters: { layout: "padded" },
+  render: () => (
+    <div className="space-y-4 [&_.sr-only]:static [&_.sr-only]:m-0 [&_.sr-only]:size-auto [&_.sr-only]:overflow-visible [&_.sr-only]:whitespace-normal [&_.sr-only]:p-0 [&_.sr-only]:[clip:auto]">
+      <p className="text-xs text-muted-foreground">
+        下方每張圖的表格平常是隱藏的（<code>sr-only</code>），此處顯形以供審查。
+        滑鼠使用者看圖、螢幕報讀器使用者讀表格——同一份資料，兩個出口。
+      </p>
+      <div className="w-[420px] space-y-1">
+        <p className="text-xs font-medium">趨勢圖</p>
+        <TrendChart caption="各月訂單量" data={[
+          { label: "1月", value: 120 }, { label: "2月", value: 150 }, { label: "3月", value: 138 },
+        ]} valueFmt={(n) => `${n} 筆`} />
+      </div>
+      <div className="w-[420px] space-y-1">
+        <p className="text-xs font-medium">柏拉圖（含佔比與累積）</p>
+        <Pareto caption="各品項銷量" data={[
+          { label: "品項 A", value: 90 }, { label: "品項 B", value: 45 }, { label: "品項 C", value: 15 },
+        ]} />
+      </div>
+      <div className="w-[420px] space-y-1">
+        <p className="text-xs font-medium">堆疊長條（分段明細原本只有 hover 拿得到）</p>
+        <StackedBar caption="各區域成本組成" rows={[
+          { label: "北區", segments: [{ label: "固定", value: 60, color: PALETTE[0] }, { label: "變動", value: 30, color: PALETTE[1] }] },
+          { label: "南區", segments: [{ label: "固定", value: 40, color: PALETTE[0] }, { label: "變動", value: 45, color: PALETTE[1] }] },
+        ]} />
+      </div>
+    </div>
+  ),
+};

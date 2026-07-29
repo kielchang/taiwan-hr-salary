@@ -56,7 +56,7 @@
 | `NumberInput` | 遵循 | `ui/number-input` | |
 | `Stepper` | 遵循 | `ui/stepper` | |
 | **`ErrorBoundary`** | **自製** | 上游刻意不收 | 上游理由：屬「應用外殼」職責，沒有視覺／互動決策要編碼。保留在本地是正確的 |
-| **`charts/`**（StackedBar／Pareto／Heatmap／TrendChart／Bullet…） | **自製** | 上游第 2 階段 | 上游判定圖表是自成一格的子系統（軸／圖例／互動／色盲驗證），第一版只收**圖表色票 token**。→ 已列[提案 0001](proposals/0001-charts.md) |
+| **`charts/`**（StackedBar／Pareto／Heatmap／TrendChart／Bullet…） | **自製** | 上游第 2 階段 | 上游判定圖表是自成一格的子系統（軸／圖例／互動／色盲驗證），第一版只收**圖表色票 token**。→ 已列[提案 0001](proposals/0001-charts.md)＋[規格草案](handoff/pages/22-charts.mdx)。**本地已補文字等價**（aria-label 摘要＋sr-only 資料表，UI_KIT 0.19.0）；鍵盤等價未做，列為已知限制 |
 
 ## App glue（**不屬**元件庫範圍，刻意不入 barrel）
 
