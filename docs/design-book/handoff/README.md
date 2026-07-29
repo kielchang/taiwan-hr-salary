@@ -30,6 +30,11 @@
 **盤點結果：22 頁裡有 13 頁判定「無差異」。** 這是好消息不是壞消息——
 代表兩邊的規範已經高度對齊，真正需要人工判斷的只剩下面那幾項。
 
+**也因為元件層已經蓋得差不多，本包已從元件層擴及基礎／模式／治理／無障礙四層**——
+剩下的價值不在「再寫一頁元件文件」，而在那些「做過一輪才知道」的實作知識：
+色票怎麼選出來的、系統骨架怎麼分、印出來會踩到哪些坑、下游怎麼長期跟著上游走。
+這一批集中在 [E 段](#e-非元件層設計知識基礎模式治理無障礙)。
+
 ---
 
 ## 落地清單（到了上游照這張表操作）
@@ -72,6 +77,32 @@
 | 草案 | 上游目標路徑 | 動作 | 一句話理由 |
 | --- | --- | --- | --- |
 | [`coverage.md`](coverage.md) | 參考資料，**不直接落地** | **登記備查** | 給上游當補 story 的依據；同時是下游的 backlog（全庫無 loading／error 態、0 個 play function、未裝 a11y addon） |
+
+### E. 非元件層設計知識（基礎／模式／治理／無障礙）
+
+本輪 9 份。共同點：**每一項都是做過一輪才知道的東西**，上游已逐項確認沒有。
+依價值排序（前三份是完整新知識，後六份是把上游既有頁補到可用）。
+
+| # | 草案 | 上游目標路徑 | 動作 | 一句話理由 |
+| --- | --- | --- | --- | --- |
+| 1 | [`foundations/choosing-a-palette.mdx`](foundations/choosing-a-palette.mdx) | `2-foundations/07-choosing-a-palette.mdx` | **新增** | 上游最貴的空洞：`01-color` 有結論卻沒有**選出那個結論的程序**，換品牌色的專案只能靠目測 |
+| 2 | [`governance/conformance-ledger.mdx`](governance/conformance-ledger.mdx) | `6-governance/08-conformance-ledger.mdx` | **新增** | 上游是設計書，最缺的正是「別人怎麼**長期**跟著它走」；`04-adoption` 停在導入那一週就結束了 |
+| 3 | [`patterns/back-office-ia.mdx`](patterns/back-office-ia.mdx) | `4-patterns/11-back-office-ia.mdx` | **新增** | 10 則模式全是「一個畫面之內」，整個系統的骨架（分區／單一出口／深連結）沒有人講 |
+| 4 | [`patterns/print-and-export.supplement.mdx`](patterns/print-and-export.supplement.mdx) | **合併** `4-patterns/09-print-and-export.mdx`（四處插入） | **合併** | 上游五條講「印出來要長得對」，這四條講「不要出現不該有的東西」——空白尾頁、半殘 iframe、螢幕上多出來的頁首 |
+| 5 | [`patterns/zero-screenshot-docs.supplement.mdx`](patterns/zero-screenshot-docs.supplement.mdx) | **合併** `4-patterns/10`（改寫〈取捨〉＋新節）＋ `3-components/21-mockup`（元件層規約） | **合併** | **直接解掉上游自己寫下的限制**：上游明寫「只能示意靜態一步」，下游已用多步播放器解決 |
+| 6 | [`governance/drift-guards.supplement.mdx`](governance/drift-guards.supplement.mdx) | **合併** `6-governance/03-drift-guards.mdx` | **合併** | 補三支跨產物守衛（token 副本同步／文件掛鉤／雙站 path filter）——這類漂移不會讓任何測試變紅 |
+| 7 | [`governance/versioning.supplement.mdx`](governance/versioning.supplement.mdx) | **合併** `6-governance/01-versioning.mdx` | **合併** | 三層版號完全沒觸及讀者那一側：這份文件對應哪一版產品？**手上這張印出來的紙**是哪一版產的？ |
+| 8 | [`patterns/feature-flags.mdx`](patterns/feature-flags.mdx) | `4-patterns/12-feature-flags.mdx` | **新增** | 「只隱藏入口、不刪碼」是分階段驗收的標準解；沒有這一頁，多數團隊的預設做法是開一條長期分支 |
+| 9 | [`accessibility/charts-a11y.supplement.mdx`](accessibility/charts-a11y.supplement.mdx) | **合併** `5-accessibility/01-principles` ＋ `02-checklist` | **合併** | `5-accessibility` 完全沒有圖形化內容；而 `role="img"` 的義務是**通則**，不該只活在圖表頁裡 |
+
+**E 段的三個合併注意事項**（草案頂端的 `{/* */}` 註解都有寫，這裡摘要）：
+
+1. **第 4 份會動到既有標題**：〈做法：五條列印規則〉需改名（建議拿掉數量詞）。
+2. **第 6 份的守衛編號**與 C 段 [`conventions/kit-boundary.md`](conventions/kit-boundary.md) 提議的
+   〈第五支守衛〉會撞號——兩份若都採用，本份三支應編為 6／7／8。**合併時要統一，不要各編各的。**
+3. **第 9 份與 A 段 `22-charts.mdx` 有重疊**：兩者都收錄時，charts 頁的
+   〈文字等價：`role="img"` 的義務〉應改成連到無障礙頁的連結＋只留各圖種實作對照表。
+   同一條規則有兩份說明，必然會分歧。
 
 ---
 
@@ -173,10 +204,14 @@
 
 ## 落地順序建議
 
-1. **先合併 B 段的補充稿**——風險最低，全部是既有頁的增修，不影響導覽結構
-2. **再處理 C 段的治理三頁**——新增頁但不動元件，需要更新 `6-governance/_category_.json` 的排序
-3. **最後才是 22-charts**——它牽動最多：新頁 ＋ 改總覽頁 ＋ 元件要進 `packages/react` ＋
+1. **先合併 B 段與 E 段的補充稿**（E 段的第 4／6／7／9 份）——風險最低，
+   全部是既有頁的增修，不影響導覽結構。其中列印（E4）投報率最高：純加值、零副作用。
+2. **再放 E 段的三份新頁**（色票方法論／符合性台帳／後台資訊架構／功能開關）——
+   新增頁但不動元件，需要更新 `2-foundations`、`4-patterns`、`6-governance` 的 `_category_.json` 排序
+3. **接著是 C 段的治理三頁**——同樣只動導覽結構
+4. **最後才是 22-charts**——它牽動最多：新頁 ＋ 改總覽頁 ＋ 元件要進 `packages/react` ＋
    註冊 MDXComponents ＋ 產 registry 條目 ＋ 補活範例。**建議獨立一個 PR。**
+   （E 段第 9 份與它有重疊，若 charts 暫不收，第 9 份仍應獨立落地——`role="img"` 是通則。）
 
 ## 去領域化
 
