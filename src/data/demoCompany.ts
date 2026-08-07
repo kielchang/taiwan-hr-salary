@@ -20,6 +20,7 @@ import { DEFAULT_PARAMETERS } from "@/config/parameters";
 import { DEFAULT_BRACKETS } from "@/config/brackets";
 import { DEFAULT_ANALYTICS } from "@/config/analytics";
 import { lookupInsuredAmounts } from "@/lib/calc";
+import { sealEntry } from "@/lib/security/auditChain";
 import { salary, dep, evt, addMonths, buildDemoData } from "@/data/seed";
 
 export const DEMO_PERIOD = "2026-06"; // 與「今天」一致；歷史回填 13 個月 → 含去年同月(2025-06)與上月(2026-05)
@@ -336,7 +337,7 @@ function buildDeclared(employees: Employee[], salaries: SalaryStructure[]): Decl
 function buildAudit(): AuditEntry[] {
   const mk = (id: string, at: string, action: AuditEntry["action"], summary: string, extra: Partial<AuditEntry> = {}): AuditEntry =>
     ({ id, at, actor: "示範人員", action, summary, ...extra });
-  return [
+  const newestFirst = [
     mk("A1", "2026-06-15T10:12:00+08:00", "salary", "調整 G07 本薪 48,000 → 50,000", { targetId: "G07" }),
     mk("A2", "2026-06-12T16:40:00+08:00", "employee", "新增員工 P11 邱新進（行銷部）", { targetId: "P11" }),
     mk("A3", "2026-06-10T09:05:00+08:00", "event", "填入 P01 代扣所得稅 16,000", { targetId: "P01", period: DEMO_PERIOD }),
@@ -346,6 +347,10 @@ function buildAudit(): AuditEntry[] {
     mk("A7", "2026-04-01T11:15:00+08:00", "project", "新增專案 PJ-G 市場拓展", { targetId: "D-G" }),
     mk("A8", "2026-03-20T13:30:00+08:00", "employee", "員工 P12 洪離職 設定離職日 2026-06-20", { targetId: "P12" }),
   ];
+  // 稽核鏈（ADR-041）：由最舊往最新逐筆封鏈，開箱示範資料的鏈驗證即通過
+  let sealed: AuditEntry[] = [];
+  for (const e of [...newestFirst].reverse()) sealed = [sealEntry(e, sealed[0]), ...sealed];
+  return sealed;
 }
 
 /* ───────────── 對外：組裝完整 store 切片 ───────────── */

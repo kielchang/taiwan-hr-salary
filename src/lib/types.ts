@@ -358,6 +358,9 @@ export interface AuditEntry {
   // ── 情境化申請單：由 applyChangeTicket 產生的異動紀錄帶此兩欄（供「異動紀錄」清單透鏡與匯出）。
   scenario?: ChangeScenario; // 異動情境
   reason?: string; // 異動原因（申請單填寫）
+  // ── 稽核鏈（ADR-041，tamper-evident）：pushAudit 封鏈時填入；舊版紀錄無此兩欄＝legacy 段。
+  prevHash?: string | null; // 前一筆（較舊）的 selfHash；null＝鏈起點（全新/tombstone/接在舊版紀錄後）
+  selfHash?: string; // 本筆內容（不含本欄）穩定序列化後的 SHA-256
 }
 
 /* ───────────── 調薪排程（核定於未來月份生效） ───────────── */

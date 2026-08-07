@@ -4,7 +4,7 @@
 //    /津貼預設，供主檔新增帶入）。投保級距主檔（BracketTables）刻意**唯讀檢視**（年度更新流程待議）。
 //  - 資料維運：整檔備份/還原（JSON envelope）、清空；稽核軌跡以 DataTable 呈現；關於卡顯示
 //    app 版號/commit/建置時間（對回部署版本）。敏感異動皆入稽核。
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { SALARY_ITEMS, type SalaryNumKey } from "@/views/MasterDataView";
@@ -40,6 +40,7 @@ import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapP
 import { readLockMeta } from "@/lib/security/lockMeta";
 import { enableEncryption, disableEncryption, changePassword, lockNow, flushPendingWrites } from "@/lib/security/encryptedStorage";
 import { encryptBackupText, decryptBackupText, isEncryptedBackupText } from "@/lib/security/backupCrypto";
+import { verifyAuditChain, chainVerdictLabel } from "@/lib/security/auditChain";
 import { APP_VERSION, GIT_SHA, IS_RELEASE, COMMIT_URL, buildTimeTaipei } from "@/version";
 import { useTheme, type Theme } from "@/lib/theme";
 
@@ -527,7 +528,17 @@ export function SettingsView() {
               <Input className="col-input h-8 w-48" value={operatorName} placeholder="例：王小明" onChange={(e) => setOperatorName(e.target.value)} />
             </div>
             <Button variant="outline" size="sm" onClick={exportAudit} disabled={auditLog.length === 0}><Download /> 匯出紀錄 CSV</Button>
-            <Button variant="outline" size="sm" onClick={() => { if (confirm("清空操作紀錄？")) clearAuditLog(); }} disabled={auditLog.length === 0}><Trash2 /> 清空紀錄</Button>
+            <Button
+              variant="outline" size="sm" disabled={auditLog.length === 0}
+              title="清除後會留下一筆不可刪的清除紀錄（何時、誰、清了幾筆）；建議先「匯出紀錄 CSV」歸檔"
+              onClick={() => {
+                // 清除治理（ADR-041）：輸入確認字串（防誤觸）＋提示先歸檔；store 端會留 tombstone
+                const typed = prompt(`清除全部 ${auditLog.length} 筆操作紀錄？\n\n清除後僅保留一筆「清除紀錄」（含時間/操作者/筆數），無法復原。\n建議先按「匯出紀錄 CSV」歸檔。\n\n要繼續，請輸入：清除稽核`);
+                if (typed === null) return;
+                if (typed.trim() !== "清除稽核") { alert("輸入不符，未清除。"); return; }
+                clearAuditLog();
+              }}
+            ><Trash2 /> 清空紀錄</Button>
           </div>
           <DataTable
             rows={auditLog}
@@ -627,6 +638,8 @@ export function SettingsView() {
 
       {secTab === "security" && (<>
         <PasswordLockCard />
+        <AuditIntegrityCard />
+        <DataErasureCard />
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base"><Info className="size-4 text-primary" /> 系統定位與隱私說明</CardTitle>
@@ -1261,6 +1274,73 @@ function PasswordLockCard() {
         ) : pwFields}
         <p className="text-xs text-danger">
           忘記密碼＝加密資料無法救回（系統無帳號、無密碼重設機制）。請牢記密碼，並定期匯出（加密）備份檔另存。
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+/** 稽核完整性卡（ADR-041）：驗證稽核鏈並以人話顯示結果。
+ *  誠實措辭：tamper-evident（可偵測）而非 tamper-proof（可阻止）——不得宣稱「防竄改」。 */
+function AuditIntegrityCard() {
+  const auditLog = usePayrollStore((s) => s.auditLog);
+  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
+  const verdict = useMemo(() => verifyAuditChain(auditLog), [auditLog, checkedAt]);
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base"><History className="size-4 text-primary" /> 稽核紀錄完整性</CardTitle>
+        <CardDescription>
+          每筆操作紀錄以雜湊鏈相互鏈接：任何單筆內容被改動、順序調換或中段刪除都會使驗證失敗。
+          此機制屬「可偵測」性質——正式多人環境的稽核證據力需後端集中日誌（見合規文件）。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {verdict.ok
+            ? <Badge variant="success">驗證{chainVerdictLabel(verdict)}</Badge>
+            : <Badge variant="destructive">{chainVerdictLabel(verdict)}</Badge>}
+          <span className="text-xs text-muted-foreground">共 {auditLog.length} 筆</span>
+          <Button variant="outline" size="sm" onClick={() => setCheckedAt(new Date())}>重新驗證</Button>
+          {checkedAt && <span className="text-xs text-muted-foreground">上次驗證：{checkedAt.toLocaleTimeString()}</span>}
+        </div>
+        {!verdict.ok && (
+          <p className="text-xs text-danger">
+            驗證失敗代表紀錄曾被系統外改動（如直接編輯瀏覽器儲存）或資料毀損。請比對先前歸檔的稽核 CSV，並評估資料可信度。
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">紀錄清單與匯出在「資料與安全」分頁；清除紀錄會留下一筆不可刪的清除事件。</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 資料清除卡：行使當事人刪除權（個資法 §3／GDPR Art.17）的完整抹除入口。 */
+function DataErasureCard() {
+  const { clearAll, clearAuditLog, auditLog } = usePayrollStore();
+  const wipe = () => {
+    const typed = prompt("完整抹除＝清空全部員工/薪資/結算資料＋稽核紀錄（留一筆清除事件）。法定參數與費率設定保留。此動作無法復原。\n\n若為行使當事人刪除權，建議先確認法定保存義務（工資清冊 5 年）已屆滿或另有歸檔。\n\n要繼續，請輸入：完整抹除");
+    if (typed === null) return;
+    if (typed.trim() !== "完整抹除") { alert("輸入不符，未執行。"); return; }
+    clearAll();
+    if (auditLog.length > 0) clearAuditLog();
+    alert("已完整抹除員工與結算資料（稽核留一筆清除事件）。若已啟用密碼鎖，殘餘儲存仍為加密狀態。");
+  };
+  return (
+    <Card className="border-danger/40">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base text-danger">完整抹除（行使刪除權）</CardTitle>
+        <CardDescription>
+          回應當事人「刪除個資」請求的一鍵入口：清空全部業務資料＋稽核紀錄（僅留清除事件本身）。
+          與「資料與安全」分頁的「清空員工資料」不同——那個會保留稽核紀錄。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <Button variant="destructive" size="sm" onClick={wipe}><Trash2 /> 完整抹除全部資料</Button>
+        <p className="text-xs text-muted-foreground">
+          提醒：已匯出的 CSV／PDF／備份檔不在系統控制範圍內，需依公司檔案程序另行銷毀；
+          勞基法要求工資清冊保存五年，抹除前請確認保存義務已由歸檔承接。
         </p>
       </CardContent>
     </Card>

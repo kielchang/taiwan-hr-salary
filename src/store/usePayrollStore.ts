@@ -35,6 +35,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { createSecureStorage } from "@/lib/security/encryptedStorage";
 import { readLockMeta } from "@/lib/security/lockMeta";
+import { sealEntry, verifyAuditChain, chainVerdictLabel } from "@/lib/security/auditChain";
 import { APP_ENV } from "@/version";
 import { DEFAULT_PARAMETERS, type Parameters } from "@/config/parameters";
 import { DEFAULT_BRACKETS, type InsuranceBrackets } from "@/config/brackets";
@@ -424,7 +425,9 @@ const sumSalary = (s: SalaryStructure) =>
 function makeAudit(actor: string, action: AuditAction, summary: string, extra: Partial<AuditEntry> = {}): AuditEntry {
   return { id: newId(), at: new Date().toISOString(), actor: actor?.trim() || "（未具名）", action, summary, ...extra };
 }
-const pushAudit = (log: AuditEntry[], entry: AuditEntry) => [entry, ...log].slice(0, AUDIT_CAP);
+// 稽核鏈（ADR-041）：推入時封鏈（prevHash←現任 log[0] 的 selfHash＋算本筆 selfHash）。
+// 簽章不變＝30+ 呼叫點免翻修；AUDIT_CAP 輪替後最舊筆的 prevHash 懸空＝驗鏈標 truncated。
+const pushAudit = (log: AuditEntry[], entry: AuditEntry) => [sealEntry(entry, log[0]), ...log].slice(0, AUDIT_CAP);
 
 /** F6：此筆稽核是否可「回復」＝有結構化 before/after 的逐欄編輯，且本身不是回復動作。 */
 export function auditRestorable(e: AuditEntry): boolean {
@@ -524,7 +527,15 @@ export const usePayrollStore = create<PayrollState>()(
       setOperatorName: (name) => set({ operatorName: name }),
 
       auditLog: DEMO.auditLog,
-      clearAuditLog: () => set({ auditLog: [] }),
+      // 清除治理（ADR-041）：不再清成空陣列——留一筆 tombstone 作新鏈 genesis，
+      // 保留「何時、誰、清了多少、被清鏈頭雜湊」四項事實。UI 端另要求輸入確認字串。
+      clearAuditLog: () =>
+        set((st) => {
+          if (st.auditLog.length === 0) return st;
+          const head = st.auditLog[0]?.selfHash?.slice(0, 12) ?? "（舊版無雜湊）";
+          const tombstone = makeAudit(st.operatorName, "clear", `清除稽核紀錄 ${st.auditLog.length} 筆（被清鏈頭雜湊：${head}）`);
+          return { auditLog: [sealEntry(tombstone, undefined)] };
+        }),
       restoreAudit: (id) =>
         set((st) => {
           const entry = st.auditLog.find((a) => a.id === id);
@@ -1226,7 +1237,11 @@ export const usePayrollStore = create<PayrollState>()(
             currencies: s.currencies ?? st.currencies,
             fxRates: s.fxRates ?? st.fxRates,
             fxPolicy: { ...DEFAULT_FX_POLICY, ...(s.fxPolicy ?? {}) },
-            auditLog: pushAudit(s.auditLog ?? st.auditLog, makeAudit(st.operatorName, "restore", "由備份檔還原全部資料")),
+            // 還原稽核附驗鏈結果（ADR-041）：備份檔可被竄改，還原當下對匯入鏈驗證並留痕
+            auditLog: pushAudit(
+              s.auditLog ?? st.auditLog,
+              makeAudit(st.operatorName, "restore", `由備份檔還原全部資料（稽核鏈驗證：${chainVerdictLabel(verifyAuditChain((s.auditLog ?? st.auditLog) as AuditEntry[]))}）`),
+            ),
             // 剛還原＝手上有這份備份檔，以其匯出時間為「上次備份」基準，避免還原後立刻誤跳「尚未備份」提醒
             lastBackupAt: env?.exportedAt ?? st.lastBackupAt,
           };

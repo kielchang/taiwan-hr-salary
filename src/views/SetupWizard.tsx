@@ -1,5 +1,6 @@
 // 初始設定引導（/setup，首次使用時 App 守門導向）。設計原理：
-//  - 五步：歡迎 → 公司設定 → 薪資結構預設 → 員工資料 → 完成；完成時設 setupCompleted＝true，之後不再進入。
+//  - 六步：歡迎 → 隱私與資料保護 → 公司設定 → 薪資結構預設 → 員工資料 → 完成；完成時設 setupCompleted＝true，之後不再進入。
+//  - 隱私步驟（合規08 §2.8）：告知資料落點/無伺服器/密碼鎖與備份建議/示範資料為虛構/刪除權入口，勾選「我已閱讀」才放行。
 //  - 兩條入門路徑：「載入範例公司」（demo 資料，快速體驗）或「從空白開始」（自行建檔）。
 //  - 「薪資結構預設」步驟設定公司新進員工的固定津貼預設（伙食津貼預帶 3,000 免稅額；寫入 salaryDefaults），
 //    空白建立模式快速新增的員工即自動帶入這些預設（本薪逐人填）。之後於「系統設定 → 公司」仍可調整。
@@ -30,7 +31,7 @@ import {
   FilePlus2,
 } from "lucide-react";
 
-const STEPS = ["歡迎", "公司設定", "薪資結構預設", "員工資料", "完成"];
+const STEPS = ["歡迎", "隱私與資料保護", "公司設定", "薪資結構預設", "員工資料", "完成"];
 
 interface QuickEmployee {
   id: string;
@@ -57,6 +58,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   } = usePayrollStore();
 
   const [step, setStep] = useState(0);
+  const [privacyAcked, setPrivacyAcked] = useState(false); // 隱私步驟勾選「我已閱讀」才放行下一步
   const [mode, setMode] = useState<"sample" | "blank" | null>(null);
   const [quick, setQuick] = useState<QuickEmployee>({
     id: "A001",
@@ -77,7 +79,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   // ── 公司薪資結構預設（salaryDefaults）：進入該步驟時，若伙食津貼未設過，預帶 3,000（免稅額）。
   const [mealPrefilled, setMealPrefilled] = useState(false);
   useEffect(() => {
-    if (step === 2 && !mealPrefilled) {
+    if (step === 3 && !mealPrefilled) {
       setMealPrefilled(true);
       if (salaryDefaults.standard.mealAllowance == null) {
         setSalaryDefaults({ ...salaryDefaults, standard: { ...salaryDefaults.standard, mealAllowance: 3000 } });
@@ -193,6 +195,31 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           )}
 
           {step === 1 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold">隱私與資料保護</h2>
+                <p className="text-sm text-muted-foreground">開始之前，請了解這套系統怎麼處理資料：</p>
+              </div>
+              <div className="space-y-2.5 rounded-md border p-4 text-sm">
+                <p><strong>資料只存在這台電腦。</strong>全部資料儲存在這台電腦的瀏覽器（localStorage），系統沒有伺服器、不上傳、也沒有任何追蹤或分析程式。清除瀏覽器資料即遺失，請養成備份習慣。</p>
+                <p><strong>建議啟用密碼鎖。</strong>員工姓名、身分證字號與薪資屬高敏感個資。到「系統設定 → 安全與隱私」啟用密碼鎖後，本機資料會以您的密碼加密（忘記密碼無法救回，請牢記）。</p>
+                <p><strong>定期匯出（加密）備份。</strong>薪資與出勤紀錄依勞基法應保存五年；到「系統設定 → 資料與安全」可匯出加密備份檔另存。</p>
+                <p><strong>示範資料為虛構。</strong>範例公司的員工皆為虛構，身分證欄是「檢查碼不合法」的測試值，不可能屬於任何真實國民。</p>
+                <p><strong>當事人權利。</strong>員工要求查詢、更正或刪除個資時，可在「基本資料」處理；完整抹除入口在「系統設定 → 安全與隱私」。</p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={privacyAcked}
+                  onChange={(e) => setPrivacyAcked(e.target.checked)}
+                />
+                我已閱讀並了解以上資料保護說明
+              </label>
+            </div>
+          )}
+
+          {step === 2 && (
             <div className="space-y-5">
               <div>
                 <h2 className="text-lg font-bold">公司設定</h2>
@@ -254,7 +281,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-bold">公司薪資結構預設</h2>
@@ -300,7 +327,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             </div>
           )}
 
-          {step === 3 && mode === "sample" && (
+          {step === 4 && mode === "sample" && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-bold">員工資料</h2>
@@ -322,7 +349,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             </div>
           )}
 
-          {step === 3 && mode === "blank" && (
+          {step === 4 && mode === "blank" && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-bold">新增第一批員工</h2>
@@ -377,7 +404,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="space-y-5 text-center">
               <Check className="mx-auto size-12 rounded-full bg-success/15 p-2 text-success" />
               <div>
@@ -410,7 +437,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               <span />
             )}
             {step >= 1 && step < STEPS.length - 1 && (
-              <Button onClick={() => setStep(step + 1)}>
+              <Button onClick={() => setStep(step + 1)} disabled={step === 1 && !privacyAcked}
+                title={step === 1 && !privacyAcked ? "請先勾選「我已閱讀並了解」" : undefined}>
                 下一步 <ChevronRight />
               </Button>
             )}
