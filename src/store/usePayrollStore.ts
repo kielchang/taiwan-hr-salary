@@ -32,7 +32,9 @@
 //   免寫 migration（如 leavePolicy/salaryDefaults/customAllowances 皆選填、合併相容）。
 // ─────────────────────────────────────────────────────────────────────────
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { createSecureStorage } from "@/lib/security/encryptedStorage";
+import { readLockMeta } from "@/lib/security/lockMeta";
 import { APP_ENV } from "@/version";
 import { DEFAULT_PARAMETERS, type Parameters } from "@/config/parameters";
 import { DEFAULT_BRACKETS, type InsuranceBrackets } from "@/config/brackets";
@@ -84,6 +86,8 @@ const DEMO = buildDemoCompany();
 // localStorage 鍵：**依環境分隔**。三環境（prod/stage/dev）同 origin（kielchang.github.io，
 // 僅路徑不同），localStorage 依 origin 共用；若不分鍵，在 /dev 動資料會污染正式站與 /stage。
 // 正式站保留原鍵（不改＝既有使用者資料不流失）；stage/dev 各自加後綴，資料互不干擾。
+// ⚠ 前綴 "taiwan-hr-salary:v1" 被 ErrorBoundary 與 AppGate 以「字面值」引用（元件庫邊界
+// 禁 import store）——改鍵名前綴時須同步改該兩處與 :lock 子鍵（lib/security/lockMeta）。
 export const STORAGE_KEY = `taiwan-hr-salary:v1${APP_ENV === "stage" ? ":stage" : APP_ENV === "dev" ? ":dev" : ""}`;
 export const STORE_VERSION = 4; // v2：專案主檔＋工時分攤；v3：多段 leaveRecords；v4：法定參數/級距生效月版本化
 
@@ -1231,6 +1235,12 @@ export const usePayrollStore = create<PayrollState>()(
     {
       name: STORAGE_KEY,
       version: STORE_VERSION,
+      // 本機加密（ADR-040）：storage adapter 未設密碼＝同步明文 passthrough（既有行為逐位元相同、
+      // 同步水合）；已設密碼＝async 解密。skipHydration 於「建立 store 當下」同步讀 lock meta 決定：
+      // 有密碼鎖 → 跳過自動水合，由 AppGate 解鎖成功後手動 persist.rehydrate()（金鑰已入記憶體），
+      // 避免鎖定時以預設值(DEMO)水合、後續寫入覆毀密文。
+      storage: createJSONStorage(() => createSecureStorage()),
+      skipHydration: readLockMeta(STORAGE_KEY) !== null,
       // 版本升級轉換點。
       // v1→v2：由 employees[].project 自由字串合成專案主檔（避免漏算）。
       // v2→v3：把舊單段留停/停職/暫離（status+leaveDate+returnDate+leavePaidRatio）轉成 leaveRecords 陣列。

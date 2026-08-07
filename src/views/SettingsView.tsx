@@ -23,7 +23,7 @@ import { validateSettings } from "@/lib/validation";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { diffRecord, type FieldSpec } from "@/lib/forms/diff";
 import type { Project, ProjectStatus, Currency } from "@/lib/types";
-import { usePayrollStore, STORE_VERSION, isPeriodLocked, auditRestorable, isSettingsInPlaceLocked, maxConfirmedPeriod } from "@/store/usePayrollStore";
+import { usePayrollStore, STORAGE_KEY, STORE_VERSION, isPeriodLocked, auditRestorable, isSettingsInPlaceLocked, maxConfirmedPeriod } from "@/store/usePayrollStore";
 import { useRunBackup } from "@/store/selectors";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
@@ -36,7 +36,10 @@ import { csvSerialize } from "@/lib/csv";
 import { cn, ntd } from "@/lib/utils";
 import { HelpHint } from "@/components/HelpHint";
 import type { AuditAction } from "@/lib/types";
-import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban, Sun, Moon, Monitor } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, Trash2, Wand2, Info, Crosshair, MapPin, CalendarRange, Download, Upload, History, Plus, Pencil, FolderKanban, Sun, Moon, Monitor, ShieldCheck, Lock, KeyRound } from "lucide-react";
+import { readLockMeta } from "@/lib/security/lockMeta";
+import { enableEncryption, disableEncryption, changePassword, lockNow, flushPendingWrites } from "@/lib/security/encryptedStorage";
+import { encryptBackupText, decryptBackupText, isEncryptedBackupText } from "@/lib/security/backupCrypto";
 import { APP_VERSION, GIT_SHA, IS_RELEASE, COMMIT_URL, buildTimeTaipei } from "@/version";
 import { useTheme, type Theme } from "@/lib/theme";
 
@@ -143,9 +146,9 @@ const LEGAL_GROUPS: { title: string; note?: string; fields: Field[] }[] = [
   },
 ];
 
-type SecTab = "legal" | "company" | "currency" | "data";
+type SecTab = "legal" | "company" | "currency" | "data" | "security";
 // 出勤功能隱藏時，公司分頁不含「打卡設定」，標籤簡化為「公司」（FEATURES.attendance）。
-const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", FEATURES.attendance ? "公司與出勤" : "公司"], ["currency", "幣別與匯率"], ["data", "資料與安全"]];
+const SEC_TABS: [SecTab, string][] = [["legal", "法定參數"], ["company", FEATURES.attendance ? "公司與出勤" : "公司"], ["currency", "幣別與匯率"], ["data", "資料與安全"], ["security", "安全與隱私"]];
 
 /** 下一個月（"2026-12" → "2027-01"）；供「新增生效版本」預設生效月＝已確認月之後 */
 function nextMonthOf(period: string): string {
@@ -155,7 +158,7 @@ function nextMonthOf(period: string): string {
 }
 
 export function SettingsView() {
-  const { parameters, brackets, setParameters, parameterVersions, addParameterVersion, resetToSeed, clearAll, loadDemoData, snapshots, importAll, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
+  const { parameters, brackets, setParameters, parameterVersions, addParameterVersion, resetToSeed, clearAll, loadDemoData, snapshots, importAll, exportAll, markBackedUp, operatorName, setOperatorName, auditLog, clearAuditLog, restoreAudit, currentPeriod, confirmations } = usePayrollStore();
   // 非版本化卡（leavePolicy/salaryDefaults/幣別）仍用「當期已確認」鎖；法定參數/級距改用版本感知鎖。
   const locked = Boolean(confirmations[currentPeriod]);
   // 版本化守衛：就地改「最新版本」會回溯改寫已確認月 → 鎖住就地編輯，導向「新增生效版本」
@@ -178,8 +181,16 @@ export function SettingsView() {
   // 匯出備份改走共用入口（同時記錄 lastBackupAt，供備份提醒/指示消警）
   const onExport = useRunBackup();
 
-  const onImportFile = async (file: File) => {
-    const text = await file.text();
+  // 加密備份（ADR-040）：匯出＝明文信封整段加密（.enc.json）；匯入＝偵測加密檔→收密碼→解密後
+  // 交給既有 parseBackup（驗證單一來源）。密碼欄用 type=password 的行內小表單，不走 window.prompt。
+  const [encExportOpen, setEncExportOpen] = useState(false);
+  const [encPw, setEncPw] = useState("");
+  const [encPw2, setEncPw2] = useState("");
+  const [encBusy, setEncBusy] = useState(false);
+  const [pendingEnc, setPendingEnc] = useState<{ name: string; text: string } | null>(null);
+  const [importPw, setImportPw] = useState("");
+
+  const restoreFromText = (text: string) => {
     const res = parseBackup(text, STORE_VERSION);
     if (!res.ok || !res.env) {
       alert(`還原失敗：${res.error}`);
@@ -196,6 +207,47 @@ export function SettingsView() {
       alert("已還原備份資料。");
     }
   };
+
+  const onImportFile = async (file: File) => {
+    const text = await file.text();
+    if (isEncryptedBackupText(text)) {
+      setPendingEnc({ name: file.name, text });
+      setImportPw("");
+      return;
+    }
+    restoreFromText(text);
+  };
+
+  const decryptAndRestore = async () => {
+    if (!pendingEnc || !importPw) return;
+    try {
+      const plain = await decryptBackupText(pendingEnc.text, importPw);
+      setPendingEnc(null);
+      setImportPw("");
+      restoreFromText(plain);
+    } catch {
+      alert("解密失敗：密碼不正確或檔案毀損。");
+    }
+  };
+
+  const onExportEncrypted = async () => {
+    if (encPw.length < 8) { alert("備份密碼至少 8 個字元。"); return; }
+    if (encPw !== encPw2) { alert("兩次輸入的密碼不一致。"); return; }
+    setEncBusy(true);
+    try {
+      const env = exportAll();
+      const fileText = await encryptBackupText(JSON.stringify(env), encPw);
+      const date = new Date().toISOString().slice(0, 10);
+      saveBlob(new Blob([fileText], { type: "application/json" }), `HR薪資備份_${date}.enc.json`);
+      markBackedUp();
+      setEncExportOpen(false);
+      setEncPw("");
+      setEncPw2("");
+      alert("已匯出加密備份檔。請牢記備份密碼——沒有密碼即無法還原此檔。");
+    } finally {
+      setEncBusy(false);
+    }
+  };
   const navigate = useNavigate();
   const [showBrackets, setShowBrackets] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set()); // 法定參數群組收合（預設全開）
@@ -203,7 +255,7 @@ export function SettingsView() {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as SecTab | null;
   const [secTab, setSecTab] = useState<SecTab>(
-    tabParam && (["legal", "company", "currency", "data"] as const).includes(tabParam) ? tabParam : "legal",
+    tabParam && (["legal", "company", "currency", "data", "security"] as const).includes(tabParam) ? tabParam : "legal",
   );
 
   // 參數改「唯讀逐欄編輯＋送出」：本地草稿，改值標黃、底部黏著列一次套用（取代逐鍵即時寫入，
@@ -415,7 +467,49 @@ export function SettingsView() {
           <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
             <Upload /> 從備份檔還原
           </Button>
-          <span className="text-xs text-muted-foreground">建議每月結算後匯出存檔。</span>
+          {!encExportOpen && (
+            <Button variant="outline" size="sm" onClick={() => setEncExportOpen(true)}>
+              <Lock /> 匯出加密備份檔
+            </Button>
+          )}
+          <span className="text-xs text-muted-foreground">建議每月結算後匯出存檔；含個資的備份建議用加密匯出。</span>
+
+          {encExportOpen && (
+            <div className="w-full space-y-2 rounded-md border bg-muted/30 p-3">
+              <p className="text-sm font-medium">以密碼加密匯出（.enc.json）</p>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">備份密碼（至少 8 字元）</Label>
+                  <Input type="password" className="col-input h-8 w-48" value={encPw} onChange={(e) => setEncPw(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">再輸入一次</Label>
+                  <Input type="password" className="col-input h-8 w-48" value={encPw2} onChange={(e) => setEncPw2(e.target.value)} />
+                </div>
+                <Button size="sm" onClick={onExportEncrypted} disabled={encBusy || !encPw || !encPw2}>
+                  {encBusy ? "加密中…" : "加密並下載"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => { setEncExportOpen(false); setEncPw(""); setEncPw2(""); }}>取消</Button>
+              </div>
+              <p className="text-xs text-warning">忘記備份密碼＝該備份檔永久無法還原，請妥善保管。</p>
+            </div>
+          )}
+
+          {pendingEnc && (
+            <div className="w-full space-y-2 rounded-md border border-info/40 bg-info/10 p-3">
+              <p className="text-sm font-medium">「{pendingEnc.name}」是加密備份檔，請輸入備份密碼解密還原：</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="password" className="col-input h-8 w-56" value={importPw} autoFocus
+                  placeholder="備份密碼" aria-label="備份密碼"
+                  onChange={(e) => setImportPw(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void decryptAndRestore(); }}
+                />
+                <Button size="sm" onClick={() => void decryptAndRestore()} disabled={!importPw}>解密並還原</Button>
+                <Button variant="outline" size="sm" onClick={() => { setPendingEnc(null); setImportPw(""); }}>取消</Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -529,6 +623,22 @@ export function SettingsView() {
           </div>
         </CardContent>
       </Card>
+      </>)}
+
+      {secTab === "security" && (<>
+        <PasswordLockCard />
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base"><Info className="size-4 text-primary" /> 系統定位與隱私說明</CardTitle>
+            <CardDescription>本系統是單機工具：資料只存在這台電腦的瀏覽器，不上傳任何伺服器。</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1.5 text-sm text-muted-foreground">
+            <p>・資料落點：瀏覽器 localStorage（可用上方密碼鎖加密）；匯出的 CSV／PDF／備份檔存於你的下載資料夾，離開系統控制範圍後請依公司檔案程序保管。</p>
+            <p>・對外連線：無。系統不含任何追蹤、分析或錯誤回報外送。</p>
+            <p>・示範資料：內建示範公司為虛構資料，身分證欄為「檢查碼不合法」的測試值，不可能屬於任何真實國民。</p>
+            <p>・薪資與出勤紀錄依勞基法應保存五年；建議每月結算後匯出（加密）備份留存。</p>
+          </CardContent>
+        </Card>
       </>)}
 
       {/* 參數變更黏著送出列：跨分頁（法定/公司）彙整未套用的參數變更，一次套用或全部還原。 */}
@@ -1042,6 +1152,116 @@ function AttendanceSettings() {
             下班建議時間＝實際上班 ＋ 應工時 ＋ 午休。工時＝在場時間 − 午休（簡化計算）。
           </p>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+/** 密碼鎖設定卡（ADR-040）：啟用/變更/停用本機加密，金鑰僅存記憶體。
+ *  忘記密碼＝資料不可救（無帳號恢復機制）——所有入口都以紅字明示此取捨。 */
+function PasswordLockCard() {
+  const [enabled, setEnabled] = useState(() => readLockMeta(STORAGE_KEY) !== null);
+  const [mode, setMode] = useState<"idle" | "enable" | "change" | "disable">("idle");
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [oldPw, setOldPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const reset = () => { setMode("idle"); setPw(""); setPw2(""); setOldPw(""); };
+
+  const doEnable = async () => {
+    if (pw.length < 8) { alert("密碼至少 8 個字元。"); return; }
+    if (pw !== pw2) { alert("兩次輸入的密碼不一致。"); return; }
+    if (!confirm("啟用後每次開啟系統都需輸入密碼解鎖。【重要】忘記密碼＝加密資料無法救回，只能清除後用備份檔重來。確定啟用？")) return;
+    setBusy(true);
+    try {
+      await enableEncryption(STORAGE_KEY, pw);
+      await flushPendingWrites();
+      setEnabled(true);
+      reset();
+      alert("已啟用密碼鎖，本機資料已加密。請牢記密碼。");
+    } finally { setBusy(false); }
+  };
+
+  const doChange = async () => {
+    if (pw.length < 8) { alert("新密碼至少 8 個字元。"); return; }
+    if (pw !== pw2) { alert("兩次輸入的新密碼不一致。"); return; }
+    setBusy(true);
+    try {
+      const ok = await changePassword(STORAGE_KEY, oldPw, pw);
+      if (!ok) { alert("目前密碼不正確。"); return; }
+      reset();
+      alert("已變更密碼，本機資料已用新密碼重新加密。");
+    } finally { setBusy(false); }
+  };
+
+  const doDisable = async () => {
+    if (!confirm("停用後本機資料將解回未加密狀態（明文存於瀏覽器）。確定停用密碼鎖？")) return;
+    setBusy(true);
+    try {
+      const ok = await disableEncryption(STORAGE_KEY, oldPw);
+      if (!ok) { alert("目前密碼不正確。"); return; }
+      setEnabled(false);
+      reset();
+      alert("已停用密碼鎖，本機資料已解回未加密狀態。");
+    } finally { setBusy(false); }
+  };
+
+  const pwFields = (
+    <div className="flex flex-wrap items-end gap-2">
+      {(mode === "change" || mode === "disable") && (
+        <div className="space-y-1">
+          <Label className="text-xs">目前密碼</Label>
+          <Input type="password" className="col-input h-8 w-44" value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
+        </div>
+      )}
+      {(mode === "enable" || mode === "change") && (<>
+        <div className="space-y-1">
+          <Label className="text-xs">{mode === "change" ? "新密碼" : "密碼"}（至少 8 字元）</Label>
+          <Input type="password" className="col-input h-8 w-44" value={pw} onChange={(e) => setPw(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">再輸入一次</Label>
+          <Input type="password" className="col-input h-8 w-44" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+        </div>
+      </>)}
+      <Button size="sm" disabled={busy} onClick={() => void (mode === "enable" ? doEnable() : mode === "change" ? doChange() : doDisable())}>
+        {busy ? "處理中…" : mode === "enable" ? "啟用並加密" : mode === "change" ? "變更密碼" : "停用密碼鎖"}
+      </Button>
+      <Button variant="outline" size="sm" disabled={busy} onClick={reset}>取消</Button>
+    </div>
+  );
+
+  return (
+    <Card data-tour="security-lock">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="size-4 text-primary" /> 本機資料密碼鎖</CardTitle>
+        <CardDescription>
+          啟用後，本機資料以您的密碼加密（AES-256-GCM）存放，開啟系統需先解鎖；未啟用時資料為未加密明文。
+          用於防範裝置遺失或共用電腦的資料外洩。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {enabled
+            ? <Badge variant="success">已啟用——本機資料已加密</Badge>
+            : <Badge variant="warning">未啟用——本機資料為明文</Badge>}
+          {enabled && mode === "idle" && (
+            <Button variant="outline" size="sm" onClick={() => { lockNow(); window.location.reload(); }}>
+              <Lock /> 立即上鎖
+            </Button>
+          )}
+        </div>
+        {mode === "idle" ? (
+          <div className="flex flex-wrap gap-2">
+            {!enabled && <Button size="sm" onClick={() => setMode("enable")}><KeyRound /> 啟用密碼鎖</Button>}
+            {enabled && <Button variant="outline" size="sm" onClick={() => setMode("change")}><KeyRound /> 變更密碼</Button>}
+            {enabled && <Button variant="outline" size="sm" onClick={() => setMode("disable")}>停用密碼鎖</Button>}
+          </div>
+        ) : pwFields}
+        <p className="text-xs text-danger">
+          忘記密碼＝加密資料無法救回（系統無帳號、無密碼重設機制）。請牢記密碼，並定期匯出（加密）備份檔另存。
+        </p>
       </CardContent>
     </Card>
   );

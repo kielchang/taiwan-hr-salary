@@ -31,6 +31,7 @@ import {
 } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { TourRunner } from "@/components/TourRunner";
+import { AppGate } from "@/components/security/AppGate";
 import { usePayrollStore } from "@/store/usePayrollStore";
 import { useBackupStatus } from "@/store/selectors";
 import { validateAll } from "@/lib/validation";
@@ -92,23 +93,26 @@ const PAYROLL_STEPS: PayrollStep[] = ["monthly", "review"];
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/setup" element={<SetupRoute />} />
-      <Route element={<Layout />}>
-        <Route index element={<DashboardView />} />
-        <Route path="/payroll/:step" element={<PayrollRoute />} />
-        <Route path="/analytics" element={<AnalyticsView />} />
-        {/* 出勤/專案暫停對外（feature flag）；隱藏時交給下方 * fallback 導回每月薪資，不白屏 */}
-        {FEATURES.projects && <Route path="/projects" element={<ProjectsView />} />}
-        <Route path="/reports" element={<ReportsHubView />} />
-        <Route path="/filing" element={<Navigate to="/reports" replace />} />
-        {FEATURES.attendance && <Route path="/attendance" element={<AttendanceView />} />}
-        <Route path="/master" element={<MasterDataView />} />
-        <Route path="/settings" element={<SettingsView />} />
-        <Route path="/help" element={<HelpView />} />
-        <Route path="*" element={<Navigate to="/payroll/monthly" replace />} />
-      </Route>
-    </Routes>
+    // AppGate：已設密碼鎖時，解鎖＋水合完成前不渲染任何業務畫面（ADR-040）
+    <AppGate>
+      <Routes>
+        <Route path="/setup" element={<SetupRoute />} />
+        <Route element={<Layout />}>
+          <Route index element={<DashboardView />} />
+          <Route path="/payroll/:step" element={<PayrollRoute />} />
+          <Route path="/analytics" element={<AnalyticsView />} />
+          {/* 出勤/專案暫停對外（feature flag）；隱藏時交給下方 * fallback 導回每月薪資，不白屏 */}
+          {FEATURES.projects && <Route path="/projects" element={<ProjectsView />} />}
+          <Route path="/reports" element={<ReportsHubView />} />
+          <Route path="/filing" element={<Navigate to="/reports" replace />} />
+          {FEATURES.attendance && <Route path="/attendance" element={<AttendanceView />} />}
+          <Route path="/master" element={<MasterDataView />} />
+          <Route path="/settings" element={<SettingsView />} />
+          <Route path="/help" element={<HelpView />} />
+          <Route path="*" element={<Navigate to="/payroll/monthly" replace />} />
+        </Route>
+      </Routes>
+    </AppGate>
   );
 }
 

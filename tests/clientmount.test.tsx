@@ -110,4 +110,16 @@ describe("client mount + 路由（白屏防護）", () => {
     const div = await mountAt("/");
     expect(div.innerHTML.length).toBeGreaterThan(200);
   });
+
+  it("已設密碼鎖（lock meta 存在）→ 顯示解鎖畫面、不進精靈也不洩資料、不白屏", async () => {
+    // 造一份形狀合法的 lock meta＋密文主資料（不需可解密——本案只驗「鎖定時的畫面」）
+    const fakeEnv = { enc: 1, kdf: "PBKDF2-SHA256", iter: 600000, salt: "c2FsdA==", iv: "aXZpdml2aXZpdg==", data: "ZGF0YQ==" };
+    localStorage.setItem(`${KEY}:lock`, JSON.stringify({ v: 1, salt: "c2FsdA==", iter: 600000, check: fakeEnv, createdAt: "2026-08-08T00:00:00Z" }));
+    localStorage.setItem(KEY, JSON.stringify(fakeEnv));
+    const div = await mountAt("/");
+    expect(div.textContent).toContain("資料已加密鎖定");
+    expect(div.textContent).toContain("清除全部資料重新開始"); // 忘記密碼逃生門
+    expect(div.textContent).not.toContain("歡迎使用薪資管理系統"); // 不因 skipHydration 誤觸精靈
+    expect(div.textContent).not.toContain("本月工作台"); // 不渲染業務畫面
+  });
 });
