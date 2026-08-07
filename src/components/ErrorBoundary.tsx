@@ -30,7 +30,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private clearAndReload = () => {
     try {
-      localStorage.removeItem("taiwan-hr-salary:v1");
+      // 以前綴掃描清除本系統資料鍵：涵蓋 ":v1"、":v1:stage"、":v1:dev" 與未來的 ":v1:lock" 等子鍵；
+      // 刻意保留 "taiwan-hr-salary:theme"（主題不會造成資料毀損，清掉徒增閃屏）。
+      // 前綴字面值與 store 的 STORAGE_KEY 以「慣例」同步——元件庫邊界（tests/uiKit.test.ts）禁止 import @/store。
+      const PREFIX = "taiwan-hr-salary:v1";
+      for (const k of Object.keys(localStorage)) if (k.startsWith(PREFIX)) localStorage.removeItem(k);
     } catch {
       /* ignore */
     }

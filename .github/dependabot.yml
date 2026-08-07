@@ -1,0 +1,16 @@
+# 供應鏈安全（合規08 §2.4）：每週檢查 npm 依賴與 GitHub Actions 的弱點/更新。
+# 與 deploy-pages.yml 的 npm audit gate 互補：audit 擋已知高危、Dependabot 提供修補 PR。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels: ["dependencies"]

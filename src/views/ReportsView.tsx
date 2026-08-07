@@ -17,6 +17,7 @@ import { usePayrollRows, useCompanySupplementary, type PayrollRow } from "@/stor
 import { cn, ntd, pctOf, formatPeriod, foreignMoney } from "@/lib/utils";
 import { downloadEncryptedPayslip } from "@/lib/payslipPdf";
 import { buildPayslipMailto } from "@/lib/payslipEmail";
+import { buildDispatchCsv, type DispatchRow } from "@/lib/payslipDispatch";
 import { computeProjectCost, UNALLOCATED_ID } from "@/lib/reports/projectCost";
 import { FEATURES } from "@/config/features";
 import { PayslipCard } from "@/views/PayslipCard";
@@ -383,7 +384,8 @@ function PayslipReport() {
       ]);
       const root = createRoot(container);
       const zip = new JSZip();
-      const csv = ["員工編號,姓名,Email,檔名,PDF密碼"];
+      // 寄送清單不含密碼或密碼規則（ZIP 未加密，提示同包＝自我抵銷加密；見 lib/payslipDispatch）
+      const dispatchRows: DispatchRow[] = [];
       const skipped: string[] = [];
       let made = 0;
       for (const e of employees) {
@@ -391,7 +393,7 @@ function PayslipReport() {
         if (!row) continue;
         if (!e.nationalId.trim()) {
           skipped.push(e.name);
-          csv.push(`${e.id},${e.name},${e.email},,（缺身分證未產生）`);
+          dispatchRows.push({ id: e.id, name: e.name, email: e.email, fileName: "", note: "缺身分證未產生" });
           continue;
         }
         await new Promise<void>((res) => {
@@ -402,11 +404,11 @@ function PayslipReport() {
         const blob = await payslipPdfBlob(node, e.nationalId.trim());
         const fileName = `${e.name}_${e.id}_薪資明細_${currentPeriod}.pdf`;
         zip.file(fileName, blob);
-        csv.push(`${e.id},${e.name},${e.email},${fileName},身分證字號`);
+        dispatchRows.push({ id: e.id, name: e.name, email: e.email, fileName });
         made += 1;
       }
       root.unmount();
-      zip.file(`寄送清單_${currentPeriod}.csv`, "\uFEFF" + csv.join("\r\n"));
+      zip.file(`寄送清單_${currentPeriod}.csv`, buildDispatchCsv(dispatchRows));
       const out = await zip.generateAsync({ type: "blob" });
       saveBlob(out, `薪資明細_${currentPeriod}.zip`);
       setBatchMsg(

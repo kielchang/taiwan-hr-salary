@@ -73,7 +73,16 @@ const sumComp = (s: SalaryStructure) =>
   s.mealAllowance + s.transportAllowance + s.attendanceBonus + s.otherFixedAllowance;
 
 const pick = <T,>(arr: T[], i: number): T => arr[((i % arr.length) + arr.length) % arr.length];
-const nid = (i: number) => `A${String(100000000 + i * 31)}`.slice(0, 10);
+// 測試身分證產生器（ADR-043 去識別）：Z 開頭、regex 合法（^[A-Z][12]\d{8}$），但末碼取
+// 「合法檢查碼＋5 mod 10」——檢查碼必不合法＝數學上不可能屬於任何真實國民，一眼可辨為測試值。
+const nid = (i: number) => {
+  const digits8 = "2" + String((10000000 + i * 31) % 10000000).padStart(7, "0"); // N1=2＋流水 7 碼
+  const weights = [8, 7, 6, 5, 4, 3, 2, 1];
+  let sum = 3 * 1 + 3 * 9; // 字母 Z＝33 → d1*1＋d2*9
+  for (let k = 0; k < 8; k++) sum += Number(digits8[k]) * weights[k];
+  const validCheck = (10 - (sum % 10)) % 10;
+  return `Z${digits8}${(validCheck + 5) % 10}`;
+};
 const cur = (id: string, over: Partial<Omit<MonthlyEvent, "employeeId" | "period">>): MonthlyEvent =>
   ({ ...evt(id, over), period: DEMO_PERIOD });
 
@@ -123,7 +132,7 @@ function add(
 function addPinned(b: Built) {
   const base: Omit<Employee, "id" | "name" | "department" | "title" | "costCenter"> = {
     hireDate: "2019-03-01", project: "", taxResidency: "居住者", withholdingMethod: "依扣繳稅額表",
-    exemptionFormReceivedDate: "2026-01-10", voluntaryPensionRate: 0, nationalId: "A100000000",
+    exemptionFormReceivedDate: "2026-01-10", voluntaryPensionRate: 0, nationalId: "Z290000000",
     email: "demo@example.com", status: "在職",
   };
   const E = (id: string, name: string, dept: string, title: string, cc: string, over: Partial<Employee> = {}): Employee =>

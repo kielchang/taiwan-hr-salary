@@ -49,6 +49,11 @@ jobs:
         with: { node-version: 20, cache: npm }
       - run: npm ci
 
+      # 供應鏈弱點掃描（合規08 §2.4）：high 以上即失敗。main 阻擋部署；stage/dev 僅警示不擋（求快）。
+      - name: npm audit（供應鏈弱點掃描）
+        run: npm audit --audit-level=high
+        continue-on-error: ${{ github.ref_name != 'main' }}
+
       # 僅正式站（main）跑驗收測試把關；預覽環境求快，build 過即可。
       - name: Run acceptance tests (README §9)
         if: github.ref_name == 'main'
