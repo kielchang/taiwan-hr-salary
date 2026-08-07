@@ -38,13 +38,16 @@ export function segmentRatio(seg: LeaveSegment, policy: LeavePolicy): number {
   return seg.paidRatio ?? policy[seg.status];
 }
 
-/** 逐日走訪當月每一天，callback 回傳該日「給薪權重」，回傳權重總和／當月天數。 */
+/** 逐日走訪當月每一天，callback 回傳該日「給薪權重」，回傳權重總和／當月天數。
+ *  每日時間戳一律用 UTC 午夜（Date.UTC）：呼叫端的 hireDate/離職日/請假段皆為 "YYYY-MM-DD"
+ *  字串、`new Date(...)` 解析為 UTC 午夜——兩側同基準才時區無關。若這裡用本地午夜，
+ *  在 UTC+N 時區本地午夜早於 UTC 午夜，邊界日會被多算/少算一天（台灣 UTC+8 實測少一天）。 */
 function dailyFactor(period: string, weight: (dayTs: number) => number): number {
   const [y, m] = period.split("-").map(Number);
   if (!y || !m) return 1;
   const total = new Date(y, m, 0).getDate();
   let sum = 0;
-  for (let d = 1; d <= total; d++) sum += weight(new Date(y, m - 1, d).getTime());
+  for (let d = 1; d <= total; d++) sum += weight(Date.UTC(y, m - 1, d));
   return Math.max(0, Math.min(1, sum / total));
 }
 
