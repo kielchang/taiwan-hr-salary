@@ -1,8 +1,12 @@
 <!doctype html>
 <html lang="zh-Hant">
   <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; script-src &#39;self&#39; &#39;sha256-rPZgiZmzJhTc3CwV0ciWuKBf9K3PnfVFmGsLpzBwbtc=&#39;; style-src &#39;self&#39; &#39;unsafe-inline&#39;; img-src &#39;self&#39; data: blob:; connect-src &#39;self&#39;; font-src &#39;self&#39; data:; object-src &#39;none&#39;; base-uri &#39;self&#39;; form-action &#39;none&#39;; frame-src &#39;self&#39;">
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 隱私：不對任何外站送出 referrer（CSP meta 由 vite build 注入，見 vite.config.ts cspPlugin） -->
+    <meta name="referrer" content="no-referrer" />
     <title>台灣合規薪資計算系統（115 年）</title>
     <!-- 深色模式防閃爍：首次繪製前先套用 .dark（鍵與 src/lib/theme.ts 一致、不隨環境加後綴）。 -->
     <script>
@@ -14,8 +18,8 @@
         } catch (e) {}
       })();
     </script>
-    <script type="module" crossorigin src="./assets/index-D6WAUf7M.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-8Um4J_Wn.css">
+    <script type="module" crossorigin src="./assets/index-BZI3eN5D.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CrWTUzhV.css">
   </head>
   <body>
     <div id="root"></div>
