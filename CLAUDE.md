@@ -81,6 +81,14 @@ storage undefined 時先想到這裡，不要改測試本身。
     畫面（views）只負責「組裝」已在 Storybook 驗證過的元件，不在 view 裡各自長出新互動。否則元件庫與介面會脫鉤、Storybook 失去意義。
     ⇒ 改/加元件的 SOP：①改 `src/components/*` 元件＋更新該元件 `*.stories.tsx`（涵蓋新狀態）→ ②`build-storybook` 綠、於 Storybook 確認 →
     ③bump `UI_KIT`＋補 `docs/ui-kit/CHANGELOG.md` → ④views 才改用。純 view 內容（非共用元件的互動）不受此限。
+11. **資安層不變量（1.12，ADR-040/041/043，合規文件＝docs/compliance/）**：
+    ①`lib/security/` 純函數層不 import store/UI；加密 storage adapter「未設密碼＝同步明文 passthrough」**必須維持逐位元零回歸**
+    （動 persist 前先跑 clientmount）；已設密碼走 skipHydration＋AppGate 解鎖後 rehydrate，**鎖定中禁止覆寫密文**（雙守衛勿拆）。
+    ②稽核＝tamper-evident 雜湊鏈：pushAudit 簽章不變、內部封鏈；clearAuditLog 一律留 tombstone（**不要**改回一鍵清空）；
+    UI/文件措辭不得宣稱「防竄改」。③示範資料身分證＝Z 段檢查碼不合法測試值（tests/deidentification.test.ts 守衛，勿塞回擬真值；
+    V7 若未來加檢查碼驗證需為 Z 段開豁免）。④密碼提示/規則不得寫入任何匯出載體（ZIP 清單/mailto 內文）。
+    ⑤storage key 前綴 `taiwan-hr-salary:v1` 被 ErrorBoundary/AppGate 以字面值引用（uiKit 邊界禁 import store），改前綴要三處同步。
+    ⑥CSP 由 vite build 注入（dev 不注入保 HMR）；index.html 新增 inline script 會自動進 sha256 白名單，但先想清楚是否必要。
 
 ## 架構地圖
 
@@ -95,7 +103,11 @@ src/
 ├── store/usePayrollStore.ts  zustand persist；硬鎖定守衛、稽核、scheduledRaises、刪除連鎖；leavePolicy/salaryDefaults 也在這
 ├── store/selectors.ts buildPayrollRows(計薪前注入當期生效「區間補貼」：計入投保→臨時 customAllowance 併月薪資總額、
 │                       不計投保→加 event.otherAddition；不改計算核心簽章，TC-9 不變)/isActiveInPeriod/ytdBonusBefore
-├── data/seed.ts       TC-9 8 人 fixture（勿動）＋buildDemoData（歷史回填）＋salary/dep/evt/addMonths 工廠
+├── lib/security/      資安純函數層（1.12）：crypto(AES-256-GCM+PBKDF2 600k)/lockMeta(:lock 鍵)/encryptedStorage
+│                       (StateStorage adapter＋unlock/enable/disable/changePassword＋鎖定守衛)/backupCrypto(.enc.json)/
+│                       sha256(同步純JS)/auditChain(sealEntry/verifyAuditChain，tamper-evident)——見鐵律 11
+├── components/security/ AppGate(解鎖閘門，包在 App.tsx 最外層)＋LockScreen（app glue 不入 barrel）
+├── data/seed.ts       TC-9 8 人 fixture（勿動；nationalId＝Z 段去識別測試值，ADR-043）＋buildDemoData（歷史回填）＋salary/dep/evt/addMonths 工廠
 ├── data/demoCompany.ts 62 人示範公司（開箱預設；含離職/留停/停職半薪/復職邊界/多月快照/確認/稽核/申報基準）
 ├── components/ui/     DataTable/ChartCard/Delta/EmptyState/table(zebra/sticky/SortHead)/…
 ├── components/charts/ 零相依 SVG 圖表（StackedBar/Pareto/Heatmap 含圖例/TrendChart/Bullet…）
@@ -109,8 +121,9 @@ src/
     ├── ProjectsView   專案之家（主檔+工時分攤+成本/EAC）
     └── MasterDataView(情境化申請單：員工清單/批次薪資/異動紀錄三分頁＋員工檔案面板挑情境→聚焦表單＋原因→applyChangeTicket；
         批次薪資＝BatchSalaryPanel 族群選擇→調整既有%/定額·新增津貼·區間補貼→預覽→即時套用/排程)/AttendanceView/
-        SettingsView(公司分頁含 年資計算方式〔seniorityBasis：fixedDate 固定基準日／hireDate 依到職日算至當月，僅影響年資/特休顯示、TC-9 不變〕＋LeavePolicyCard＋SalaryDefaultsCard 新進預設)/
-        SetupWizard(五步：歡迎/公司設定/薪資結構預設〔伙食津貼預帶 3000→salaryDefaults，空白模式快速新增即帶入〕/員工資料/完成)/HelpView/SourcesView
+        SettingsView(公司分頁含 年資計算方式〔seniorityBasis：fixedDate 固定基準日／hireDate 依到職日算至當月，僅影響年資/特休顯示、TC-9 不變〕＋LeavePolicyCard＋SalaryDefaultsCard 新進預設；
+        1.12 新增「安全與隱私」分頁＝PasswordLockCard＋AuditIntegrityCard＋DataErasureCard＋隱私說明；備份卡含加密匯出/匯入)/
+        SetupWizard(六步：歡迎/隱私與資料保護〔勾選才放行〕/公司設定/薪資結構預設〔伙食津貼預帶 3000→salaryDefaults〕/員工資料/完成)/HelpView/SourcesView
 ```
 
 **員工生命週期**（使用者拍板）：`EmployeeStatus` 5 種＝在職/離職/留停/停職/暫離。
@@ -174,6 +187,11 @@ gating 點：App 側邊欄+路由（隱藏時 `*` fallback 導回 `/payroll/mont
 - **停保/復保為提醒性質**：名冊列出加退保/停保/復保供人工辦理，系統**不自動改保費**（健保續保自費等依公司規定）。
 - 出勤→加班「自動分級回填」（目前僅顯示參考工時，使用者要求不自動回填 — 若要做需先確認規則）。
 - 投保級距主檔改「可編輯」（現為刻意唯讀檢視＝設定頁明示文案；要做需使用者確認年度更新流程與稽核）。
+- **資安 P1（1.13.0，見 docs/compliance/合規08 §3）**：保存期限管理（勞基法 5 年＋到期提醒＋人工清理，ADR-042）、
+  資料主體權利工具（單員全量匯出／抹除＋稽核假名化保鏈）、ipify 同意閘（attendance 啟用前必做）、
+  閒置自動上鎖、PDF/ZIP 密碼策略升級（@zip.js AES-256）、敏感欄位（note/病假）書寫規範提示。
+- **資安 P2（1.14.0）**：docs/compliance/templates 四範本（隱私政策/事故應變/DPIA/教育訓練）＋合規01 主報告定稿複審。
+- **PMIS features 補登**：features 資料表伺服端故障（2026-08-08），13 筆清單見合規08 §6 與 CLAUDE.local.md「待補登」。
 
 ## 改動驗證清單（每批必跑）
 
